@@ -1,5 +1,7 @@
 import {
+  AttributeInput,
   CreateInput,
+  gateForAttribute,
   gateForLink,
   gateForPriority,
   gateForStatus,
@@ -27,7 +29,12 @@ export interface WriteToolDefinition {
   readonly name: string;
   readonly title: string;
   readonly description: string;
-  readonly inputSchema: typeof CreateInput | typeof UpdateInput | typeof SetStatusInput | typeof LinkInput;
+  readonly inputSchema:
+    | typeof CreateInput
+    | typeof UpdateInput
+    | typeof SetStatusInput
+    | typeof LinkInput
+    | typeof AttributeInput;
   /** Whether this call needs asking about first, decided from the arguments and current state. */
   gate(client: ForemanClient, input: unknown): Promise<GateDecision>;
   run(client: ForemanClient, input: unknown): Promise<unknown>;
@@ -142,6 +149,24 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
     run: async (client, input) => {
       const args = LinkInput.parse(input);
       return client.post('/api/links', args);
+    },
+  },
+  {
+    name: 'foreman_attribute',
+    title: 'Attribute a commit',
+    description:
+      'Say which task a commit was work on. This is the strongest signal — the other two guess ' +
+      'from the message or the files — so a declaration is recorded as confirmed.',
+    inputSchema: AttributeInput,
+    gate: (_client, input) => Promise.resolve(gateForAttribute(AttributeInput.parse(input).remove)),
+    run: async (client, input) => {
+      const args = AttributeInput.parse(input);
+      const project = projectOf(args.task);
+      const action = args.remove ? 'reject' : 'confirm';
+      return client.post(
+        `/api/projects/${project}/attributions/${args.sha}/${action}`,
+        { task: args.task, ...(args.remove ? {} : { declared: true }) },
+      );
     },
   },
 ];

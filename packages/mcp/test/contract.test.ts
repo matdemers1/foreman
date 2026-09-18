@@ -1,4 +1,5 @@
 import {
+  AttributeInput,
   BriefInput,
   CACHE,
   CoverageInput,
@@ -310,6 +311,56 @@ describe('the gate in front of the write tools (T-2.9, FRM-REQ-090, FRM-REQ-091)
     const setStatus = WRITE_TOOLS.find((t) => t.name === 'foreman_set_status');
     const decision = await setStatus?.gate({ get } as never, { id: 'BND-T-0.3', status: 'in_progress' });
     expect(decision?.gated).toBe(false);
+  });
+});
+
+describe('foreman_attribute (T-5.9, FRM-REQ-109)', () => {
+  const tool = WRITE_TOOLS.find((t) => t.name === 'foreman_attribute');
+
+  it('exists, and takes a short SHA', () => {
+    expect(tool).toBeDefined();
+    expect(AttributeInput.parse({ sha: 'a1b2c3d', task: 'BND-T-13.9' }).sha).toBe('a1b2c3d');
+  });
+
+  it('refuses something that is not a SHA', () => {
+    for (const sha of ['', 'zzzz', 'abc', 'not a sha']) {
+      expect(AttributeInput.safeParse({ sha, task: 'BND-T-13.9' }).success, sha).toBe(false);
+    }
+  });
+
+  it('is not gated when asserting, because that is the motion of working', async () => {
+    // Signal 1 arriving with a confirmation prompt in front of it is signal 1 nobody uses.
+    const decision = await tool?.gate({} as never, { sha: 'a1b2c3d', task: 'BND-T-13.9' });
+    expect(decision?.gated).toBe(false);
+  });
+
+  it('is gated when withdrawing, because that removes a recorded fact', async () => {
+    const decision = await tool?.gate({} as never, {
+      sha: 'a1b2c3d',
+      task: 'BND-T-13.9',
+      remove: true,
+    });
+    expect(decision?.gated).toBe(true);
+    expect(decision?.because).toContain('Coverage');
+  });
+
+  it('confirms as declared, so the source is not whatever a guess had proposed', async () => {
+    const post = vi.fn().mockResolvedValue({ confirmed: true });
+    await tool?.run({ post } as never, { sha: 'a1b2c3d', task: 'BND-T-13.9' });
+
+    expect(post).toHaveBeenCalledWith('/api/projects/BND/attributions/a1b2c3d/confirm', {
+      task: 'BND-T-13.9',
+      declared: true,
+    });
+  });
+
+  it('withdraws by rejecting, which is remembered rather than forgotten', async () => {
+    const post = vi.fn().mockResolvedValue({ confirmed: false });
+    await tool?.run({ post } as never, { sha: 'a1b2c3d', task: 'BND-T-13.9', remove: true });
+
+    expect(post).toHaveBeenCalledWith('/api/projects/BND/attributions/a1b2c3d/reject', {
+      task: 'BND-T-13.9',
+    });
   });
 });
 

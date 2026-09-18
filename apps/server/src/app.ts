@@ -86,7 +86,8 @@ export function createApp({ config, db, oidc = null, registry }: AppDeps): Expre
   app.set('trust proxy', 1);
   // Before `express.json`, and with its own raw parser: the HMAC is over the exact bytes GitHub
   // sent, and a re-serialised object is not those bytes.
-  app.use('/webhooks', webhookRoutes({ db, config, registry: registry ?? buildRegistry({ config }) }));
+  const jobs = registry ?? buildRegistry({ config });
+  app.use('/webhooks', webhookRoutes({ db, config, registry: jobs }));
   app.use(express.json({ limit: '2mb' }));
   app.use(attachAuth({ db, config }));
   mount(app, '/auth', authRoutes({ db, config, oidcAvailable: oidc !== null }));
@@ -99,7 +100,7 @@ export function createApp({ config, db, oidc = null, registry }: AppDeps): Expre
   mount(app, '/api/links', linkRoutes(db));
   mount(app, '/api/projects', coverageRoutes(db));
   mount(app, '/api/projects', recordRoutes(db));
-  mount(app, '/api/projects', realityRoutes(db));
+  mount(app, '/api/projects', realityRoutes(db, jobs));
 
   /** Liveness: the process is up. Deliberately touches nothing else. */
   app.get('/healthz', (_req, res) => {

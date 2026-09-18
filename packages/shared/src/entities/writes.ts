@@ -56,6 +56,24 @@ export const LinkInput = z.object({
 });
 export type LinkInput = z.infer<typeof LinkInput>;
 
+/**
+ * `foreman_attribute` — Claude saying what a commit was for (T-5.9, FRM-REQ-109).
+ *
+ * This is **signal 1**, and the only one that is not an inference. Foreman's other two signals read
+ * a commit message or a file list and guess; this is the one party that was actually there saying
+ * what it did. So a declaration arrives confirmed, where a proposal does not.
+ */
+export const AttributeInput = z.object({
+  /** The commit. A short SHA is fine — that is what anybody has to hand. */
+  sha: z
+    .string()
+    .regex(/^[0-9a-f]{7,40}$/i, 'a commit SHA, seven characters or more'),
+  task: HumanId.describe('The task this commit was work on, e.g. BND-T-13.9'),
+  /** Withdraw an attribution instead of asserting one. Gated: it removes a recorded fact. */
+  remove: z.boolean().default(false),
+});
+export type AttributeInput = z.infer<typeof AttributeInput>;
+
 // ─── The gate ──────────────────────────────────────────────────────────────
 
 /**
@@ -142,3 +160,21 @@ export const GATED_OPERATIONS = [
   'priority:W',
   'link:remove',
 ] as const;
+
+/**
+ * Withdrawing an attribution is asked about; asserting one is not.
+ *
+ * Declaring what a commit was for is forward progress — the motion of working, and gating it is
+ * how a confirmation stops being read. Withdrawing one removes something a person may have relied
+ * on when they looked at coverage.
+ */
+export function gateForAttribute(remove: boolean): GateDecision {
+  return remove
+    ? {
+        gated: true,
+        because:
+          'Withdrawing an attribution removes a recorded link between a commit and the work it ' +
+          'was for. Coverage and release notes read that link.',
+      }
+    : { gated: false };
+}
