@@ -226,4 +226,61 @@ describe.skipIf(url === undefined)('portfolio and search', () => {
       expect((await fetch(`${origin}/api/portfolio`)).status).toBe(401);
     });
   });
+
+  describe('get by human ID', () => {
+    it('resolves a requirement, with what cites it', async () => {
+      const requirement = await db.requirement.findFirstOrThrow({
+        where: { humanId: 'PFA-REQ-001' },
+      });
+      const task = await db.task.findFirstOrThrow({ where: { humanId: 'PFA-T-2.2' } });
+      await db.reference.upsert({
+        where: {
+          fromType_fromId_toType_toId_kind: {
+            fromType: 'task',
+            fromId: task.id,
+            toType: 'requirement',
+            toId: requirement.id,
+            kind: 'satisfies',
+          },
+        },
+        create: {
+          fromType: 'task',
+          fromId: task.id,
+          toType: 'requirement',
+          toId: requirement.id,
+          kind: 'satisfies',
+          citedAs: 'PFA-REQ-001',
+        },
+        update: {},
+      });
+
+      const result = await get<{
+        type: string;
+        projectCode: string;
+        backlinks: { humanId: string; kind: string }[];
+      }>('/entities/PFA-REQ-001');
+
+      expect(result.type).toBe('requirement');
+      expect(result.projectCode).toBe('PFA');
+      expect(result.backlinks[0]?.humanId).toBe('PFA-T-2.2');
+      expect(result.backlinks[0]?.kind).toBe('satisfies');
+    });
+
+    it('says why an unprefixed ID cannot resolve, rather than just "not found"', async () => {
+      const res = await fetch(`${origin}/api/entities/REQ-001`, { headers: { cookie } });
+      expect(res.status).toBe(404);
+      // The ADR-008 argument, delivered where it is useful.
+      expect(((await res.json()) as { error: string }).error).toContain('project-prefixed');
+    });
+
+    it('404s an ID that is well-formed but names nothing', async () => {
+      const res = await fetch(`${origin}/api/entities/PFA-REQ-999`, { headers: { cookie } });
+      expect(res.status).toBe(404);
+    });
+
+    it('omits backlinks when they are not asked for', async () => {
+      const result = await get<{ backlinks: unknown[] }>('/entities/PFA-REQ-001?backlinks=false');
+      expect(result.backlinks).toEqual([]);
+    });
+  });
 });

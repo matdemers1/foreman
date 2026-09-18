@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../auth/middleware.js';
 import type { Db } from '../db.js';
+import { getByHumanId } from '../domain/entities.js';
 import { portfolio } from '../domain/portfolio.js';
 import { SEARCHABLE, search } from '../domain/search.js';
-import { handler, parseQuery } from './helpers.js';
+import { handler, param, parseQuery } from './helpers.js';
 
 /**
  * Cross-project reads: the portfolio, and typed search.
@@ -52,6 +53,14 @@ export function searchRoutes(db: Db): Router {
     handler(async (_req, res) => {
       const rows = await portfolio(db);
       res.json({ items: rows, nextCursor: null, total: rows.length });
+    }),
+  );
+
+  router.get(
+    '/entities/:humanId',
+    handler(async (req, res) => {
+      const backlinks = req.query['backlinks'] !== 'false';
+      res.json(await getByHumanId(db, param(req, 'humanId'), { backlinks }));
     }),
   );
 
