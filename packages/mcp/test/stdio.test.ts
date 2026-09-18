@@ -1,6 +1,7 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * The binary itself (ADR-003).
@@ -12,6 +13,8 @@ import { describe, expect, it } from 'vitest';
 
 const ENTRY = fileURLToPath(new URL('../src/index.ts', import.meta.url));
 const PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
+const SHARED_DIST = fileURLToPath(new URL('../../shared/dist/index.js', import.meta.url));
 
 interface RunOptions {
   readonly input?: string;
@@ -63,6 +66,18 @@ function run(
 }
 
 describe('the stdio entry point', () => {
+  beforeAll(() => {
+    // A subprocess does not get vitest's aliases: it resolves `@foreman/shared` through the
+    // package's own exports, which point at `dist`. Every other test in this repo runs in-process
+    // and never needs it built, so on a clean checkout it is not there.
+    if (existsSync(SHARED_DIST)) return;
+    const built = spawnSync('pnpm', ['--filter', '@foreman/shared', 'build'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    });
+    expect(built.status, `could not build @foreman/shared: ${built.stderr}`).toBe(0);
+  }, 120_000);
+
   it('refuses to start with no configuration, and names both variables', async () => {
     const result = await run({}, { unset: true });
 
