@@ -63,6 +63,12 @@ importers:
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.0
       tsx:
         specifier: ^4.23.13
         version: 4.23.13
@@ -141,7 +147,7 @@ packages:
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
 
   '@d3cloud/ui@https://github.com/matdemers1/d3-design-system/releases/download/v1.1.0/d3cloud-ui-1.1.0.tgz':
-    resolution: {tarball: https://github.com/matdemers1/d3-design-system/releases/download/v1.1.0/d3cloud-ui-1.1.0.tgz}
+    resolution: {integrity: sha512-BstfVZqV8Otvm57sOo6TJXWiuF+BxGgLeh/el5Xrk7eb3Ng1Nc72DZzaUDdc0FKm4rIvc8EQn0Awk3WfxYXx0g==, tarball: https://github.com/matdemers1/d3-design-system/releases/download/v1.1.0/d3cloud-ui-1.1.0.tgz}
     version: 1.1.0
     engines: {node: '>=20.0.0'}
     hasBin: true

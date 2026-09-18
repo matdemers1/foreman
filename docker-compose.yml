@@ -22,11 +22,18 @@ services:
       dockerfile: apps/server/Dockerfile
     restart: unless-stopped
     env_file: .env
+    environment:
+      # Set here, not in .env: inside the network the database is `postgres:5432`, and /backups is
+      # the only writable path in the image. A developer's .env points at the host instead.
+      DATABASE_URL: postgresql://foreman:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/foreman
+      BACKUP_DIR: /backups
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - backups:/backups
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3200/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "dist/healthcheck.js"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -37,9 +44,14 @@ services:
       dockerfile: apps/worker/Dockerfile
     restart: unless-stopped
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://foreman:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/foreman
+      BACKUP_DIR: /backups
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - backups:/backups
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/worker-heartbeat && find /tmp/worker-heartbeat -mmin -2 | grep -q ."]
       interval: 60s
@@ -48,3 +60,4 @@ services:
 
 volumes:
   pgdata:
+  backups:
