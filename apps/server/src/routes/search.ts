@@ -1,0 +1,59 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { requireAuth } from '../auth/middleware.js';
+import type { Db } from '../db.js';
+import { portfolio } from '../domain/portfolio.js';
+import { SEARCHABLE, search } from '../domain/search.js';
+import { handler, parseQuery } from './helpers.js';
+
+/**
+ * Cross-project reads: the portfolio, and typed search.
+ *
+ * These are the two that answer "where is everything" and "where is that thing I remember" — the
+ * questions the vault could only answer by opening files.
+ */
+
+const SearchQuery = z.object({
+  q: z.string().min(1).max(200),
+  /** Comma-separated, so a client can narrow without a repeated parameter. */
+  types: z.string().optional(),
+  project: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+});
+
+export function searchRoutes(db: Db): Router {
+  const router = Router();
+  router.use(requireAuth);
+
+  router.get(
+    '/search',
+    handler(async (req, res) => {
+      const query = parseQuery(SearchQuery, req, res);
+      if (query === null) return;
+
+      const requested = query.types
+        ?.split(',')
+        .map((t) => t.trim())
+        .filter((t): t is (typeof SEARCHABLE)[number] =>
+          (SEARCHABLE as readonly string[]).includes(t),
+        );
+
+      const hits = await search(db, query.q, {
+        ...(requested !== undefined && requested.length > 0 ? { types: requested } : {}),
+        ...(query.project === undefined ? {} : { projectCode: query.project }),
+        limit: query.limit,
+      });
+      res.json({ items: hits, nextCursor: null, total: hits.length });
+    }),
+  );
+
+  router.get(
+    '/portfolio',
+    handler(async (_req, res) => {
+      const rows = await portfolio(db);
+      res.json({ items: rows, nextCursor: null, total: rows.length });
+    }),
+  );
+
+  return router;
+}

@@ -15,6 +15,8 @@ import { attachAuth } from './auth/middleware.js';
 import { authRoutes } from './routes/auth.js';
 import { oidcRoutes } from './routes/oidc.js';
 import { projectRoutes } from './routes/projects.js';
+import { briefRoutes } from './routes/brief.js';
+import { searchRoutes } from './routes/search.js';
 import type { OidcClient } from './auth/oidc.js';
 
 export interface AppDeps {
@@ -42,6 +44,8 @@ export function createApp({ config, db, oidc = null }: AppDeps): Express {
   app.use('/auth', authRoutes({ db, config, oidcAvailable: oidc !== null }));
   app.use('/auth/oidc', oidcRoutes({ db, config, client: oidc }));
   app.use('/api/projects', projectRoutes(db));
+  app.use('/api/brief', briefRoutes(db));
+  app.use('/api', searchRoutes(db));
 
   /** Liveness: the process is up. Deliberately touches nothing else. */
   app.get('/healthz', (_req, res) => {
