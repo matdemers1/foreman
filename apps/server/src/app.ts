@@ -6,6 +6,7 @@ import express, {
   type NextFunction,
   type Request,
   type Response,
+  type Router,
 } from 'express';
 import type { Config } from './config.js';
 import type { Db } from './db.js';
@@ -17,7 +18,42 @@ import { oidcRoutes } from './routes/oidc.js';
 import { projectRoutes } from './routes/projects.js';
 import { briefRoutes } from './routes/brief.js';
 import { searchRoutes } from './routes/search.js';
+import { undoRoutes } from './routes/undo.js';
 import type { OidcClient } from './auth/oidc.js';
+
+export interface MountedRoute {
+  readonly method: string;
+  readonly path: string;
+}
+
+/**
+ * Every route the app mounts, recorded as it is mounted.
+ *
+ * Express 5 does not expose a router's mount path statically — it is compiled into a matcher — so
+ * reconstructing the surface by introspection means parsing regexps. Declaring it here instead is
+ * both simpler and more honest: the app states what it serves, and the route-enumeration tests
+ * check that every one of them behaves (T-2.1, T-2.11).
+ */
+export function mountedRoutes(app: Express): readonly MountedRoute[] {
+  return (app as Express & { locals: { foremanRoutes?: MountedRoute[] } }).locals.foremanRoutes ?? [];
+}
+
+function mount(app: Express, prefix: string, router: Router): void {
+  app.use(prefix, router);
+
+  const routes = ((app.locals as { foremanRoutes?: MountedRoute[] }).foremanRoutes ??= []);
+  const stack = (router as unknown as { stack: { route?: { path: string; methods: Record<string, boolean> } }[] })
+    .stack;
+
+  for (const layer of stack) {
+    if (layer.route === undefined) continue;
+    for (const [method, enabled] of Object.entries(layer.route.methods)) {
+      if (!enabled) continue;
+      const path = `${prefix}${layer.route.path}`.replace(/\/{2,}/g, '/').replace(/(.)\/$/, '$1');
+      routes.push({ method: method.toUpperCase(), path });
+    }
+  }
+}
 
 export interface AppDeps {
   readonly config: Config;
@@ -41,11 +77,12 @@ export function createApp({ config, db, oidc = null }: AppDeps): Express {
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '2mb' }));
   app.use(attachAuth({ db, config }));
-  app.use('/auth', authRoutes({ db, config, oidcAvailable: oidc !== null }));
-  app.use('/auth/oidc', oidcRoutes({ db, config, client: oidc }));
-  app.use('/api/projects', projectRoutes(db));
-  app.use('/api/brief', briefRoutes(db));
-  app.use('/api', searchRoutes(db));
+  mount(app, '/auth', authRoutes({ db, config, oidcAvailable: oidc !== null }));
+  mount(app, '/auth/oidc', oidcRoutes({ db, config, client: oidc }));
+  mount(app, '/api/projects', projectRoutes(db));
+  mount(app, '/api/brief', briefRoutes(db));
+  mount(app, '/api', searchRoutes(db));
+  mount(app, '/api/undo', undoRoutes(db));
 
   /** Liveness: the process is up. Deliberately touches nothing else. */
   app.get('/healthz', (_req, res) => {

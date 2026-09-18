@@ -11,6 +11,7 @@ import {
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Db } from '../db.js';
+import { softDelete } from '../domain/undo.js';
 import {
   createPhase,
   createProject,
@@ -248,6 +249,30 @@ export function projectRoutes(db: Db): Router {
       const body = parseBody(TaskUpdate, req, res);
       if (body === null) return;
       res.json(await updateTask(db, actorOf(req), param(req, 'humanId'), body));
+    }),
+  );
+
+  router.delete(
+    '/:code/requirements/:humanId',
+    handler(async (req, res) => {
+      await softDelete(db, actorOf(req), 'requirement', param(req, 'humanId'));
+      res.status(204).end();
+    }),
+  );
+
+  router.delete(
+    '/:code/tasks/:humanId',
+    handler(async (req, res) => {
+      await softDelete(db, actorOf(req), 'task', param(req, 'humanId'));
+      res.status(204).end();
+    }),
+  );
+
+  router.delete(
+    '/:code/phases/:humanId',
+    handler(async (req, res) => {
+      await softDelete(db, actorOf(req), 'phase', param(req, 'humanId'));
+      res.status(204).end();
     }),
   );
 
