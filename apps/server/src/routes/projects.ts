@@ -45,6 +45,26 @@ import {
  * the day it is asked about the real corpus.
  */
 
+/**
+ * S-13's four filters, as the server reads them.
+ *
+ * Exported so it can be tested without a database: it is where a query-string bug hides, and this
+ * one had one. `z.coerce.boolean()` reads the string `'false'` as **true** — every non-empty string
+ * is truthy — so `?uncovered=false` filtered to exactly the rows it asked to exclude. An enum
+ * cannot do that, and refuses anything that is neither.
+ */
+export const RequirementQuery = PageQuery.extend({
+  priority: z.enum(['M', 'S', 'C', 'W']).optional(),
+  /** A phase ID, or `none` for the backlog — a requirement with no phase at all (T-3.1). */
+  phase: z.string().optional(),
+  /** Requirements no task covers — the coverage hole, which is the point of the register. */
+  uncovered: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
+  earsLint: z.enum(['ok', 'warned']).optional(),
+});
+
 export function projectRoutes(db: Db): Router {
   const router = Router();
   router.use(requireAuth);
@@ -158,23 +178,6 @@ export function projectRoutes(db: Db): Router {
   );
 
   // ─── Requirements ────────────────────────────────────────────────────────
-
-  const RequirementQuery = PageQuery.extend({
-    priority: z.enum(['M', 'S', 'C', 'W']).optional(),
-    /** A phase ID, or `none` for the backlog — a requirement with no phase at all (T-3.1). */
-    phase: z.string().optional(),
-    /**
-     * Requirements no task covers — the coverage hole, which is the point of the register.
-     *
-     * Spelled as an enum rather than `z.coerce.boolean()`: coercion reads the string `'false'` as
-     * true, so `?uncovered=false` would have filtered to exactly what it asked to exclude.
-     */
-    uncovered: z
-      .enum(['true', 'false'])
-      .optional()
-      .transform((value) => (value === undefined ? undefined : value === 'true')),
-    earsLint: z.enum(['ok', 'warned']).optional(),
-  });
 
   router.get(
     '/:code/requirements',
