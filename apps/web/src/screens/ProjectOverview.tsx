@@ -95,6 +95,13 @@ export function ProjectOverview({ code }: { code: string }) {
         }
       />
 
+      <nav className="fm-sections" aria-label="Sections of this project">
+        <Link href={`/projects/${code}/phases`}>Phases</Link>
+        <Link href={`/projects/${code}/requirements`}>Requirements</Link>
+        <Link href={`/projects/${code}/scope-of-work`}>Scope of work</Link>
+        <Link href={`/projects/${code}/register`}>Register</Link>
+      </nav>
+
       <Grid minItemWidth="md">
         <Card>
           <CardTitle>In flight</CardTitle>
@@ -131,7 +138,15 @@ export function ProjectOverview({ code }: { code: string }) {
               <Ci ci={brief.ci} />
             </DescriptionItem>
             <DescriptionItem term="Uncovered requirements" numeric>
-              {brief.drift.uncoveredRequirements === 0 ? 'none' : brief.drift.uncoveredRequirements}
+              {brief.drift.uncoveredRequirements === 0 ? (
+                'none'
+              ) : (
+                // A count somebody has to go looking for is a count nobody acts on: the number
+                // is the link, and it lands on exactly those rows.
+                <Link href={`/projects/${code}/requirements?uncovered=true`}>
+                  {brief.drift.uncoveredRequirements}
+                </Link>
+              )}
             </DescriptionItem>
             {/* Named for what they are: proposals, not progress. */}
             <DescriptionItem term="Attributions to review" numeric>

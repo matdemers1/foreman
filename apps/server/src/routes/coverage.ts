@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import type { Db } from '../db.js';
 import { coverageFor, exitGate, traceabilityMatrix } from '../domain/coverage.js';
+import { scopeOfWork } from '../domain/views.js';
 import { handler, param } from './helpers.js';
 
 /**
@@ -34,6 +35,15 @@ export function coverageRoutes(db: Db): Router {
     '/:code/phases/:humanId/gate',
     handler(async (req, res) => {
       res.json(await exitGate(db, param(req, 'humanId')));
+    }),
+  );
+
+  // ADR-006: the Scope of Work is a query, not a document. There is no `scope_of_work` kind to
+  // author, so there is nothing here that could disagree with the phases and tasks themselves.
+  router.get(
+    '/:code/scope-of-work',
+    handler(async (req, res) => {
+      res.json(await scopeOfWork(db, param(req, 'code')));
     }),
   );
 

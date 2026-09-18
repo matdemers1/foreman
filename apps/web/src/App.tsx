@@ -14,12 +14,16 @@ import {
 } from '@d3cloud/ui';
 import { FolderKanban, Home as HomeIcon, ListChecks, Search } from 'lucide-react';
 import { fetchSession, logout, type SessionState } from './lib/api';
-import { routeFor, usePath } from './lib/router';
+import { routeFor, useLocation } from './lib/router';
 import { Login } from './screens/Login';
 import { PhaseDetail } from './screens/PhaseDetail';
 import { Phases } from './screens/Phases';
 import { Portfolio } from './screens/Portfolio';
 import { ProjectOverview } from './screens/ProjectOverview';
+import { RequirementDetail } from './screens/RequirementDetail';
+import { Requirements } from './screens/Requirements';
+import { RegisterView } from './screens/RegisterView';
+import { ScopeOfWorkView } from './screens/ScopeOfWorkView';
 import { TaskDetail } from './screens/TaskDetail';
 
 /**
@@ -37,7 +41,7 @@ type State =
 
 export function App() {
   const [state, setState] = useState<State>({ status: 'loading' });
-  const path = usePath();
+  const { path, search } = useLocation();
 
   const load = useCallback(() => {
     void fetchSession()
@@ -118,14 +122,14 @@ export function App() {
           </AccountMenu>
         }
       >
-        <Screen path={path} />
+        <Screen path={path} search={search} />
       </AppShell>
     </ThemeProvider>
   );
 }
 
-/** One screen, chosen by the path. */
-function Screen({ path }: { path: string }) {
+/** One screen, chosen by the path. The query configures it. */
+function Screen({ path, search }: { path: string; search: string }) {
   const route = routeFor(path);
 
   switch (route.screen) {
@@ -137,6 +141,16 @@ function Screen({ path }: { path: string }) {
       return <Phases code={route.code ?? ''} />;
     case 'phase':
       return <PhaseDetail code={route.code ?? ''} phaseHumanId={route.humanId ?? ''} />;
+    case 'requirements':
+      // Keyed by the query, so following `?uncovered=true` from a screen already showing this
+      // table re-reads the filters instead of quietly ignoring them.
+      return <Requirements key={search} code={route.code ?? ''} search={search} />;
+    case 'requirement':
+      return <RequirementDetail humanId={route.humanId ?? ''} />;
+    case 'scope-of-work':
+      return <ScopeOfWorkView code={route.code ?? ''} />;
+    case 'register':
+      return <RegisterView code={route.code ?? ''} />;
     case 'task':
       return <TaskDetail humanId={route.humanId ?? ''} />;
     case 'not-found':

@@ -212,6 +212,26 @@ describe.skipIf(url === undefined)('the spine', () => {
       expect(((await third.json()) as { humanId: string }).humanId).toBe('SPN-REQ-003');
     });
 
+    it('filters to the backlog — the requirements no phase has claimed (T-3.1)', async () => {
+      await makeProject();
+      await post('/projects/SPN/phases', { number: 1, name: 'One' });
+      const phase = await db.phase.findFirstOrThrow({ where: { humanId: 'SPN-P-1' } });
+
+      await post('/projects/SPN/requirements', {
+        statement: 'Foreman shall be scheduled.',
+        phaseId: phase.id,
+      });
+      await post('/projects/SPN/requirements', { statement: 'Foreman shall wait its turn.' });
+
+      const backlog = (await (await api('/projects/SPN/requirements?phase=none')).json()) as {
+        items: { humanId: string }[];
+        total: number;
+      };
+      expect(backlog.items.map((r) => r.humanId)).toEqual(['SPN-REQ-002']);
+      // The total is the filtered total. "1 of 2" while showing one row is the only honest answer.
+      expect(backlog.total).toBe(1);
+    });
+
     it('finds the coverage hole: requirements no task cites', async () => {
       await makeProject();
       await post('/projects/SPN/requirements', { statement: 'Foreman shall be covered.' });

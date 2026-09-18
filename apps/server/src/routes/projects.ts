@@ -161,9 +161,18 @@ export function projectRoutes(db: Db): Router {
 
   const RequirementQuery = PageQuery.extend({
     priority: z.enum(['M', 'S', 'C', 'W']).optional(),
+    /** A phase ID, or `none` for the backlog — a requirement with no phase at all (T-3.1). */
     phase: z.string().optional(),
-    /** Requirements no task covers — the coverage hole, which is the point of the register. */
-    uncovered: z.coerce.boolean().optional(),
+    /**
+     * Requirements no task covers — the coverage hole, which is the point of the register.
+     *
+     * Spelled as an enum rather than `z.coerce.boolean()`: coercion reads the string `'false'` as
+     * true, so `?uncovered=false` would have filtered to exactly what it asked to exclude.
+     */
+    uncovered: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((value) => (value === undefined ? undefined : value === 'true')),
     earsLint: z.enum(['ok', 'warned']).optional(),
   });
 
@@ -175,31 +184,52 @@ export function projectRoutes(db: Db): Router {
       const project = await findProject(db, param(req, 'code'));
       const after = decodeCursor(query.cursor);
 
-      const rows = await db.requirement.findMany({
-        where: {
-          projectId: project.id,
-          deletedAt: null,
-          ...(query.priority === undefined ? {} : { priority: query.priority }),
-          ...(query.phase === undefined ? {} : { phase: { humanId: query.phase } }),
-          ...(query.earsLint === undefined ? {} : { earsLintOk: query.earsLint === 'ok' }),
-          ...(query.uncovered === true ? { tasks: { none: {} } } : {}),
-          ...(after === null ? {} : { seq: { gt: Number(after) } }),
-        },
-        orderBy: { seq: 'asc' },
-        take: query.limit + 1,
-        include: { tasks: { select: { taskId: true } } },
-      });
+      const filters = {
+        projectId: project.id,
+        deletedAt: null,
+        ...(query.priority === undefined ? {} : { priority: query.priority }),
+        ...(query.phase === undefined
+          ? {}
+          : query.phase === 'none'
+            ? { phaseId: null }
+            : { phase: { humanId: query.phase } }),
+        ...(query.earsLint === undefined ? {} : { earsLintOk: query.earsLint === 'ok' }),
+        // A soft-deleted task covers nothing, which is the same rule the coverage engine uses.
+        ...(query.uncovered === undefined
+          ? {}
+          : query.uncovered
+            ? { tasks: { none: { task: { deletedAt: null } } } }
+            : { tasks: { some: { task: { deletedAt: null } } } }),
+      };
+
+      const [rows, total] = await Promise.all([
+        db.requirement.findMany({
+          where: { ...filters, ...(after === null ? {} : { seq: { gt: Number(after) } }) },
+          orderBy: { seq: 'asc' },
+          take: query.limit + 1,
+          include: {
+            phase: { select: { humanId: true, name: true } },
+            tasks: {
+              where: { task: { deletedAt: null } },
+              select: { task: { select: { humanId: true, status: true } } },
+            },
+          },
+        }),
+        // The filtered total, not the project's: a table saying "23 of 439" while showing a
+        // filtered page is a table that has lied about the size of the hole.
+        db.requirement.count({ where: filters }),
+      ]);
 
       const items = rows.slice(0, query.limit);
       res.json({
-        items: items.map((row) => ({
+        items: items.map(({ tasks, ...row }) => ({
           ...row,
-          coveredBy: row.tasks.length,
-          tasks: undefined,
+          coveredBy: tasks.length,
+          satisfiedBy: tasks.map((t) => t.task),
         })),
         nextCursor:
           rows.length > query.limit ? encodeCursor(String(items.at(-1)?.seq ?? '')) : null,
-        total: null,
+        total,
       });
     }),
   );

@@ -31,3 +31,11 @@
   line-height: var(--leading-13);
   color: var(--color-danger);
 }
+
+/* The strip of sections under a project's heading. Not a tab set: these are routes, and a tab that
+   changes the URL is a link wearing the wrong clothes. */
+.fm-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+}

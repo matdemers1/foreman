@@ -80,6 +80,7 @@ export function Phases({ code }: { code: string }) {
       <PageHeader
         title="Phases"
         description="In the order they are being built, which is not the order they are numbered."
+        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       {phases.state.status === 'loading' ? (

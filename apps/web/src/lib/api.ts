@@ -154,6 +154,33 @@ export interface TaskRow {
   requirements: string[];
 }
 
+export interface RequirementRow {
+  id: string;
+  humanId: string;
+  statement: string;
+  priority: string;
+  source: string | null;
+  acceptanceTest: string | null;
+  earsPattern: string;
+  earsLintOk: boolean;
+  earsLintNote: string | null;
+  phase: { humanId: string; name: string } | null;
+  /** How many live tasks cite it. Zero is the coverage hole, and the screen says so. */
+  coveredBy: number;
+  satisfiedBy: { humanId: string; status: string }[];
+}
+
+/** What S-13's four filters compile to. Every one of them is applied by the server. */
+export interface RequirementFilters {
+  priority?: string;
+  /** A phase human ID, or `none` for the backlog. */
+  phase?: string;
+  uncovered?: boolean;
+  earsLint?: 'ok' | 'warned';
+  limit?: number;
+  cursor?: string;
+}
+
 export interface Brief {
   project: { code: string; name: string; lifecycle: string; pitch: string | null };
   activePhase: {
@@ -184,6 +211,61 @@ export interface EntityResult {
   backlinks: { fromType: string; humanId: string | null; title: string; kind: string }[];
 }
 
+export interface Coverage {
+  project: string;
+  requirements: { total: number; covered: number; musts: number; mustsCovered: number };
+  uncoveredMusts: { humanId: string; statement: string; priority: string }[];
+  uncovered: { humanId: string; statement: string; priority: string }[];
+  withoutAcceptanceTest: { humanId: string; statement: string }[];
+  tasksWithoutRequirements: { humanId: string; title: string }[];
+  earsWarnings: { humanId: string; statement: string; note: string }[];
+}
+
+export interface MatrixRow {
+  humanId: string;
+  statement: string;
+  priority: string;
+  earsPattern: string;
+  earsLintOk: boolean;
+  acceptanceTest: string | null;
+  phase: { humanId: string; number: string; name: string } | null;
+  satisfiedBy: { humanId: string; title: string; status: string }[];
+}
+
+export interface ScopeOfWorkTask {
+  humanId: string;
+  title: string;
+  status: string;
+  size: string | null;
+  blockedReason: string | null;
+  doneWhen: string | null;
+  satisfies: string[];
+}
+
+export interface ScopeOfWork {
+  project: { code: string; name: string };
+  phases: {
+    humanId: string;
+    number: string;
+    name: string;
+    objective: string | null;
+    status: string;
+    exitDemo: string | null;
+    size: string | null;
+    tasks: ScopeOfWorkTask[];
+    done: number;
+    uncoveredMusts: string[];
+  }[];
+  unphased: ScopeOfWorkTask[];
+  generatedAt: string;
+}
+
+export interface GateResult {
+  phase: string;
+  passed: boolean;
+  failures: { kind: string; humanId: string; detail: string }[];
+}
+
 interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -198,6 +280,20 @@ export const foreman = {
     api.get<Page<TaskRow>>(
       `/api/projects/${code}/tasks?limit=200${phaseHumanId === undefined ? '' : `&phase=${phaseHumanId}`}`,
     ),
+  requirements: (code: string, filters: RequirementFilters = {}) => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value !== undefined) query.set(key, String(value));
+    }
+    return api.get<Page<RequirementRow>>(
+      `/api/projects/${code}/requirements?${query.toString()}`,
+    );
+  },
+  coverage: (code: string) => api.get<Coverage>(`/api/projects/${code}/coverage`),
+  matrix: (code: string) => api.get<Page<MatrixRow>>(`/api/projects/${code}/matrix`),
+  scopeOfWork: (code: string) => api.get<ScopeOfWork>(`/api/projects/${code}/scope-of-work`),
+  gate: (code: string, phaseHumanId: string) =>
+    api.get<GateResult>(`/api/projects/${code}/phases/${phaseHumanId}/gate`),
   brief: (code: string) => api.get<Brief>(`/api/brief/${code}`),
   entity: (humanId: string) => api.get<EntityResult>(`/api/entities/${humanId}`),
 };
