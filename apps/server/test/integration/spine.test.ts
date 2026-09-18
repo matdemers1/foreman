@@ -24,15 +24,13 @@ describe.skipIf(url === undefined)('the spine', () => {
   let origin: string;
   let cookie: string;
 
-  const api = (path: string, init: RequestInit = {}) =>
-    fetch(`${origin}/api${path}`, {
-      ...init,
-      headers: {
-        cookie,
-        ...(init.body === undefined ? {} : { 'content-type': 'application/json' }),
-        ...init.headers,
-      },
-    });
+  const api = (path: string, init: RequestInit = {}) => {
+    // Headers may be an array of pairs, which spreads into indices rather than into an object.
+    const headers = new Headers(init.headers);
+    headers.set('cookie', cookie);
+    if (init.body !== undefined) headers.set('content-type', 'application/json');
+    return fetch(`${origin}/api${path}`, { ...init, headers });
+  };
 
   const post = (path: string, body: unknown) =>
     api(path, { method: 'POST', body: JSON.stringify(body) });
