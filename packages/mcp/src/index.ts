@@ -13,8 +13,18 @@ import { createServer } from './server.js';
  *   FOREMAN_URL=https://foreman.d3cloud.io FOREMAN_TOKEN=… foreman-mcp
  */
 
-const baseUrl = process.env['FOREMAN_URL'];
-const token = process.env['FOREMAN_TOKEN'];
+/**
+ * Unset and empty are the same failure. A client config that defines the variable but leaves the
+ * value blank is common, and `''` would otherwise pass an `=== undefined` guard and start a server
+ * that can never work — Claude connects, and every call fails obscurely much later.
+ */
+const required = (name: string): string | undefined => {
+  const value = process.env[name]?.trim();
+  return value === undefined || value === '' ? undefined : value;
+};
+
+const baseUrl = required('FOREMAN_URL');
+const token = required('FOREMAN_TOKEN');
 
 if (baseUrl === undefined || token === undefined) {
   // stderr, never stdout: stdout is the protocol channel, and a stray line there is a parse error

@@ -11,7 +11,11 @@
     "dist"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts",
+    "./resources": "./src/resources.ts",
+    "./tools": "./src/tools/index.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
