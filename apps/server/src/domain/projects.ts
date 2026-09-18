@@ -1,0 +1,359 @@
+import {
+  lintEars,
+  type PhaseCreate,
+  type ProjectCreate,
+  type ProjectUpdate,
+  type RequirementCreate,
+  type RequirementUpdate,
+  type TaskCreate,
+  type TaskUpdate,
+} from '@foreman/shared';
+import type { Db } from '../db.js';
+import { record, type Actor } from './audit.js';
+import { Conflict, Invalid, NotFound } from './errors.js';
+import { allocate, phaseHumanId, taskHumanId } from './humanId.js';
+
+/**
+ * The spine's write paths.
+ *
+ * Every mutation here runs in a transaction with its own `audit_event`, because "every mutation,
+ * no exceptions" is only true if the record cannot fail separately from the change.
+ */
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 200);
+}
+
+export async function findProject(db: Db, code: string) {
+  const project = await db.project.findFirst({ where: { code, deletedAt: null } });
+  if (project === null) throw new NotFound(`project ${code}`);
+  return project;
+}
+
+export async function createProject(db: Db, actor: Actor, input: ProjectCreate) {
+  const existing = await db.project.findUnique({ where: { code: input.code } });
+  // A duplicate code is refused rather than disambiguated: the code is what every ID embeds.
+  if (existing !== null) throw new Conflict(`project code ${input.code} is already in use`);
+
+  return db.$transaction(async (tx) => {
+    const project = await tx.project.create({
+      data: {
+        code: input.code,
+        name: input.name,
+        slug: input.slug ?? slugify(input.name),
+        ...(input.lifecycle !== undefined ? { lifecycle: input.lifecycle } : {}),
+        ...(input.pitch !== undefined ? { pitch: input.pitch } : {}),
+        ...(input.vaultPath !== undefined ? { vaultPath: input.vaultPath } : {}),
+      },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'create',
+      entityType: 'project',
+      entityId: project.id,
+      entityHumanId: project.code,
+      after: project,
+    });
+    return project;
+  });
+}
+
+export async function updateProject(db: Db, actor: Actor, code: string, input: ProjectUpdate) {
+  const before = await findProject(db, code);
+
+  return db.$transaction(async (tx) => {
+    const project = await tx.project.update({
+      where: { id: before.id },
+      // `code` is not in the update shape at all, so there is nothing here to guard against.
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.slug !== undefined ? { slug: input.slug } : {}),
+        ...(input.lifecycle !== undefined ? { lifecycle: input.lifecycle } : {}),
+        ...(input.pitch !== undefined ? { pitch: input.pitch } : {}),
+        ...(input.vaultPath !== undefined ? { vaultPath: input.vaultPath } : {}),
+      },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'update',
+      entityType: 'project',
+      entityId: project.id,
+      entityHumanId: project.code,
+      before,
+      after: project,
+    });
+    return project;
+  });
+}
+
+// ─── Phases ────────────────────────────────────────────────────────────────
+
+export async function createPhase(db: Db, actor: Actor, code: string, input: PhaseCreate) {
+  const project = await findProject(db, code);
+
+  const clash = await db.phase.findFirst({
+    where: { projectId: project.id, number: input.number, deletedAt: null },
+  });
+  if (clash !== null) throw new Conflict(`${code} already has a phase numbered ${String(input.number)}`);
+
+  return db.$transaction(async (tx) => {
+    // Appended to the end of the build order by default. `sortOrder` is independent of `number`
+    // precisely so a phase can be inserted out of numeric order later.
+    const last = await tx.phase.findFirst({
+      where: { projectId: project.id },
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+    const sortOrder = input.sortOrder ?? (last === null ? 0 : last.sortOrder + 1);
+
+    const phase = await tx.phase.create({
+      data: {
+        projectId: project.id,
+        humanId: phaseHumanId(project.code, input.number),
+        number: input.number,
+        sortOrder,
+        name: input.name,
+        ...(input.objective !== undefined ? { objective: input.objective } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.exitDemo !== undefined ? { exitDemo: input.exitDemo } : {}),
+        ...(input.size !== undefined ? { size: input.size } : {}),
+      },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'create',
+      entityType: 'phase',
+      entityId: phase.id,
+      entityHumanId: phase.humanId,
+      after: phase,
+    });
+    return phase;
+  });
+}
+
+/** Phases in the order they are being built, which is not the order they are numbered. */
+export async function listPhases(db: Db, code: string) {
+  const project = await findProject(db, code);
+  return db.phase.findMany({
+    where: { projectId: project.id, deletedAt: null },
+    orderBy: { sortOrder: 'asc' },
+  });
+}
+
+// ─── Requirements ──────────────────────────────────────────────────────────
+
+export async function createRequirement(
+  db: Db,
+  actor: Actor,
+  code: string,
+  input: RequirementCreate,
+) {
+  const project = await findProject(db, code);
+  // The lint warns and never blocks: an unparsed requirement is stored with its note.
+  const ears = lintEars(input.statement);
+
+  return db.$transaction(async (tx) => {
+    const { humanId, seq } = await allocate(tx, project, 'requirement');
+    const requirement = await tx.requirement.create({
+      data: {
+        projectId: project.id,
+        humanId,
+        seq,
+        statement: input.statement,
+        earsPattern: ears.pattern,
+        earsLintOk: ears.ok,
+        earsLintNote: ears.note ?? null,
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+        ...(input.source !== undefined ? { source: input.source } : {}),
+        ...(input.acceptanceTest !== undefined ? { acceptanceTest: input.acceptanceTest } : {}),
+        phaseId: input.phaseId ?? null,
+      },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'create',
+      entityType: 'requirement',
+      entityId: requirement.id,
+      entityHumanId: requirement.humanId,
+      after: requirement,
+    });
+    return requirement;
+  });
+}
+
+export async function updateRequirement(
+  db: Db,
+  actor: Actor,
+  humanId: string,
+  input: RequirementUpdate,
+) {
+  const before = await db.requirement.findFirst({ where: { humanId, deletedAt: null } });
+  if (before === null) throw new NotFound(humanId);
+
+  const ears = input.statement === undefined ? null : lintEars(input.statement);
+
+  return db.$transaction(async (tx) => {
+    const requirement = await tx.requirement.update({
+      where: { id: before.id },
+      data: {
+        ...(input.statement !== undefined ? { statement: input.statement } : {}),
+        ...(ears !== null
+          ? { earsPattern: ears.pattern, earsLintOk: ears.ok, earsLintNote: ears.note ?? null }
+          : {}),
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+        ...(input.source !== undefined ? { source: input.source } : {}),
+        ...(input.acceptanceTest !== undefined ? { acceptanceTest: input.acceptanceTest } : {}),
+        ...(input.phaseId !== undefined ? { phaseId: input.phaseId ?? null } : {}),
+      },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'update',
+      entityType: 'requirement',
+      entityId: requirement.id,
+      entityHumanId: requirement.humanId,
+      before,
+      after: requirement,
+    });
+    return requirement;
+  });
+}
+
+// ─── Tasks ─────────────────────────────────────────────────────────────────
+
+export async function createTask(db: Db, actor: Actor, code: string, input: TaskCreate) {
+  const project = await findProject(db, code);
+
+  const phaseId = input.phaseId ?? null;
+  const phase =
+    phaseId === null
+      ? null
+      : await db.phase.findFirst({ where: { id: phaseId, projectId: project.id } });
+  if (phaseId !== null && phase === null) {
+    throw new Invalid('that phase does not belong to this project', [
+      { path: 'phaseId', message: 'not a phase of this project' },
+    ]);
+  }
+
+  if (input.requirementIds !== undefined && input.requirementIds.length > 0) {
+    const owned = await db.requirement.count({
+      where: { id: { in: input.requirementIds }, projectId: project.id, deletedAt: null },
+    });
+    if (owned !== input.requirementIds.length) {
+      throw new Invalid('a requirement does not belong to this project', [
+        { path: 'requirementIds', message: 'one or more are not requirements of this project' },
+      ]);
+    }
+  }
+
+  return db.$transaction(async (tx) => {
+    // The task ID carries its phase and its position within it, so it is not drawn from a counter.
+    const siblings = await tx.task.count({
+      where: { projectId: project.id, phaseId: phase?.id ?? null },
+    });
+    const humanId =
+      phase === null
+        ? (await allocate(tx, project, 'task')).humanId
+        : taskHumanId(project.code, phase.number.toString(), siblings + 1);
+
+    const task = await tx.task.create({
+      data: {
+        projectId: project.id,
+        phaseId: phase?.id ?? null,
+        humanId,
+        title: input.title,
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.blockedReason === undefined || input.blockedReason === null
+          ? {}
+          : { blockedReason: input.blockedReason }),
+        ...(input.size !== undefined ? { size: input.size } : {}),
+        ...(input.doneWhen !== undefined ? { doneWhen: input.doneWhen } : {}),
+        sortOrder: input.sortOrder ?? siblings,
+        ...(input.files !== undefined
+          ? { files: { create: input.files.map((path) => ({ path })) } }
+          : {}),
+        ...(input.requirementIds !== undefined
+          ? {
+              requirements: {
+                create: input.requirementIds.map((requirementId) => ({ requirementId })),
+              },
+            }
+          : {}),
+      },
+      include: { files: true, requirements: true },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'create',
+      entityType: 'task',
+      entityId: task.id,
+      entityHumanId: task.humanId,
+      after: task,
+    });
+    return task;
+  });
+}
+
+export async function updateTask(db: Db, actor: Actor, humanId: string, input: TaskUpdate) {
+  const before = await db.task.findFirst({
+    where: { humanId, deletedAt: null },
+    include: { files: true, requirements: true },
+  });
+  if (before === null) throw new NotFound(humanId);
+
+  // The schema enforces "blocked needs a reason" on a complete body; a partial update can set the
+  // status alone, so the rule is checked against the merged state rather than the patch.
+  const status = input.status ?? before.status;
+  const reason = input.blockedReason === undefined ? before.blockedReason : input.blockedReason;
+  if (status === 'blocked' && (reason === null || reason.trim().length === 0)) {
+    throw new Invalid('a blocked task must say what is blocking it', [
+      { path: 'blockedReason', message: 'required when the status is blocked' },
+    ]);
+  }
+
+  return db.$transaction(async (tx) => {
+    const task = await tx.task.update({
+      where: { id: before.id },
+      data: {
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.phaseId !== undefined ? { phaseId: input.phaseId ?? null } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.blockedReason !== undefined ? { blockedReason: input.blockedReason ?? null } : {}),
+        ...(input.size !== undefined ? { size: input.size } : {}),
+        ...(input.doneWhen !== undefined ? { doneWhen: input.doneWhen } : {}),
+        ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+        // A status change is also a timestamp: "when did this start" is asked constantly.
+        ...(input.status === 'in_progress' && before.startedAt === null
+          ? { startedAt: new Date() }
+          : {}),
+        ...(input.status === 'done' ? { completedAt: new Date() } : {}),
+        ...(input.files !== undefined
+          ? { files: { deleteMany: {}, create: input.files.map((path) => ({ path })) } }
+          : {}),
+        ...(input.requirementIds !== undefined
+          ? {
+              requirements: {
+                deleteMany: {},
+                create: input.requirementIds.map((requirementId) => ({ requirementId })),
+              },
+            }
+          : {}),
+      },
+      include: { files: true, requirements: true },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'update',
+      entityType: 'task',
+      entityId: task.id,
+      entityHumanId: task.humanId,
+      before,
+      after: task,
+    });
+    return task;
+  });
+}

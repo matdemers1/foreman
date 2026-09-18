@@ -32,6 +32,24 @@ export function scrub(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(scrub);
   if (value instanceof Date) return value.toISOString();
 
+  // Anything that is not a plain object is a value, not a bag of fields: Prisma's `Decimal` is the
+  // one that matters here, and walking into it serialises its internals — including a `constructor`
+  // the database rightly refuses. A phase number is `8.5`, not `{ s: 1, e: 0, d: [85] }`.
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    const candidate = value as { toJSON?: unknown; toString?: unknown };
+    if (typeof candidate.toJSON === 'function') {
+      return scrub((candidate.toJSON as () => unknown).call(value));
+    }
+    // Only a `toString` the class actually wrote. Object's default would record the useless
+    // "[object Object]" and quietly lose whatever the value was.
+    if (typeof candidate.toString === 'function' && candidate.toString !== Object.prototype.toString) {
+      return (candidate.toString as () => string).call(value);
+    }
+    const name = (prototype as { constructor?: { name?: string } }).constructor?.name;
+    return `[${name ?? 'object'}]`;
+  }
+
   const out: Record<string, unknown> = {};
   for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
     out[key] = REDACTED.has(key) ? '[redacted]' : scrub(inner);

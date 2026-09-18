@@ -1,0 +1,177 @@
+import { describe, expect, it } from 'vitest';
+import {
+  FORBIDDEN_ESTIMATE_FIELDS,
+  lintEars,
+  PageQuery,
+  Phase,
+  ProjectCreate,
+  ProjectUpdate,
+  Task,
+  TaskCreate,
+  TaskUpdate,
+} from '../src/index.js';
+
+describe('project (FRM-REQ-031)', () => {
+  it('requires a code on creation', () => {
+    expect(ProjectCreate.safeParse({ name: 'Bindery' }).success).toBe(false);
+    expect(ProjectCreate.safeParse({ code: 'BND', name: 'Bindery' }).success).toBe(true);
+  });
+
+  it('has no code in the update shape at all — immutability as a type, not a rule', () => {
+    expect('code' in ProjectUpdate.shape).toBe(false);
+    // A code sent to an update is simply not a field, so it cannot be applied by accident.
+    const parsed = ProjectUpdate.parse({ name: 'Renamed', code: 'NEW' });
+    expect(parsed).not.toHaveProperty('code');
+  });
+
+  it('refuses a slug that is not slug-shaped', () => {
+    const attempt = ProjectCreate.safeParse({ code: 'BND', name: 'Bindery', slug: 'Not A Slug' });
+    expect(attempt.success).toBe(false);
+  });
+});
+
+describe('phase (FRM-REQ-034, FRM-REQ-035)', () => {
+  it('accepts a decimal number, because Phase 8.5 exists', () => {
+    const phase = Phase.safeParse({
+      id: '00000000-0000-7000-8000-000000000000',
+      projectId: '00000000-0000-7000-8000-000000000001',
+      humanId: 'BND-P-8.5',
+      number: 8.5,
+      sortOrder: 10,
+      name: 'The half phase',
+      objective: null,
+      status: 'complete',
+      exitDemo: null,
+      size: null,
+      startedAt: null,
+      completedAt: null,
+      createdAt: '2026-09-18T00:00:00Z',
+      updatedAt: '2026-09-18T00:00:00Z',
+      deletedAt: null,
+    });
+    expect(phase.success).toBe(true);
+  });
+});
+
+describe('task (FRM-REQ-040)', () => {
+  it('refuses a blocked task with no reason', () => {
+    const attempt = TaskCreate.safeParse({ title: 'Wire the inbox', status: 'blocked' });
+    expect(attempt.success).toBe(false);
+    expect(attempt.error?.issues[0]?.path).toEqual(['blockedReason']);
+  });
+
+  it('refuses a blocked task whose reason is only whitespace', () => {
+    const attempt = TaskCreate.safeParse({
+      title: 'Wire the inbox',
+      status: 'blocked',
+      blockedReason: '   ',
+    });
+    expect(attempt.success).toBe(false);
+  });
+
+  it('accepts a blocked task that says what is blocking it', () => {
+    const attempt = TaskCreate.safeParse({
+      title: 'Wire the inbox',
+      status: 'blocked',
+      blockedReason: 'Waiting on the GitHub App installation.',
+    });
+    expect(attempt.success).toBe(true);
+  });
+
+  it('leaves the blocked rule to the domain on an update, where the merged state is known', () => {
+    // A patch of `{ status: 'blocked' }` alone is legitimate for a task that already carries a
+    // reason. Refusing it in the schema would reject a correct request, so the check happens where
+    // the task's existing reason is visible.
+    expect(TaskUpdate.safeParse({ status: 'blocked' }).success).toBe(true);
+    expect(TaskUpdate.safeParse({ status: 'todo' }).success).toBe(true);
+  });
+
+  it('lets a task satisfy several requirements', () => {
+    const parsed = TaskCreate.parse({
+      title: 'Covers three',
+      requirementIds: [
+        '00000000-0000-7000-8000-000000000001',
+        '00000000-0000-7000-8000-000000000002',
+        '00000000-0000-7000-8000-000000000003',
+      ],
+    });
+    expect(parsed.requirementIds).toHaveLength(3);
+  });
+});
+
+describe('no time estimates anywhere (FRM-REQ-041)', () => {
+  // The guard is worth more on the schemas than on the database, because this is where a field
+  // would be added first.
+  const shapes = { Task: Task.shape, Phase: Phase.shape };
+
+  it.each(Object.entries(shapes))('%s declares no estimate-shaped field', (_name, shape) => {
+    const offending = Object.keys(shape).filter((key) =>
+      FORBIDDEN_ESTIMATE_FIELDS.some((banned) => key.toLowerCase() === banned.toLowerCase()),
+    );
+    expect(offending).toEqual([]);
+  });
+});
+
+describe('paging (FRM-REQ-092)', () => {
+  it('defaults to a bounded page', () => {
+    expect(PageQuery.parse({}).limit).toBe(50);
+  });
+
+  it('refuses an unbounded request', () => {
+    expect(PageQuery.safeParse({ limit: 100_000 }).success).toBe(false);
+    expect(PageQuery.safeParse({ limit: 0 }).success).toBe(false);
+  });
+});
+
+describe('the EARS lint warns and never blocks', () => {
+  it.each([
+    ['The system shall persist all state in PostgreSQL.', 'ubiquitous'],
+    ['While the queue is draining, the system shall report its depth.', 'state'],
+    ['When a webhook arrives, the system shall enqueue it.', 'event'],
+    ['If the issuer is unreachable, then the system shall accept a password.', 'unwanted'],
+    ['Where the tunnel overlay is applied, the system shall serve the console.', 'optional'],
+    ['While ingest is running, when a commit arrives, the system shall attribute it.', 'complex'],
+  ])('classifies %s as %s', (statement, pattern) => {
+    const result = lintEars(statement);
+    expect(result.pattern).toBe(pattern);
+    expect(result.ok).toBe(true);
+  });
+
+  it('stores a non-conforming statement as unparsed, with a note that says what to do', () => {
+    const result = lintEars('This is just a sentence about the system.');
+    expect(result.pattern).toBe('unparsed');
+    expect(result.ok).toBe(false);
+    expect(result.note).toContain('shall');
+  });
+
+  it('flags an If with no then, but still classifies it', () => {
+    const result = lintEars('If the disk fills the system shall stop writing.');
+    expect(result.pattern).toBe('unwanted');
+    expect(result.ok).toBe(false);
+    expect(result.note).toContain('then');
+  });
+
+  it('flags a missing comma without discarding the pattern', () => {
+    const result = lintEars('While draining the system shall report depth.');
+    expect(result.pattern).toBe('state');
+    expect(result.ok).toBe(false);
+  });
+
+  it('never throws, whatever it is handed', () => {
+    for (const input of ['', '   ', '🙂', 'shall', 'SHALL SHALL SHALL']) {
+      expect(() => lintEars(input)).not.toThrow();
+    }
+  });
+
+  it('accepts the real register verbatim — the statements it has to survive', () => {
+    const real = [
+      'Foreman shall run as a pnpm monorepo on Node 22 with TypeScript strict across every package',
+      'Foreman shall refuse to boot when a required secret is absent',
+      'Where the tunnel overlay is applied, Foreman shall be reachable at foreman.d3cloud.io',
+      'Foreman shall never call an LLM API from the server',
+    ];
+    for (const statement of real) {
+      expect(lintEars(statement).pattern).not.toBe('unparsed');
+    }
+  });
+});

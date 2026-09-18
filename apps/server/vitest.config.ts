@@ -1,8 +1,16 @@
+import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 // Named projects, because CI gates in layers: lint → unit → integration → e2e (FRM-REQ-008).
 // The integration project is the only one that needs a database.
 export default defineConfig({
+  resolve: {
+    alias: {
+      // The package resolves to `dist` at runtime, which is right for the image and wrong for a
+      // test run: nobody should have to build a sibling package to run a unit test.
+      '@foreman/shared': resolve(import.meta.dirname, '../../packages/shared/src/index.ts'),
+    },
+  },
   test: {
     projects: [
       {
