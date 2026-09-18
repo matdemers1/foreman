@@ -115,3 +115,48 @@
 .fm-diff__removed {
   color: var(--color-danger);
 }
+
+/* Links inside prose carry an underline.
+
+   axe's `link-in-text-block` (serious): a link that differs from the text around it only by colour
+   is invisible to anyone who cannot see that difference — WCAG 1.4.1. The library's Link is
+   correct on its own; the failure is ours, for putting one in the middle of a sentence and
+   relying on the hue.
+
+   Scoped to running text. A link in a table cell, a nav or a card title is surrounded by
+   structure rather than by prose, and underlining every one of those makes a dense screen
+   illegible. */
+.fm-markdown a,
+li a,
+p a,
+dd a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* Except where the link *is* the structure: a nav item, a table cell, a card title. Underlining
+   those makes a dense screen illegible, and none of them relies on colour to be found — they are
+   found by position. The first attempt used `li > a:not(:only-child)`, which missed the real
+   case: a link followed by a bare text node is still an only *element* child. */
+.d3-nav a,
+.d3-tbl a,
+.d3-page-header a {
+  text-decoration: none;
+}
+
+/* Mermaid's edge labels, made readable.
+
+   Its dark theme paints the label's background from one palette and the text from another, and in
+   dark mode the pair fails contrast — axe caught it on the ADR supersedes graph (`color-contrast`,
+   serious, on `.edgeLabel > p`). It looked wrong before axe said so; the label on the "supersedes"
+   edge was pale text on a pale plate.
+
+   Set from tokens rather than from Mermaid's theme variables, so it follows the console's own
+   light and dark palettes rather than a second theme that has to be kept in step. */
+.fm-markdown .edgeLabel,
+.fm-markdown .edgeLabel p,
+.fm-markdown .edgeLabel rect {
+  background: var(--color-surface);
+  fill: var(--color-surface);
+  color: var(--color-fg);
+}
