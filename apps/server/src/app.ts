@@ -13,17 +13,24 @@ import { schemaRevision } from './boot.js';
 import { logger } from './logger.js';
 import { attachAuth } from './auth/middleware.js';
 import { authRoutes } from './routes/auth.js';
+import { oidcRoutes } from './routes/oidc.js';
+import type { OidcClient } from './auth/oidc.js';
 
 export interface AppDeps {
   readonly config: Config;
   readonly db: Db;
+  /**
+   * Null when D3 Auth is not configured, or was unreachable at boot. The console then shows one
+   * login button instead of two, and nothing else changes (FRM-REQ-017).
+   */
+  readonly oidc?: OidcClient | null;
 }
 
 /**
  * The Express app. Routes arrive in Phase 1; what exists here from Phase 0 is what the Compose
  * healthchecks and the tunnel need.
  */
-export function createApp({ config, db }: AppDeps): Express {
+export function createApp({ config, db, oidc = null }: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
   // Behind the Cloudflare Tunnel, so `req.ip` must come from the proxy or every login shares one
@@ -31,7 +38,8 @@ export function createApp({ config, db }: AppDeps): Express {
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '2mb' }));
   app.use(attachAuth({ db, config }));
-  app.use('/auth', authRoutes({ db, config }));
+  app.use('/auth', authRoutes({ db, config, oidcAvailable: oidc !== null }));
+  app.use('/auth/oidc', oidcRoutes({ db, config, client: oidc }));
 
   /** Liveness: the process is up. Deliberately touches nothing else. */
   app.get('/healthz', (_req, res) => {
@@ -64,6 +72,9 @@ export function createApp({ config, db }: AppDeps): Express {
       queue: { queued, running, failed },
       schemaRevision: revision,
       oidcConfigured: config.oidcConfigured,
+      // Configured and reachable are different questions, and only the second one decides
+      // whether the console should offer the button.
+      oidcReachable: oidc !== null,
     });
   });
 

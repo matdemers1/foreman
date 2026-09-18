@@ -23,6 +23,8 @@ const LoginBody = z.object({
 export interface AuthRouteDeps {
   readonly db: Db;
   readonly config: Config;
+  /** Whether the D3 Auth button should be offered at all. */
+  readonly oidcAvailable?: boolean;
 }
 
 export function authRoutes(deps: AuthRouteDeps): Router {
@@ -127,7 +129,7 @@ export function authRoutes(deps: AuthRouteDeps): Router {
         user,
         totpEnrolled: credential?.totpConfirmedAt !== undefined && credential.totpConfirmedAt !== null,
         // The console shows the second button only when there is something behind it.
-        oidcAvailable: deps.config.oidcConfigured,
+        oidcAvailable: deps.oidcAvailable ?? false,
       });
     })().catch(() => {
       res.status(500).json({ error: 'session lookup failed' });

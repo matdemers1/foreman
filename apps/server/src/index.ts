@@ -1,6 +1,7 @@
 import { migrate } from './boot.js';
 import { ConfigError, loadConfig } from './config.js';
 import { createApp } from './app.js';
+import { createOidcClient } from './auth/oidc.js';
 import { createDb } from './db.js';
 import { logger } from './logger.js';
 
@@ -25,11 +26,21 @@ const config = (() => {
 await migrate(config);
 
 const db = createDb(config.DATABASE_URL);
-const app = createApp({ config, db });
+
+// Discovery is attempted once and allowed to fail. An unreachable D3 Auth means one login button
+// instead of two — never a server that will not start (FRM-REQ-017, ADR-004).
+const oidc = await createOidcClient(config);
+
+const app = createApp({ config, db, oidc });
 
 const server = app.listen(config.PORT, () => {
   logger.info(
-    { port: config.PORT, baseUrl: config.BASE_URL, oidc: config.oidcConfigured },
+    {
+      port: config.PORT,
+      baseUrl: config.BASE_URL,
+      oidcConfigured: config.oidcConfigured,
+      oidcReachable: oidc !== null,
+    },
     'foreman-server listening',
   );
 });
