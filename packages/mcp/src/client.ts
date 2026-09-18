@@ -21,6 +21,9 @@ export type QueryValue = string | number | boolean | readonly string[] | undefin
 
 export interface ForemanClient {
   get<T>(path: string, query?: Record<string, QueryValue>): Promise<T>;
+  post<T>(path: string, body: unknown, query?: Record<string, QueryValue>): Promise<T>;
+  patch<T>(path: string, body: unknown): Promise<T>;
+  del<T>(path: string): Promise<T>;
 }
 
 export interface ClientOptions {
@@ -36,8 +39,12 @@ export function createClient(options: ClientOptions): ForemanClient {
   const timeoutMs = options.timeoutMs ?? 10_000;
   const base = options.baseUrl.replace(/\/$/, '');
 
-  return {
-    async get<T>(path: string, query: Record<string, QueryValue> = {}): Promise<T> {
+  async function request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    query: Record<string, QueryValue> = {},
+  ): Promise<T> {
       const url = new URL(`${base}${path}`);
       for (const [key, value] of Object.entries(query)) {
         // An array parameter is sent comma-joined, which is what the API parses. Everything else
@@ -54,24 +61,27 @@ export function createClient(options: ClientOptions): ForemanClient {
 
       try {
         const res = await doFetch(url, {
+          method,
           headers: {
             authorization: `Bearer ${options.token}`,
             accept: 'application/json',
+            ...(body === undefined ? {} : { 'content-type': 'application/json' }),
           },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
           signal: controller.signal,
         });
 
         const text = await res.text();
-        const body: unknown = text.length > 0 ? JSON.parse(text) : undefined;
+        const answer: unknown = text.length > 0 ? JSON.parse(text) : undefined;
 
         if (!res.ok) {
           const message =
-            typeof body === 'object' && body !== null && 'error' in body
-              ? String(body.error)
+            typeof answer === 'object' && answer !== null && 'error' in answer
+              ? String(answer.error)
               : `Foreman answered ${String(res.status)}`;
           throw new ForemanApiError(res.status, message);
         }
-        return body as T;
+        return answer as T;
       } catch (error) {
         if (error instanceof ForemanApiError) throw error;
         if (error instanceof Error && error.name === 'AbortError') {
@@ -84,6 +94,14 @@ export function createClient(options: ClientOptions): ForemanClient {
       } finally {
         clearTimeout(timer);
       }
-    },
+  }
+
+  return {
+    get: <T>(path: string, query?: Record<string, QueryValue>) =>
+      request<T>('GET', path, undefined, query),
+    post: <T>(path: string, body: unknown, query?: Record<string, QueryValue>) =>
+      request<T>('POST', path, body, query),
+    patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
+    del: <T>(path: string) => request<T>('DELETE', path),
   };
 }

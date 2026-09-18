@@ -333,4 +333,72 @@ describe.skipIf(url === undefined)('the spine', () => {
       expect((await api('/projects/SPN/requirements?limit=100000')).status).toBe(400);
     });
   });
+
+  describe('links (T-2.8)', () => {
+    it('links a task to a requirement, and coverage counts it', async () => {
+      await makeProject();
+      await post('/projects/SPN/requirements', { statement: 'Foreman shall be covered by a link.' });
+      await post('/projects/SPN/tasks', { title: 'Covers it' });
+
+      const res = await post('/links', { from: 'SPN-T-001', to: 'SPN-REQ-001', kind: 'satisfies' });
+      expect(res.status).toBe(200);
+
+      // Coverage is computed from task_requirement, so the link has to land there too.
+      const uncovered = (await (
+        await api('/projects/SPN/requirements?uncovered=true')
+      ).json()) as { items: unknown[] };
+      expect(uncovered.items).toEqual([]);
+    });
+
+    it('makes the citation visible as a backlink', async () => {
+      await makeProject();
+      await post('/projects/SPN/requirements', { statement: 'Foreman shall be cited.' });
+      await post('/projects/SPN/tasks', { title: 'Cites it' });
+      await post('/links', { from: 'SPN-T-001', to: 'SPN-REQ-001', kind: 'satisfies' });
+
+      const entity = (await (await api('/entities/SPN-REQ-001')).json()) as {
+        backlinks: { humanId: string; kind: string }[];
+      };
+      expect(entity.backlinks[0]?.humanId).toBe('SPN-T-001');
+      expect(entity.backlinks[0]?.kind).toBe('satisfies');
+    });
+
+    it('is idempotent: linking twice does not double anything', async () => {
+      await makeProject();
+      await post('/projects/SPN/requirements', { statement: 'Foreman shall be linked once.' });
+      await post('/projects/SPN/tasks', { title: 'Links twice' });
+
+      await post('/links', { from: 'SPN-T-001', to: 'SPN-REQ-001', kind: 'satisfies' });
+      const second = await post('/links', { from: 'SPN-T-001', to: 'SPN-REQ-001', kind: 'satisfies' });
+      expect(second.status).toBe(200);
+      expect(((await second.json()) as { created: boolean }).created).toBe(false);
+
+      const entity = (await (await api('/entities/SPN-REQ-001')).json()) as {
+        backlinks: unknown[];
+      };
+      expect(entity.backlinks).toHaveLength(1);
+    });
+
+    it('removes a link when asked, and coverage notices', async () => {
+      await makeProject();
+      await post('/projects/SPN/requirements', { statement: 'Foreman shall lose a link.' });
+      await post('/projects/SPN/tasks', { title: 'Unlinks' });
+      await post('/links', { from: 'SPN-T-001', to: 'SPN-REQ-001', kind: 'satisfies' });
+
+      await post('/links', { from: 'SPN-T-001', to: 'SPN-REQ-001', kind: 'satisfies', remove: true });
+
+      const uncovered = (await (
+        await api('/projects/SPN/requirements?uncovered=true')
+      ).json()) as { items: { humanId: string }[] };
+      expect(uncovered.items.map((r) => r.humanId)).toEqual(['SPN-REQ-001']);
+    });
+
+    it('refuses to cite something that does not exist', async () => {
+      await makeProject();
+      await post('/projects/SPN/tasks', { title: 'Cites nothing' });
+      const res = await post('/links', { from: 'SPN-T-001', to: 'SPN-REQ-999', kind: 'satisfies' });
+      // A citation of something absent is not a link, it is a typo.
+      expect(res.status).toBe(404);
+    });
+  });
 });

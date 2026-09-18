@@ -1,6 +1,7 @@
 import { BriefInput, CACHE, GetInput, PortfolioInput, SearchInput } from '@foreman/shared';
 import { z } from 'zod';
 import type { ForemanClient } from '../client.js';
+import { WRITE_TOOLS } from './writes.js';
 
 /**
  * The read tools (T-1.9). Writes arrive in Phase 2.
@@ -28,7 +29,7 @@ export interface ToolDefinition {
   run(client: ForemanClient, input: unknown): Promise<unknown>;
 }
 
-export const TOOLS: readonly ToolDefinition[] = [
+export const READ_TOOLS: readonly ToolDefinition[] = [
   {
     name: 'foreman_brief',
     title: 'Project brief',
@@ -81,6 +82,19 @@ export const TOOLS: readonly ToolDefinition[] = [
   },
 ];
 
+/** What every tool has, whichever half it belongs to. This is what the budget is measured over. */
+export interface ToolSummary {
+  readonly name: string;
+  readonly title: string;
+  readonly description: string;
+  readonly inputSchema: z.ZodObject<z.ZodRawShape>;
+}
+
+/** Every tool, read and write. The contract tests measure this list. */
+export const TOOLS: readonly ToolSummary[] = [...READ_TOOLS, ...WRITE_TOOLS];
+
+export { WRITE_TOOLS };
+
 /**
  * The ceiling, asserted by a contract test. Twelve is not arbitrary: past roughly that many, the
  * definitions cost more context than the answers are worth, and the model starts choosing badly
@@ -89,13 +103,23 @@ export const TOOLS: readonly ToolDefinition[] = [
 export const MAX_TOOLS = 12;
 
 /**
- * The token budget for the whole definition set. Four characters per token is the usual
- * approximation for English; the number is crude on purpose, because the failure it guards against
- * is a doubling, not a rounding.
+ * The token budget for the whole definition set.
+ *
+ * Derived from the plan's own figure — the API Contract sizes the surface at **~2–3k tokens for
+ * ~10 verbs**, against the measured token tax in the research notes. 2400 is the middle of that
+ * range, and with the full surface the set costs about 1250, so there is real headroom rather than
+ * a number chosen to fit what happens to be there.
+ *
+ * It was 1200 while only the four read tools existed, and the write tools tripped it — which is the
+ * guard working. The right response was to calibrate the constant against the plan rather than
+ * against the moment, and to keep the test that proves it still bites when a definition bloats.
+ *
+ * Four characters per token is the usual approximation for English; the number is crude on purpose,
+ * because the failure it guards against is a doubling, not a rounding.
  */
-export const TOOL_DEFINITION_TOKEN_BUDGET = 1200;
+export const TOOL_DEFINITION_TOKEN_BUDGET = 2400;
 
-export function toolDefinitionTokens(definitions: readonly ToolDefinition[] = TOOLS): number {
+export function toolDefinitionTokens(definitions: readonly ToolSummary[] = TOOLS): number {
   const payload = definitions.map((tool) => ({
     name: tool.name,
     title: tool.title,

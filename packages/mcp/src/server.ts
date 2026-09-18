@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ForemanClient } from './client.js';
 import { ForemanApiError } from './client.js';
-import { TOOLS } from './tools/index.js';
+import { READ_TOOLS, WRITE_TOOLS } from './tools/index.js';
 
 /**
  * The MCP server the shim exposes over stdio.
@@ -36,7 +36,7 @@ export function createServer({ client, name, version }: ServerOptions): McpServe
     },
   );
 
-  for (const tool of TOOLS) {
+  for (const tool of READ_TOOLS) {
     server.registerTool(
       tool.name,
       {
@@ -61,6 +61,73 @@ export function createServer({ client, name, version }: ServerOptions): McpServe
         } catch (error) {
           // An error is returned as a tool result, not thrown: the model can read it and decide,
           // where a protocol error just ends the call.
+          const message =
+            error instanceof ForemanApiError
+              ? `Foreman: ${error.message} (${String(error.status)})`
+              : error instanceof Error
+                ? error.message
+                : String(error);
+          return { content: [{ type: 'text' as const, text: message }], isError: true };
+        }
+      },
+    );
+  }
+
+  for (const tool of WRITE_TOOLS) {
+    server.registerTool(
+      tool.name,
+      {
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.inputSchema.shape,
+        annotations: {
+          readOnlyHint: false,
+          // Not destructive by default: most writes here add or advance. The ones that lose
+          // something are gated individually below, which is more honest than one flag for all.
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: false,
+        },
+      },
+      async (args: unknown) => {
+        try {
+          const decision = await tool.gate(client, args);
+
+          if (decision.gated) {
+            // ADR-011: the plan's MRTR `input_required` round-trip, carried by 2025-11-25's
+            // elicitation. The design is unchanged — ask before losing something — and this is
+            // the mechanism the SDK actually ships.
+            const asked = await server.server.elicitInput({
+              message: `${decision.because ?? 'This change needs confirming.'}\n\nGo ahead?`,
+              requestedSchema: {
+                type: 'object',
+                properties: {
+                  confirm: {
+                    type: 'boolean',
+                    title: 'Confirm',
+                    description: 'Yes, make this change.',
+                  },
+                },
+                required: ['confirm'],
+              },
+            });
+
+            if (asked.action !== 'accept' || asked.content?.['confirm'] !== true) {
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    // Declining is a normal outcome, not a failure: say what did not happen.
+                    text: `Not done — ${asked.action === 'accept' ? 'not confirmed' : asked.action}. Nothing was changed.`,
+                  },
+                ],
+              };
+            }
+          }
+
+          const result = await tool.run(client, args);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+        } catch (error) {
           const message =
             error instanceof ForemanApiError
               ? `Foreman: ${error.message} (${String(error.status)})`

@@ -1,6 +1,10 @@
 import {
   BriefInput,
   CACHE,
+  gateForDelete,
+  gateForLink,
+  gateForPriority,
+  gateForStatus,
   GetInput,
   PortfolioInput,
   SEARCHABLE_TYPES,
@@ -12,9 +16,11 @@ import { createClient, ForemanApiError } from '../src/client.js';
 import { createServer } from '../src/server.js';
 import {
   MAX_TOOLS,
+  READ_TOOLS,
   TOOL_DEFINITION_TOKEN_BUDGET,
   TOOLS,
   toolDefinitionTokens,
+  WRITE_TOOLS,
 } from '../src/tools/index.js';
 
 /**
@@ -75,7 +81,7 @@ describe('schemas are generated from packages/shared (FRM-REQ-081)', () => {
     foreman_get: GetInput,
   };
 
-  it.each(TOOLS.map((tool) => [tool.name, tool] as const))(
+  it.each(READ_TOOLS.map((tool) => [tool.name, tool] as const))(
     '%s uses the shared schema itself, not a copy',
     (name, tool) => {
       const shared = expected[name];
@@ -102,7 +108,7 @@ describe('schemas are generated from packages/shared (FRM-REQ-081)', () => {
 });
 
 describe('listings carry cache metadata', () => {
-  it.each(TOOLS.map((tool) => [tool.name, tool] as const))('%s advertises a TTL and a scope', (_name, tool) => {
+  it.each(READ_TOOLS.map((tool) => [tool.name, tool] as const))('%s advertises a TTL and a scope', (_name, tool) => {
     expect(tool.cache.ttlMs).toBeGreaterThan(0);
     expect(['project', 'global']).toContain(tool.cache.cacheScope);
   });
@@ -118,14 +124,14 @@ describe('the tools call the API they claim to', () => {
 
   it('foreman_brief asks for that project’s brief', async () => {
     const get = vi.fn().mockResolvedValue({ project: { code: 'BND' } });
-    const tool = TOOLS.find((t) => t.name === 'foreman_brief');
+    const tool = READ_TOOLS.find((t) => t.name === 'foreman_brief');
     await tool?.run(clientWith(get), { project: 'BND' });
     expect(get).toHaveBeenCalledWith('/api/brief/BND');
   });
 
   it('foreman_search passes its filters through', async () => {
     const get = vi.fn().mockResolvedValue({ items: [] });
-    const tool = TOOLS.find((t) => t.name === 'foreman_search');
+    const tool = READ_TOOLS.find((t) => t.name === 'foreman_search');
     await tool?.run(clientWith(get), { q: 'pg_trgm', types: ['adr'], project: 'BND', limit: 5 });
     expect(get).toHaveBeenCalledWith('/api/search', {
       q: 'pg_trgm',
@@ -136,7 +142,7 @@ describe('the tools call the API they claim to', () => {
   });
 
   it('refuses input that does not match the shared schema', async () => {
-    const tool = TOOLS.find((t) => t.name === 'foreman_get');
+    const tool = READ_TOOLS.find((t) => t.name === 'foreman_get');
     // Not project-prefixed, so it is not a human ID (ADR-008).
     await expect(tool?.run(clientWith(vi.fn()), { id: 'REQ-021' })).rejects.toThrow();
   });
@@ -205,5 +211,85 @@ describe('the server', () => {
     expect(source).not.toMatch(/\bserver\.tool\(/);
     expect(source).not.toMatch(/\bserver\.resource\(/);
     expect(source).not.toMatch(/\bserver\.prompt\(/);
+  });
+});
+
+describe('the gate in front of the write tools (T-2.9, FRM-REQ-090, FRM-REQ-091)', () => {
+  it('gates nothing that is forward progress', () => {
+    // The motions of working. A confirmation on each is exactly how a confirmation stops being read.
+    expect(gateForStatus('task', 'todo', 'in_progress').gated).toBe(false);
+    expect(gateForStatus('task', 'in_progress', 'done').gated).toBe(false);
+    expect(gateForStatus('task', null, 'todo').gated).toBe(false);
+    expect(gateForStatus('finding', 'open', 'fixed').gated).toBe(false);
+    expect(gateForPriority('M').gated).toBe(false);
+    expect(gateForLink(false).gated).toBe(false);
+  });
+
+  it('gates a task moving backwards, and says which way it went', () => {
+    const decision = gateForStatus('task', 'done', 'todo');
+    expect(decision.gated).toBe(true);
+    expect(decision.because).toContain('done');
+    expect(decision.because).toContain('todo');
+  });
+
+  it('gates cancelling, whatever the entity', () => {
+    expect(gateForStatus('task', 'in_progress', 'cancelled').gated).toBe(true);
+    expect(gateForStatus('phase', 'planned', 'cancelled').gated).toBe(true);
+  });
+
+  it('gates completing a phase', () => {
+    expect(gateForStatus('phase', 'active', 'complete').gated).toBe(true);
+  });
+
+  it("gates setting a requirement to Won't, because it leaves every coverage count", () => {
+    const decision = gateForPriority('W');
+    expect(decision.gated).toBe(true);
+    expect(decision.because).toContain('coverage');
+  });
+
+  it('gates unlinking but not linking', () => {
+    expect(gateForLink(true).gated).toBe(true);
+    expect(gateForLink(false).gated).toBe(false);
+  });
+
+  it('gives every gated decision a reason phrased for the person being asked', () => {
+    const gated = [
+      gateForStatus('task', 'done', 'todo'),
+      gateForStatus('task', 'todo', 'cancelled'),
+      gateForStatus('phase', 'active', 'complete'),
+      gateForPriority('W'),
+      gateForLink(true),
+      gateForDelete(),
+    ];
+    for (const decision of gated) {
+      expect(decision.gated).toBe(true);
+      expect(decision.because?.length ?? 0).toBeGreaterThan(20);
+      // A reason, not a restatement of the rule: it says what is lost.
+      expect(decision.because).toMatch(/\.$/);
+    }
+  });
+
+  it('asks the gate before running, for every write tool', () => {
+    for (const tool of WRITE_TOOLS) {
+      expect(typeof tool.gate, tool.name).toBe('function');
+      expect(typeof tool.run, tool.name).toBe('function');
+    }
+  });
+
+  it('decides a status gate from the current state, not from the request alone', async () => {
+    const get = vi.fn().mockResolvedValue({ type: 'task', entity: { status: 'done' } });
+    const setStatus = WRITE_TOOLS.find((t) => t.name === 'foreman_set_status');
+
+    // The same request is a regression or not depending on where the task already is — which is
+    // why the gate fetches rather than guesses.
+    const decision = await setStatus?.gate({ get } as never, { id: 'BND-T-0.3', status: 'todo' });
+    expect(decision?.gated).toBe(true);
+  });
+
+  it('does not gate the same request when the task has not got there yet', async () => {
+    const get = vi.fn().mockResolvedValue({ type: 'task', entity: { status: 'todo' } });
+    const setStatus = WRITE_TOOLS.find((t) => t.name === 'foreman_set_status');
+    const decision = await setStatus?.gate({ get } as never, { id: 'BND-T-0.3', status: 'in_progress' });
+    expect(decision?.gated).toBe(false);
   });
 });
