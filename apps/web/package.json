@@ -1,0 +1,28 @@
+{
+  "name": "foreman-web",
+  "private": true,
+  "version": "0.0.0",
+  "description": "React console, served as statics by the API",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint . && d3-check-usage src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@d3cloud/ui": "https://github.com/matdemers1/d3-design-system/releases/download/v1.1.0/d3cloud-ui-1.1.0.tgz",
+    "@foreman/shared": "workspace:*",
+    "lucide-react": "^1.44.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.9.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.0"
+  }
+}

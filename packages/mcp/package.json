@@ -1,0 +1,19 @@
+{
+  "name": "@d3cloud/foreman-mcp",
+  "private": false,
+  "version": "0.0.0",
+  "description": "Foreman MCP stdio shim — runs on the operator's machine, speaks to the Foreman API with a scoped token (ADR-003)",
+  "type": "module",
+  "bin": { "foreman-mcp": "./dist/index.js" },
+  "files": ["dist"],
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@foreman/shared": "workspace:*"
+  }
+}

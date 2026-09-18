@@ -1,0 +1,25 @@
+{
+  "name": "foreman-worker",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Job-queue drain: ingest, attribution, scans, reconcile, backup",
+  "type": "module",
+  "files": ["dist"],
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@foreman/shared": "workspace:*",
+    "@prisma/client": "7.10.0",
+    "foreman-server": "workspace:*",
+    "pino": "^10.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.13"
+  }
+}

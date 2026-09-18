@@ -1,0 +1,36 @@
+{
+  "name": "foreman-server",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Express API, Prisma schema, dual auth, webhook receiver and CLI",
+  "type": "module",
+  "files": ["dist", "prisma"],
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "seed:example": "tsx src/cli/seed-example.ts",
+    "import": "tsx src/cli/import.ts"
+  },
+  "dependencies": {
+    "@foreman/shared": "workspace:*",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "argon2": "^0.45.1",
+    "express": "^5.2.1",
+    "otpauth": "^9.5.2",
+    "pino": "^10.3.1",
+    "prisma": "7.10.0",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "tsx": "^4.23.13"
+  }
+}

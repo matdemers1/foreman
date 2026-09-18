@@ -1,0 +1,22 @@
+{
+  "name": "@foreman/shared",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Domain entities, EARS parser and generated API client — the single source of truth for every entity shape (FRM-REQ-003)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.6.2"
+  }
+}
