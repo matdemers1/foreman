@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import type { Db } from '../db.js';
 import { getByHumanId } from '../domain/entities.js';
 import { portfolio } from '../domain/portfolio.js';
@@ -25,6 +25,7 @@ const SearchQuery = z.object({
 export function searchRoutes(db: Db): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireScope(db, 'read'));
 
   router.get(
     '/search',

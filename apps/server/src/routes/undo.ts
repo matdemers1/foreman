@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import type { Db } from '../db.js';
 import { undo } from '../domain/undo.js';
 import { actorOf, handler, param } from './helpers.js';
@@ -13,6 +13,8 @@ import { actorOf, handler, param } from './helpers.js';
 export function undoRoutes(db: Db): Router {
   const router = Router();
   router.use(requireAuth);
+  // Undo changes state, so it needs `write` like any other mutation.
+  router.use(requireScope(db, 'write'));
 
   router.post(
     '/:auditEventId',

@@ -18,6 +18,7 @@ import { oidcRoutes } from './routes/oidc.js';
 import { projectRoutes } from './routes/projects.js';
 import { briefRoutes } from './routes/brief.js';
 import { searchRoutes } from './routes/search.js';
+import { tokenRoutes } from './routes/tokens.js';
 import { undoRoutes } from './routes/undo.js';
 import type { OidcClient } from './auth/oidc.js';
 
@@ -83,6 +84,7 @@ export function createApp({ config, db, oidc = null }: AppDeps): Express {
   mount(app, '/api/brief', briefRoutes(db));
   mount(app, '/api', searchRoutes(db));
   mount(app, '/api/undo', undoRoutes(db));
+  mount(app, '/api/tokens', tokenRoutes(db));
 
   /** Liveness: the process is up. Deliberately touches nothing else. */
   app.get('/healthz', (_req, res) => {

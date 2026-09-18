@@ -103,6 +103,58 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   next();
 }
 
+/**
+ * The scopes a token may hold. `read` answers questions; `write` changes state; `admin` manages
+ * tokens and accounts. A session always holds all three — the operator signing in is the owner —
+ * and a token holds only what it was issued with (FRM-REQ-025, FRM-REQ-026, FRM-REQ-027).
+ */
+export const SCOPES = ['read', 'write', 'admin'] as const;
+export type Scope = (typeof SCOPES)[number];
+
+export function hasScope(auth: AuthContext | undefined, scope: Scope): boolean {
+  if (auth === undefined) return false;
+  // A signed-in user is the operator. Tokens are the things that are scoped.
+  if (auth.scopes.includes('*')) return true;
+  return auth.scopes.includes(scope);
+}
+
+/**
+ * Guard a route by scope. **A denial is audited**, because a read-only token being used on a write
+ * route is either a misconfiguration worth finding or an attempt worth seeing — and either way,
+ * silence is the wrong answer.
+ */
+export function requireScope(db: Db, scope: Scope) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (hasScope(req.auth, scope)) {
+      next();
+      return;
+    }
+
+    const auth = req.auth;
+    void db.auditEvent
+      .create({
+        data: {
+          actor: auth?.actor ?? 'anonymous',
+          actorKind: auth?.actorKind ?? 'system',
+          action: 'update',
+          entityType: 'api_token',
+          entityId: auth?.tokenId ?? '00000000-0000-7000-8000-000000000000',
+          after: {
+            event: 'scope_denied',
+            required: scope,
+            held: auth?.scopes ?? [],
+            method: req.method,
+            path: req.path,
+          },
+        },
+      })
+      // The denial itself must still happen even if recording it fails.
+      .catch(() => undefined);
+
+    res.status(403).json({ error: `this token may not ${scope}` });
+  };
+}
+
 /** Guard: console-only routes. A scoped MCP token may not manage accounts. */
 export function requireUser(req: Request, res: Response, next: NextFunction): void {
   if (req.auth === undefined || req.auth.userId === null) {

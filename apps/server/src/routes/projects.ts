@@ -23,7 +23,7 @@ import {
   updateRequirement,
   updateTask,
 } from '../domain/projects.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import {
   actorOf,
   decodeCursor,
@@ -45,6 +45,9 @@ import {
 export function projectRoutes(db: Db): Router {
   const router = Router();
   router.use(requireAuth);
+  // Reading needs `read`; anything that changes state needs `write`, and a denial is audited.
+  router.use(requireScope(db, 'read'));
+  const canWrite = requireScope(db, 'write');
 
   // ─── Projects ────────────────────────────────────────────────────────────
 
@@ -73,6 +76,7 @@ export function projectRoutes(db: Db): Router {
 
   router.post(
     '/',
+    canWrite,
     handler(async (req, res) => {
       const body = parseBody(ProjectCreate, req, res);
       if (body === null) return;
@@ -97,6 +101,7 @@ export function projectRoutes(db: Db): Router {
 
   router.patch(
     '/:code',
+    canWrite,
     handler(async (req, res) => {
       const body = parseBody(ProjectUpdate, req, res);
       if (body === null) return;
@@ -117,6 +122,7 @@ export function projectRoutes(db: Db): Router {
 
   router.post(
     '/:code/phases',
+    canWrite,
     handler(async (req, res) => {
       const body = parseBody(PhaseCreate, req, res);
       if (body === null) return;
@@ -173,6 +179,7 @@ export function projectRoutes(db: Db): Router {
 
   router.post(
     '/:code/requirements',
+    canWrite,
     handler(async (req, res) => {
       const body = parseBody(RequirementCreate, req, res);
       if (body === null) return;
@@ -183,6 +190,7 @@ export function projectRoutes(db: Db): Router {
 
   router.patch(
     '/:code/requirements/:humanId',
+    canWrite,
     handler(async (req, res) => {
       const body = parseBody(RequirementUpdate, req, res);
       if (body === null) return;
@@ -236,6 +244,7 @@ export function projectRoutes(db: Db): Router {
 
   router.post(
     '/:code/tasks',
+    canWrite,
     handler(async (req, res) => {
       const body = parseBody(TaskCreate, req, res);
       if (body === null) return;
@@ -245,6 +254,7 @@ export function projectRoutes(db: Db): Router {
 
   router.patch(
     '/:code/tasks/:humanId',
+    canWrite,
     handler(async (req, res) => {
       const body = parseBody(TaskUpdate, req, res);
       if (body === null) return;
@@ -254,6 +264,7 @@ export function projectRoutes(db: Db): Router {
 
   router.delete(
     '/:code/requirements/:humanId',
+    canWrite,
     handler(async (req, res) => {
       await softDelete(db, actorOf(req), 'requirement', param(req, 'humanId'));
       res.status(204).end();
@@ -262,6 +273,7 @@ export function projectRoutes(db: Db): Router {
 
   router.delete(
     '/:code/tasks/:humanId',
+    canWrite,
     handler(async (req, res) => {
       await softDelete(db, actorOf(req), 'task', param(req, 'humanId'));
       res.status(204).end();
@@ -270,6 +282,7 @@ export function projectRoutes(db: Db): Router {
 
   router.delete(
     '/:code/phases/:humanId',
+    canWrite,
     handler(async (req, res) => {
       await softDelete(db, actorOf(req), 'phase', param(req, 'humanId'));
       res.status(204).end();

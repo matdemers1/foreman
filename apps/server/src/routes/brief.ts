@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import type { Db } from '../db.js';
 import { approximateTokens, buildBrief } from '../domain/brief.js';
 import { handler, param } from './helpers.js';
@@ -13,6 +13,7 @@ import { handler, param } from './helpers.js';
 export function briefRoutes(db: Db): Router {
   const router = Router();
   router.use(requireAuth);
+  router.use(requireScope(db, 'read'));
 
   router.get(
     '/:code',
