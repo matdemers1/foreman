@@ -11,6 +11,18 @@ import {
 import type { Db } from '../db.js';
 import type { ImportStatus } from '../generated/prisma/enums.js';
 import { classify, documentKindFor, type FileKind } from './classify.js';
+import {
+  parsePhaseHeading,
+  taskFrom,
+  writeAdr,
+  writeDocument,
+  writeFinding,
+  writePhase,
+  writeRisk,
+  writeTask,
+  writeTerm,
+  type WriteContext,
+} from './write.js';
 
 /**
  * The importer (T-8.3 … T-8.8).
@@ -264,6 +276,35 @@ async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
       const withIds = items.filter((i) => /\bT-\d+(?:\.\d+)?\b/.test(i.text)).length;
       ctx.count('task', items.length);
       ctx.count('task-synthesized', items.length - withIds);
+
+      if (!ctx.dryRun && ctx.projectId !== null) {
+        const write: WriteContext = { db, projectId: ctx.projectId, code: ctx.code };
+
+        // Phases first: a task's ID carries its phase number, so the phase has to exist and be
+        // known before any task under it can be named.
+        const phases = new Map<string, { id: string; number: string }>();
+        let order = 0;
+        for (const section of new Set(items.map((i) => i.section))) {
+          if (section === null) continue;
+          const parsed = parsePhaseHeading(section);
+          if (parsed === null) continue;
+          const id = await writePhase(write, parsed.number, parsed.name, order);
+          phases.set(section, { id, number: parsed.number });
+          order += 1;
+          ctx.count('phase');
+        }
+
+        const positions = new Map<string, number>();
+        for (const item of items) {
+          const phase = item.section === null ? undefined : phases.get(item.section);
+          const number = phase?.number ?? '0';
+          const position = (positions.get(number) ?? 0) + 1;
+          positions.set(number, position);
+
+          const task = taskFrom(item, ctx.code, number, position);
+          await writeTask(write, { ...task, phaseId: phase?.id ?? null });
+        }
+      }
       produced.push(
         `${String(items.length)} tasks${items.length - withIds > 0 ? ` (${String(items.length - withIds)} with synthesized IDs)` : ''}`,
       );
@@ -281,6 +322,14 @@ async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
       if (number === undefined) {
         return outcome('partial', 'an ADR whose filename carries no number');
       }
+      if (!ctx.dryRun && ctx.projectId !== null) {
+        await writeAdr(
+          { db, projectId: ctx.projectId, code: ctx.code },
+          ctx.path,
+          ctx.data,
+          parseSections(ctx.body),
+        );
+      }
       ctx.count('adr');
       produced.push('1 ADR');
       return outcome('mapped', null);
@@ -291,6 +340,14 @@ async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
       if (typeof id !== 'string') {
         return outcome('partial', 'a finding with no finding_id in its frontmatter');
       }
+      if (!ctx.dryRun && ctx.projectId !== null) {
+        await writeFinding(
+          { db, projectId: ctx.projectId, code: ctx.code },
+          ctx.data,
+          basename(ctx.path).replace(/\.md$/i, '').replace(/^[A-Z]+-\d+\s*[—–-]\s*/, ''),
+          parseSections(ctx.body),
+        );
+      }
       ctx.count('finding');
       produced.push('1 finding');
       return outcome('mapped', null);
@@ -298,16 +355,42 @@ async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
 
     case 'risk-register': {
       const rows = parseTables(ctx.body).flatMap((t) => t.rows);
+      let written = 0;
+      if (!ctx.dryRun && ctx.projectId !== null) {
+        const write: WriteContext = { db, projectId: ctx.projectId, code: ctx.code };
+        for (const [index, row] of rows.entries()) {
+          if (await writeRisk(write, row, index + 1)) written += 1;
+        }
+      }
       ctx.count('risk', rows.length);
       produced.push(`${String(rows.length)} risks`);
-      return outcome(rows.length === 0 ? 'partial' : 'mapped', rows.length === 0 ? 'no risk rows parsed' : null);
+      return outcome(
+        rows.length === 0 ? 'partial' : 'mapped',
+        rows.length === 0
+          ? 'no risk rows parsed'
+          : written === 0 && !ctx.dryRun
+            ? 'rows parsed, but none had a title column this importer recognises'
+            : null,
+      );
     }
 
     case 'glossary': {
       const rows = parseTables(ctx.body).flatMap((t) => t.rows);
+      let written = 0;
+      if (!ctx.dryRun && ctx.projectId !== null) {
+        const write: WriteContext = { db, projectId: ctx.projectId, code: ctx.code };
+        for (const row of rows) if (await writeTerm(write, row)) written += 1;
+      }
       ctx.count('term', rows.length);
       produced.push(`${String(rows.length)} terms`);
-      return outcome(rows.length === 0 ? 'partial' : 'mapped', rows.length === 0 ? 'no term rows parsed' : null);
+      return outcome(
+        rows.length === 0 ? 'partial' : 'mapped',
+        rows.length === 0
+          ? 'no term rows parsed'
+          : written === 0 && !ctx.dryRun
+            ? 'rows parsed, but none had a term and a definition column'
+            : null,
+      );
     }
 
     case 'phase-plan':
@@ -323,6 +406,15 @@ async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
         }
         ctx.count('document');
         return outcome('partial', 'no headings to split into sections — imported as one body');
+      }
+      if (!ctx.dryRun && ctx.projectId !== null) {
+        await writeDocument(
+          { db, projectId: ctx.projectId, code: ctx.code },
+          basename(ctx.path).replace(/\.md$/i, ''),
+          documentKindFor(basename(ctx.path)) ?? 'research',
+          ctx.path,
+          sections,
+        );
       }
       ctx.count('document');
       ctx.count('document_section', sections.length);
