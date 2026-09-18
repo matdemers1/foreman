@@ -1,0 +1,157 @@
+{
+  "totals": {
+    "seen": 12,
+    "mapped": 12,
+    "partial": 0,
+    "unmapped": 0
+  },
+  "projects": [
+    {
+      "code": "BND",
+      "folder": "Bindery",
+      "files": 8
+    },
+    {
+      "code": "BURR",
+      "folder": "Burrow",
+      "files": 1
+    },
+    {
+      "code": "CW",
+      "folder": "Clearwhen",
+      "files": 2
+    },
+    {
+      "code": "AUTH",
+      "folder": "D3 Auth",
+      "files": 1
+    },
+    {
+      "code": "PW",
+      "folder": "Personal Website",
+      "files": 0
+    }
+  ],
+  "files": [
+    {
+      "path": "Bindery/ADR-002 — Postgres Job Queue with Replayable Pipeline Stages.md",
+      "status": "mapped",
+      "kind": "adr",
+      "note": null,
+      "produced": [
+        "1 ADR"
+      ]
+    },
+    {
+      "path": "Bindery/Architecture.md",
+      "status": "mapped",
+      "kind": "document",
+      "note": null,
+      "produced": [
+        "1 document, 15 sections"
+      ]
+    },
+    {
+      "path": "Bindery/Audits/Findings/CR-001 — Vaulting one document out of a bundle deletes every page of the file and orpha.md",
+      "status": "mapped",
+      "kind": "finding",
+      "note": null,
+      "produced": [
+        "1 finding"
+      ]
+    },
+    {
+      "path": "Bindery/Glossary.md",
+      "status": "mapped",
+      "kind": "glossary",
+      "note": null,
+      "produced": [
+        "29 terms"
+      ]
+    },
+    {
+      "path": "Bindery/Phase Plans/Phase 0 — Foundation.md",
+      "status": "mapped",
+      "kind": "phase-plan",
+      "note": "stored as a research document: no typed kind matches this filename",
+      "produced": [
+        "1 document, 7 sections"
+      ]
+    },
+    {
+      "path": "Bindery/Requirements Register.md",
+      "status": "mapped",
+      "kind": "requirements-register",
+      "note": null,
+      "produced": [
+        "210 requirements"
+      ]
+    },
+    {
+      "path": "Bindery/Risk Register.md",
+      "status": "mapped",
+      "kind": "risk-register",
+      "note": null,
+      "produced": [
+        "25 risks"
+      ]
+    },
+    {
+      "path": "Bindery/Scope of Work.md",
+      "status": "mapped",
+      "kind": "scope-of-work",
+      "note": null,
+      "produced": [
+        "222 tasks"
+      ]
+    },
+    {
+      "path": "Burrow/Requirements Register.md",
+      "status": "mapped",
+      "kind": "requirements-register",
+      "note": null,
+      "produced": [
+        "85 requirements"
+      ]
+    },
+    {
+      "path": "Clearwhen/ADR-001 — Weather Data Provider.md",
+      "status": "mapped",
+      "kind": "adr",
+      "note": null,
+      "produced": [
+        "1 ADR"
+      ]
+    },
+    {
+      "path": "Clearwhen/Scope of Work.md",
+      "status": "mapped",
+      "kind": "scope-of-work",
+      "note": "no task IDs in the file — every task ID was synthesized and flagged",
+      "produced": [
+        "84 tasks (84 with synthesized IDs)"
+      ]
+    },
+    {
+      "path": "D3 Auth/Scope of Work.md",
+      "status": "mapped",
+      "kind": "scope-of-work",
+      "note": null,
+      "produced": [
+        "78 tasks (6 with synthesized IDs)"
+      ]
+    }
+  ],
+  "entities": {
+    "adr": 2,
+    "document": 2,
+    "document_section": 22,
+    "finding": 1,
+    "term": 29,
+    "requirement": 295,
+    "risk": 25,
+    "task": 384,
+    "task-synthesized": 90
+  },
+  "substitutions": 924
+}

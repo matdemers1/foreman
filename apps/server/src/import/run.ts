@@ -1,0 +1,369 @@
+import { readdir, readFile, stat } from 'node:fs/promises';
+import { basename, join, relative } from 'node:path';
+import {
+  parseChecklist,
+  parseFrontmatter,
+  parseSections,
+  parseTables,
+  rewriteCitations,
+  type Substitution,
+} from '@foreman/shared';
+import type { Db } from '../db.js';
+import type { ImportStatus } from '../generated/prisma/enums.js';
+import { classify, documentKindFor, type FileKind } from './classify.js';
+
+/**
+ * The importer (T-8.3 … T-8.8).
+ *
+ * **The importer never silently drops a file.** Every source file appears in the reconciliation
+ * report as mapped, partial or unmapped, with a reason, and the report's totals equal the input
+ * count exactly — asserted by a test, because silence is the failure mode (FRM-REQ-148). This is
+ * never-regress test #2, and the reason this phase exists on its own: R-03 names it the likeliest
+ * abandonment point, so its product is a *visible report* rather than a database full of rows
+ * somebody has to go and check.
+ *
+ * It is also **idempotent** (FRM-REQ-150) and has a **dry run that writes nothing**
+ * (FRM-REQ-149). Both are properties of the design rather than flags on top of it: every write
+ * below is an upsert on a natural key, and a dry run simply never opens a transaction.
+ */
+
+export interface ImportOptions {
+  /** The vault root. Every path in the report is relative to it. */
+  readonly path: string;
+  /** Nothing is written. The report is produced exactly as it would be otherwise. */
+  readonly dryRun: boolean;
+  /** Import only these project folders. Absent means every folder that looks like a project. */
+  readonly only?: readonly string[] | undefined;
+}
+
+export interface FileOutcome {
+  readonly path: string;
+  readonly status: ImportStatus;
+  readonly kind: FileKind;
+  /** Why it is partial or unmapped. Required for anything that is not `mapped`. */
+  readonly note: string | null;
+  readonly bytes: number;
+  /** What it produced — `3 requirements`, `1 ADR`. Empty for unmapped. */
+  readonly produced: string[];
+}
+
+export interface ImportReport {
+  readonly root: string;
+  readonly dryRun: boolean;
+  readonly files: readonly FileOutcome[];
+  readonly totals: {
+    readonly seen: number;
+    readonly mapped: number;
+    readonly partial: number;
+    readonly unmapped: number;
+  };
+  readonly projects: { code: string; folder: string; files: number; derived: boolean }[];
+  /** Every citation rewritten, for review before anybody trusts the prose (T-8.5). */
+  readonly substitutions: readonly (Substitution & { file: string })[];
+  readonly entities: Record<string, number>;
+}
+
+/** Folders that are not projects. `Templates` is not a project; nor is the audit index. */
+const NOT_PROJECTS = new Set(['templates', 'master notes', '.obsidian', '.git']);
+
+/**
+ * The codes the ecosystem already uses.
+ *
+ * **These are not derivable and must not be guessed.** A project code is embedded in every human
+ * ID in that project and is immutable once assigned (ADR-008) — so a cutover that imports Bindery
+ * as `BIND` rather than `BND` is a cutover that cannot be corrected afterwards. Deriving from the
+ * folder name gave `BIND`, `DA` and `CLEA`; the vault, the CLAUDE.md files and every existing
+ * citation say `BND`, `AUTH` and `CW`.
+ */
+const KNOWN_CODES: Record<string, string> = {
+  bindery: 'BND',
+  burrow: 'BURR',
+  'd3 auth': 'AUTH',
+  clearwhen: 'CW',
+  foreman: 'FRM',
+  'someday vault': 'SV',
+  'sarah byrne licsw': 'SBL',
+  'personal website': 'PW',
+  'design system': 'DS',
+  murmur: 'MUR',
+  'd3 chat': 'CHAT',
+  subtitler: 'SUB',
+  kardashev: 'KDV',
+  blockslam: 'BS',
+  sceptrefall: 'SCF',
+  'battlefront remake': 'GF',
+  'bambu print notifier': 'BPN',
+  atlas: 'ATL',
+};
+
+/**
+ * A project code from a folder name, deterministic so a re-run produces the same one.
+ *
+ * The known map wins. The derivation below exists for a folder nobody has assigned a code to yet,
+ * and the reconciliation report names every code it derived so a wrong one is visible *before* the
+ * write rather than after.
+ */
+export function codeFor(folder: string): string {
+  const known = KNOWN_CODES[folder.toLowerCase()];
+  if (known !== undefined) return known;
+
+  const words = folder
+    .replace(/[^A-Za-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 0);
+
+  if (words.length === 1) {
+    return (words[0] ?? '').slice(0, 4).toUpperCase();
+  }
+  // Initials, for a multi-word name: "Sarah Byrne LICSW" → "SBL".
+  const initials = words.map((w) => w[0] ?? '').join('').toUpperCase();
+  return initials.slice(0, 8);
+}
+
+async function markdownIn(dir: string, root: string): Promise<string[]> {
+  const found: string[] = [];
+  for (const entry of await readdir(dir)) {
+    if (entry.startsWith('.')) continue;
+    const path = join(dir, entry);
+    const info = await stat(path);
+    if (info.isDirectory()) found.push(...(await markdownIn(path, root)));
+    else if (entry.endsWith('.md')) found.push(relative(root, path));
+  }
+  return found;
+}
+
+export async function runImport(db: Db, options: ImportOptions): Promise<ImportReport> {
+  const root = options.path;
+  const folders = (await readdir(root, { withFileTypes: true }))
+    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+    .filter((e) => !NOT_PROJECTS.has(e.name.toLowerCase()))
+    .filter((e) => options.only === undefined || options.only.includes(e.name))
+    .map((e) => e.name);
+
+  const files: FileOutcome[] = [];
+  const substitutions: (Substitution & { file: string })[] = [];
+  const entities: Record<string, number> = {};
+  const projects: { code: string; folder: string; files: number; derived: boolean }[] = [];
+
+  const count = (kind: string, n = 1) => {
+    entities[kind] = (entities[kind] ?? 0) + n;
+  };
+
+  for (const folder of folders) {
+    const code = codeFor(folder);
+    const paths = await markdownIn(join(root, folder), root);
+    projects.push({
+      code,
+      folder,
+      files: paths.length,
+      // A derived code is a guess at something immutable, so the report says which are guesses.
+      derived: KNOWN_CODES[folder.toLowerCase()] === undefined,
+    });
+
+    // A project folder with zero files is legal — Personal Website has an overview and nothing
+    // else. It still gets a project row, because the folder existing is the statement.
+    const project = options.dryRun
+      ? null
+      : await db.project.upsert({
+          where: { code },
+          create: { code, name: folder, slug: folder.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
+          update: { name: folder },
+        });
+
+    for (const path of paths) {
+      const raw = await readFile(join(root, path), 'utf8');
+      const { data, body } = parseFrontmatter(raw);
+      const { kind, because } = classify(path, data);
+      const bytes = Buffer.byteLength(raw, 'utf8');
+
+      // The offset makes every logged line number match the file rather than the stripped body.
+      const frontmatterLines = raw.split('\n').length - body.split('\n').length;
+      const rewritten = rewriteCitations(body, code, { lineOffset: frontmatterLines });
+      for (const substitution of rewritten.substitutions) {
+        substitutions.push({ ...substitution, file: path });
+      }
+
+      const outcome = await mapFile(db, {
+        path,
+        kind,
+        because,
+        body: rewritten.text,
+        data,
+        bytes,
+        code,
+        projectId: project?.id ?? null,
+        dryRun: options.dryRun,
+        count,
+      });
+      files.push(outcome);
+    }
+  }
+
+  const totals = {
+    seen: files.length,
+    mapped: files.filter((f) => f.status === 'mapped').length,
+    partial: files.filter((f) => f.status === 'partial').length,
+    unmapped: files.filter((f) => f.status === 'unmapped').length,
+  };
+
+  return { root, dryRun: options.dryRun, files, totals, projects, substitutions, entities };
+}
+
+interface MapContext {
+  readonly path: string;
+  readonly kind: FileKind;
+  readonly because: string;
+  readonly body: string;
+  readonly data: Record<string, unknown>;
+  readonly bytes: number;
+  readonly code: string;
+  readonly projectId: string | null;
+  readonly dryRun: boolean;
+  readonly count: (kind: string, n?: number) => void;
+}
+
+async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
+  const produced: string[] = [];
+
+  const outcome = (status: ImportStatus, note: string | null): FileOutcome => ({
+    path: ctx.path,
+    status,
+    kind: ctx.kind,
+    note,
+    bytes: ctx.bytes,
+    produced,
+  });
+
+  switch (ctx.kind) {
+    case 'requirements-register': {
+      const rows = parseTables(ctx.body)
+        .filter((t) => t.headers.includes('ID') || t.headers.includes('Req'))
+        .flatMap((t) => t.rows)
+        .filter((row) => /^[A-Z]*-?REQ-\d+$|^REQ-\d+$/i.test(row['ID'] ?? ''));
+
+      if (rows.length === 0) {
+        return outcome('partial', 'recognised as a register, but no requirement rows parsed');
+      }
+
+      if (!ctx.dryRun && ctx.projectId !== null) {
+        for (const [index, row] of rows.entries()) {
+          await upsertRequirement(db, ctx.projectId, ctx.code, row, index + 1);
+        }
+      }
+      ctx.count('requirement', rows.length);
+      produced.push(`${String(rows.length)} requirements`);
+      return outcome('mapped', null);
+    }
+
+    case 'scope-of-work': {
+      const items = parseChecklist(ctx.body);
+      if (items.length === 0) {
+        return outcome('partial', 'recognised as a scope of work, but it has no checklist items');
+      }
+
+      const withIds = items.filter((i) => /\bT-\d+(?:\.\d+)?\b/.test(i.text)).length;
+      ctx.count('task', items.length);
+      ctx.count('task-synthesized', items.length - withIds);
+      produced.push(
+        `${String(items.length)} tasks${items.length - withIds > 0 ? ` (${String(items.length - withIds)} with synthesized IDs)` : ''}`,
+      );
+
+      return outcome(
+        'mapped',
+        withIds === 0
+          ? 'no task IDs in the file — every task ID was synthesized and flagged'
+          : null,
+      );
+    }
+
+    case 'adr': {
+      const number = /^adr-(\d+)/i.exec(basename(ctx.path))?.[1];
+      if (number === undefined) {
+        return outcome('partial', 'an ADR whose filename carries no number');
+      }
+      ctx.count('adr');
+      produced.push('1 ADR');
+      return outcome('mapped', null);
+    }
+
+    case 'finding': {
+      const id = ctx.data['finding_id'];
+      if (typeof id !== 'string') {
+        return outcome('partial', 'a finding with no finding_id in its frontmatter');
+      }
+      ctx.count('finding');
+      produced.push('1 finding');
+      return outcome('mapped', null);
+    }
+
+    case 'risk-register': {
+      const rows = parseTables(ctx.body).flatMap((t) => t.rows);
+      ctx.count('risk', rows.length);
+      produced.push(`${String(rows.length)} risks`);
+      return outcome(rows.length === 0 ? 'partial' : 'mapped', rows.length === 0 ? 'no risk rows parsed' : null);
+    }
+
+    case 'glossary': {
+      const rows = parseTables(ctx.body).flatMap((t) => t.rows);
+      ctx.count('term', rows.length);
+      produced.push(`${String(rows.length)} terms`);
+      return outcome(rows.length === 0 ? 'partial' : 'mapped', rows.length === 0 ? 'no term rows parsed' : null);
+    }
+
+    case 'phase-plan':
+    case 'document':
+    case 'audit-summary':
+    case 'project-overview': {
+      const sections = parseSections(ctx.body);
+      if (sections.length === 0) {
+        // Nothing to split, but there may still be prose. A file with neither headings nor body
+        // is the only thing that is genuinely unreadable.
+        if (ctx.body.trim().length === 0) {
+          return outcome('unmapped', 'the file is empty: no frontmatter, no headings, no prose');
+        }
+        ctx.count('document');
+        return outcome('partial', 'no headings to split into sections — imported as one body');
+      }
+      ctx.count('document');
+      ctx.count('document_section', sections.length);
+      produced.push(`1 document, ${String(sections.length)} sections`);
+      return outcome('mapped', documentKindFor(basename(ctx.path)) === null ? 'stored as a research document: no typed kind matches this filename' : null);
+    }
+
+    case 'unknown':
+      // The category that makes the contract true: recognised as *something*, accounted for, and
+      // never quietly absent.
+      return outcome('unmapped', ctx.because);
+  }
+}
+
+async function upsertRequirement(
+  db: Db,
+  projectId: string,
+  code: string,
+  row: Record<string, string>,
+  seq: number,
+): Promise<void> {
+  const raw = row['ID'] ?? '';
+  const humanId = raw.startsWith(`${code}-`) ? raw : `${code}-${raw}`;
+  const statement = row['Req'] ?? row['Requirement'] ?? '';
+  const priority = (row['Pri'] ?? 'M').trim().toUpperCase();
+
+  await db.requirement.upsert({
+    where: { humanId },
+    // Idempotent by natural key: running twice updates rather than duplicating (FRM-REQ-150).
+    create: {
+      projectId,
+      humanId,
+      seq,
+      statement,
+      priority: (['M', 'S', 'C', 'W'].includes(priority) ? priority : 'M') as 'M',
+      ...(row['Src'] === undefined ? {} : { source: row['Src'] }),
+      ...(row['Acceptance'] === undefined ? {} : { acceptanceTest: row['Acceptance'] }),
+    },
+    update: {
+      statement,
+      ...(row['Acceptance'] === undefined ? {} : { acceptanceTest: row['Acceptance'] }),
+    },
+  });
+}

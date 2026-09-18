@@ -42,7 +42,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "seed:example": "pnpm --filter @foreman/shared build && node --env-file-if-exists=../../.env --import tsx src/cli/seed-example.ts",
-    "import": "pnpm --filter @foreman/shared build && tsx src/cli/import.ts",
+    "import": "pnpm --filter @foreman/shared build && node --env-file-if-exists=../../.env --import tsx src/cli/import.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
