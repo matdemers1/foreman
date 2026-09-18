@@ -83,6 +83,8 @@ export interface Route {
     | 'glossary'
     | 'audits'
     | 'activity'
+    | 'findings'
+    | 'finding'
     | 'search'
     | 'task'
     | 'not-found';
@@ -123,6 +125,14 @@ export function routeFor(path: string): Route {
   }
 
   if (parts[0] === 'search' && parts[1] === undefined) return { screen: 'search' };
+
+  // Findings are reached without a project: the inbox is cross-project by design, and a finding's
+  // human ID already carries its project (ADR-008).
+  if (parts[0] === 'findings') {
+    return parts[1] === undefined
+      ? { screen: 'findings' }
+      : { screen: 'finding', humanId: parts[1] };
+  }
 
   if (parts[0] === 'tasks' && parts[1] !== undefined) {
     return { screen: 'task', humanId: parts[1] };

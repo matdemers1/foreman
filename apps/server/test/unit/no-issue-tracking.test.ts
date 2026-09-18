@@ -88,12 +88,30 @@ describe('recurrence reaches no model (FRM-REQ-122)', () => {
   });
 
   it('is the only place recurrence is computed', () => {
-    // A second implementation elsewhere would not be covered by the checks above.
-    const elsewhere = sourceFiles(SERVER_SRC)
+    // A second implementation elsewhere would not be covered by the checks above. Searching for
+    // the *word* is too blunt — it fired on a seed comment and a pitch string, neither of which
+    // computes anything. What a second implementation would necessarily contain is the scoring:
+    // a similarity function.
+    const scorers = sourceFiles(SERVER_SRC)
       .filter((f) => !f.endsWith('domain/recurrence.ts'))
-      .filter((f) => /recurrenc/i.test(readFileSync(f, 'utf8').replace(/^\s*(\/\/|\*).*$/gm, '')))
-      .filter((f) => !/routes\/findings\.ts$/.test(f));
+      .filter((f) => {
+        const text = readFileSync(f, 'utf8');
+        return /\bjaccard\b/i.test(text) || /\bsimilarity\b/i.test(text);
+      });
 
-    expect(elsewhere.map((f) => f.replace(SERVER_SRC, 'src'))).toEqual([]);
+    expect(
+      scorers.map((f) => f.replace(SERVER_SRC, 'src')),
+      'a second similarity implementation would not be covered by the no-network checks above',
+    ).toEqual([]);
+  });
+
+  it('is reached through one entry point', () => {
+    // One importer, so there is one place to check. If the engine grows a second caller, this
+    // fails and somebody decides deliberately rather than by accident.
+    const importers = sourceFiles(SERVER_SRC)
+      .filter((f) => /from '.*recurrence\.js'/.test(readFileSync(f, 'utf8')))
+      .map((f) => f.replace(SERVER_SRC, 'src'));
+
+    expect(importers).toEqual(['src/routes/findings.ts']);
   });
 });

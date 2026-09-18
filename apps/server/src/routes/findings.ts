@@ -37,10 +37,21 @@ export function findingRoutes(db: Db): Router {
 
   // ─── The cross-project inbox (T-6.6) ─────────────────────────────────────
 
+  /**
+   * The same shape as `FindingsInput`, with `limit` coerced.
+   *
+   * The tool's schema must keep `limit` a number — it becomes JSON Schema, and a client sending a
+   * string there would be wrong. A query string has no numbers at all, so the HTTP side coerces.
+   * One contract, two encodings.
+   */
+  const FindingsQuery = FindingsInput.extend({
+    limit: z.coerce.number().int().min(1).max(200).default(50),
+  });
+
   router.get(
     '/findings',
     handler(async (req, res) => {
-      const query = parseQuery(FindingsInput, req, res);
+      const query = parseQuery(FindingsQuery, req, res);
       if (query === null) return;
 
       const items = await inbox(db, {

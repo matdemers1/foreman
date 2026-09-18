@@ -25,6 +25,8 @@ import { Adrs } from './screens/Adrs';
 import { AuditIndex } from './screens/AuditIndex';
 import { DocumentEditor } from './screens/DocumentEditor';
 import { Documents } from './screens/Documents';
+import { FindingDetail } from './screens/FindingDetail';
+import { Findings } from './screens/Findings';
 import { Glossary } from './screens/Glossary';
 import { RequirementDetail } from './screens/RequirementDetail';
 import { RiskRegister } from './screens/RiskRegister';
@@ -111,7 +113,12 @@ export function App() {
               label="Projects"
               current={path.startsWith('/projects')}
             />
-            <SideNavItem href="/findings" icon={<ListChecks />} label="Findings" />
+            <SideNavItem
+              href="/findings"
+              icon={<ListChecks />}
+              label="Findings"
+              current={path.startsWith('/findings')}
+            />
             <SideNavItem
               href="/search"
               icon={<Search />}
@@ -178,6 +185,10 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <AuditIndex code={route.code ?? ''} />;
     case 'activity':
       return <Activity code={route.code ?? ''} />;
+    case 'findings':
+      return <Findings key={search} search={search} />;
+    case 'finding':
+      return <FindingDetail humanId={route.humanId ?? ''} />;
     case 'search':
       return <SearchScreen key={search} search={search} />;
     case 'task':

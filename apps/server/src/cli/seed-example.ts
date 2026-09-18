@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { parseLocation } from '@foreman/shared';
 import { setPassword } from '../auth/native.js';
 import { loadConfig } from '../config.js';
 import { createDb, type Db } from '../db.js';
@@ -18,12 +19,14 @@ import { record } from '../domain/audit.js';
  */
 
 const CODE = 'EXMP';
+/** The second project. Recurrence is cross-project, so one project cannot show it. */
+const OTHER_CODE = 'NBR';
 
 async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void> {
   // `deleteMany`, not find-then-delete: the pair is not atomic, and two seeds run close together
   // race into "the record required but not found". Cascades take the phases, tasks, requirements,
   // documents and findings with it. Other projects are untouched.
-  const { count } = await db.project.deleteMany({ where: { code: CODE } });
+  const { count } = await db.project.deleteMany({ where: { code: { in: [CODE, OTHER_CODE] } } });
   if (count > 0) process.stdout.write(`removed the previous ${CODE} project\n`);
 
   // The seeded example job is addressed by kind, so re-seeding does not pile them up.
@@ -367,10 +370,119 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
           requirementId: requirements[index]?.id ?? null,
           adrId: adrs[index % adrs.length]?.id ?? null,
           phaseId: phases[index % phases.length]?.id ?? null,
+          // Parsed rows beside the raw string, the way a real write does it.
+          locations: {
+            create: parseLocation(
+              'apps/server/src/example.ts:196-206, 299-310; apps/web/src/App.tsx:12 (no guard)',
+            ).map((location, order) => ({ ...location, sortOrder: order })),
+          },
         },
       }),
     ),
   );
+
+  // The finding the recurrence engine is meant to catch: the same shape of problem as the
+  // neighbour's, in different words. Bindery's real "five modal overlays have no dialog
+  // semantics" is the case this stands in for.
+  await db.finding.create({
+    data: {
+      projectId: project.id,
+      auditId: audits[1]?.id ?? null,
+      humanId: `${CODE}-DA-001`,
+      title: 'Five modal overlays have no dialog semantics',
+      lenses: ['accessibility'],
+      severity: 'high',
+      confidence: 'high',
+      verified: 'unverified',
+      status: 'open',
+      foundRound: 1,
+      effort: 'M',
+      locationRaw: 'apps/web/src/features/edit/EditPanel.tsx:353; apps/web/src/screens/Modal.tsx:22',
+      observedMd:
+        'Each overlay is a plain div with no role, no focus trap and no labelled title, so a ' +
+        'screen reader walks past it and keyboard focus stays on the page behind.',
+      recommendationMd: 'Give each overlay a dialog role, a labelled title and a focus trap.',
+      locations: {
+        create: parseLocation(
+          'apps/web/src/features/edit/EditPanel.tsx:353; apps/web/src/screens/Modal.tsx:22',
+        ).map((location, order) => ({ ...location, sortOrder: order })),
+      },
+    },
+  });
+
+  /**
+   * A second project, minimal, existing for one reason: **recurrence is cross-project**, and a
+   * seed with one project cannot demonstrate the feature that justifies Phase 6. Both findings
+   * below describe the same problem in different words, which is exactly the case the overlap
+   * scoring has to catch.
+   */
+  const other = await db.project.create({
+    data: {
+      code: OTHER_CODE,
+      name: 'Neighbour Project',
+      slug: 'neighbour-project',
+      lifecycle: 'building',
+      pitch: 'A second project, so the findings inbox and recurrence have more than one.',
+    },
+  });
+
+  const neighbourAudit = await db.audit.create({
+    data: {
+      projectId: other.id,
+      humanId: `${OTHER_CODE}-AUD-001`,
+      kind: 'design',
+      scope: 'the console',
+      runDate: new Date('2026-09-12'),
+      verdict: 'One accessibility problem worth fixing.',
+      rounds: 1,
+      status: 'complete',
+    },
+  });
+
+  for (const [index, finding] of [
+    {
+      title: 'The confirmation overlay has no dialog role or focus trap',
+      severity: 'high' as const,
+      lenses: ['accessibility'],
+      observedMd:
+        'The overlay is a plain div: no role, no focus trap, no labelled title. A screen reader ' +
+        'walks straight past it and keyboard focus stays on the page behind.',
+      location: 'web/src/features/settings/Confirm.tsx:88-140',
+    },
+    {
+      title: 'A query runs once per row in the export path',
+      severity: 'medium' as const,
+      lenses: ['performance', 'data'],
+      observedMd: 'The loop issues one select per row returned by the outer query.',
+      location: 'api/export/run.py:212-240',
+    },
+  ].entries()) {
+    await db.finding.create({
+      data: {
+        projectId: other.id,
+        auditId: neighbourAudit.id,
+        humanId: `${OTHER_CODE}-DA-${String(index + 1).padStart(3, '0')}`,
+        title: finding.title,
+        lenses: finding.lenses,
+        severity: finding.severity,
+        confidence: 'high',
+        // What 123 of the 127 real findings say.
+        verified: 'unverified',
+        status: 'open',
+        foundRound: 1,
+        effort: 'M',
+        locationRaw: finding.location,
+        observedMd: finding.observedMd,
+        recommendationMd: 'What to do about it.',
+        locations: {
+          create: parseLocation(finding.location).map((location, order) => ({
+            ...location,
+            sortOrder: order,
+          })),
+        },
+      },
+    });
+  }
 
   // Ingested reality: a repo, commits, an attribution of each kind, check runs, a release and a
   // deployment. The unconfirmed attribution is the important row — it is a proposal, not a fact.

@@ -484,6 +484,73 @@ export interface RepoRow {
   backfilledAt: string | null;
 }
 
+export interface FindingRow {
+  humanId: string;
+  project: string;
+  title: string;
+  severity: string;
+  lenses: string[];
+  status: string;
+  verified: string;
+  effort: string | null;
+  foundIn: string | null;
+  locations: { path: string; lines: string | null }[];
+  fixedCommitSha: string | null;
+}
+
+export interface FindingDetail {
+  id: string;
+  humanId: string;
+  title: string;
+  severity: string;
+  lenses: string[];
+  confidence: string | null;
+  verified: string;
+  status: string;
+  effort: string | null;
+  foundRound: number | null;
+  fixedRound: number | null;
+  locationRaw: string | null;
+  observedMd: string | null;
+  recommendationMd: string | null;
+  fixedCommitSha: string | null;
+  project: { code: string; name: string };
+  audit: { humanId: string; kind: string; runDate: string; verdict: string | null } | null;
+  locations: { path: string; lines: string | null; note: string | null }[];
+  adr: { humanId: string; title: string } | null;
+  requirement: { humanId: string; statement: string } | null;
+  phase: { humanId: string; name: string } | null;
+  fix: {
+    sha: string | null;
+    verdict: 'green' | 'red' | 'running' | 'unverified' | 'none';
+    detail: string;
+    ingested: boolean;
+    checks: { name: string; conclusion: string | null }[];
+  };
+}
+
+export interface RecurrenceResult {
+  source: { humanId: string; project: string; title: string };
+  candidates: {
+    humanId: string;
+    project: string;
+    title: string;
+    severity: string;
+    status: string;
+    score: number;
+    because: { lenses: string[]; words: string[]; pathShapes: string[] };
+  }[];
+  method: string;
+}
+
+export interface RegressionFlag {
+  humanId: string;
+  project: string;
+  title: string;
+  path: string;
+  changedBy: { sha: string; message: string; at: string }[];
+}
+
 interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -561,6 +628,19 @@ export const foreman = {
   releaseNotes: (code: string, tag: string) =>
     api.get<ReleaseNotes>(`/api/projects/${code}/releases/${encodeURIComponent(tag)}/notes`),
   repos: (code: string) => api.get<Page<RepoRow>>(`/api/projects/${code}/repos`),
+  findings: (params: { project?: string; severity?: string; status?: string; lens?: string } = {}) => {
+    const query = new URLSearchParams({ limit: '200' });
+    // `exactOptionalPropertyTypes` means an absent key is absent, not undefined — so the only
+    // value worth skipping is the empty string the "any" option sends.
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== '') query.set(key, value);
+    }
+    return api.get<Page<FindingRow>>(`/api/findings?${query.toString()}`);
+  },
+  finding: (humanId: string) => api.get<FindingDetail>(`/api/findings/${humanId}`),
+  recurrences: (humanId: string) =>
+    api.get<RecurrenceResult>(`/api/findings/${humanId}/recurrences`),
+  regressionWatch: () => api.get<Page<RegressionFlag>>('/api/regression-watch'),
   brief: (code: string) => api.get<Brief>(`/api/brief/${code}`),
   entity: (humanId: string) => api.get<EntityResult>(`/api/entities/${humanId}`),
 };
