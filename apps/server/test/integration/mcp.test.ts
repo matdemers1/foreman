@@ -1,8 +1,10 @@
 import type { Server } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createClient } from '@d3cloud/foreman-mcp/client';
-import { createServer as createMcpServer } from '@d3cloud/foreman-mcp/server';
+// Source, not the package name: `exports` points at `dist` because this package is published,
+// and a test is not a reason to make the published shape wrong.
+import { createClient } from '../../../../packages/mcp/src/client.js';
+import { createServer as createMcpServer } from '../../../../packages/mcp/src/server.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { setPassword } from '../../src/auth/native.js';
