@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "description": "Express API, Prisma schema, dual auth, webhook receiver and CLI",
   "type": "module",
-  "files": ["dist", "prisma"],
+  "files": [
+    "dist",
+    "prisma"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json",
@@ -16,7 +19,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "seed:example": "tsx src/cli/seed-example.ts",
-    "import": "tsx src/cli/import.ts"
+    "import": "tsx src/cli/import.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@foreman/shared": "workspace:*",

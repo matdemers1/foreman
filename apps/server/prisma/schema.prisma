@@ -1,0 +1,1120 @@
+// Foreman schema. The shape's source of truth is D3 Cloud Vault/Foreman/Data Model.md, and the
+// enums mirror packages/shared/src/enums.ts value for value (FRM-REQ-003).
+//
+// Three details the plan singles out as expensive to get wrong later, all settled here:
+//   1. `phase.number` is numeric, not integer — Bindery shipped a Phase 8.5.
+//   2. `phase.sort_order` is independent of `phase.number` — Bindery built 0–8.5, 9–11, 13–16.
+//   3. `requirement.phase_id` is nullable — an unassigned requirement is the backlog.
+//
+// Deletion is soft everywhere (`deleted_at`), and every mutation writes an `audit_event`, which is
+// also the substrate for undo.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums (mirror packages/shared/src/enums.ts) ───────────────────────────
+
+enum ProjectLifecycle {
+  planned
+  scaffolded
+  building
+  deployed
+  parked
+  scrapped
+}
+
+enum PhaseStatus {
+  planned
+  active
+  complete
+  parked
+}
+
+/// T-shirt sizes only. Foreman records no time estimates anywhere.
+enum Size {
+  XS
+  S
+  M
+  L
+  XL
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  blocked
+  done
+  cancelled
+}
+
+/// MoSCoW.
+enum Priority {
+  M
+  S
+  C
+  W
+}
+
+/// `unparsed` is a legal stored state: the EARS lint warns, it never blocks.
+enum EarsPattern {
+  ubiquitous
+  state
+  event
+  unwanted
+  optional
+  complex
+  unparsed
+}
+
+enum AdrStatus {
+  proposed
+  accepted
+  superseded
+  rejected
+}
+
+enum AdrRelationKind {
+  extends
+  supersedes
+  superseded_by
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+}
+
+enum RiskStatus {
+  open
+  fired
+  closed
+}
+
+/// Document kinds are data, not a migration (ADR-006). The five registers that used to be files
+/// are views over tables, and are deliberately absent.
+enum DocumentKind {
+  architecture
+  data_model
+  api_contract
+  ux_flows
+  research
+  discovery
+  phase_plan
+  test_strategy
+  feature_ideas
+  overview
+  runbook
+}
+
+enum AuditKind {
+  code_review
+  design
+  feature
+  api
+}
+
+enum AuditStatus {
+  running
+  complete
+  abandoned
+}
+
+enum Severity {
+  critical
+  high
+  medium
+  low
+}
+
+enum Verified {
+  confirmed
+  plausible
+}
+
+enum FindingStatus {
+  open
+  fixed
+  skipped
+  wont_fix
+}
+
+enum CheckConclusion {
+  success
+  failure
+  cancelled
+  skipped
+  timed_out
+  action_required
+  neutral
+  stale
+}
+
+/// How a commit came to be attributed to a task. Declared beats message beats overlap (ADR-005).
+enum AttributionSource {
+  declared
+  message
+  file_overlap
+}
+
+/// The importer's three outcomes. Every source file gets one; silence is the failure mode.
+enum ImportStatus {
+  mapped
+  partial
+  unmapped
+}
+
+enum JobStatus {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+enum ReferenceKind {
+  cites
+  satisfies
+  violates
+  relates
+  supersedes
+}
+
+enum EntityType {
+  project
+  repo
+  phase
+  requirement
+  task
+  adr
+  decision
+  risk
+  term
+  document
+  document_section
+  audit
+  finding
+  commit
+  check_run
+  release
+  deployment
+  tech_item
+  user
+  api_token
+  job
+}
+
+enum AuditAction {
+  create
+  update
+  delete
+  restore
+  undo
+}
+
+/// Who performed a mutation. The MCP shim and the importer are first-class actors.
+enum ActorKind {
+  user
+  mcp
+  importer
+  webhook
+  system
+}
+
+enum AuthMethod {
+  password
+  oidc
+}
+
+enum UserStatus {
+  invited
+  active
+  suspended
+}
+
+enum ThrottleScope {
+  account
+  ip
+}
+
+// ─── Core spine ────────────────────────────────────────────────────────────
+
+model Project {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// `BND`, `AUTH`, `FRM`. Unique, and immutable after creation: every human ID embeds it
+  /// (ADR-008, FRM-REQ-031).
+  code      String           @unique
+  name      String
+  slug      String           @unique
+  lifecycle ProjectLifecycle @default(planned)
+  pitch     String?
+  /// Legacy provenance: where this project's documents came from in the vault.
+  vaultPath String?          @map("vault_path")
+  /// Next sequence per human-ID type, so IDs are never reused after a delete.
+  idCounters Json            @default("{}") @map("id_counters")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  repos        Repo[]
+  phases       Phase[]
+  requirements Requirement[]
+  tasks        Task[]
+  adrs         Adr[]
+  decisions    Decision[]
+  risks        Risk[]
+  terms        Term[]
+  documents    Document[]
+  audits       Audit[]
+  findings     Finding[]
+  deployments  Deployment[]
+  techItems    TechItem[]
+
+  @@index([lifecycle])
+  @@map("project")
+}
+
+model Repo {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  /// `matdemers1/d3-auth`.
+  fullName      String  @unique @map("full_name")
+  defaultBranch String  @default("main") @map("default_branch")
+  /// GitHub's numeric repository id, when the App has seen it.
+  githubId      BigInt? @unique @map("github_id")
+  /// Set once a full backfill has completed, so incremental ingest knows where to start.
+  backfilledAt  DateTime? @map("backfilled_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  commits   Commit[]
+  checkRuns CheckRun[]
+  releases  Release[]
+
+  @@index([projectId])
+  @@map("repo")
+}
+
+model Phase {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  /// **Numeric, not integer.** Bindery shipped a Phase 8.5; an integer column would have made
+  /// that plan unrepresentable.
+  number Decimal @db.Decimal(6, 2)
+  /// **Independent of `number`.** Bindery built 0–8.5, then 9–11, then 13–16, with 12 still ahead:
+  /// the order phases were built in is not the order they are numbered.
+  sortOrder Int    @map("sort_order")
+
+  humanId   String      @unique @map("human_id")
+  name      String
+  objective String?
+  status    PhaseStatus @default(planned)
+  exitDemo  String?     @map("exit_demo")
+  size      Size?
+
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks        Task[]
+  requirements Requirement[]
+  documents    Document[]
+  risks        Risk[]
+  findings     Finding[]
+  dependsOn    PhaseDependency[] @relation("phase_depends_on")
+  dependedOnBy PhaseDependency[] @relation("phase_depended_on_by")
+
+  @@unique([projectId, number])
+  @@index([projectId, sortOrder])
+  @@map("phase")
+}
+
+model PhaseDependency {
+  phaseId   String @map("phase_id") @db.Uuid
+  dependsOnId String @map("depends_on_id") @db.Uuid
+  /// Why the order is forced, in the plan's own words.
+  reason    String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  phase     Phase @relation("phase_depends_on", fields: [phaseId], references: [id], onDelete: Cascade)
+  dependsOn Phase @relation("phase_depended_on_by", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@id([phaseId, dependsOnId])
+  @@map("phase_dependency")
+}
+
+model Requirement {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  /// `BND-REQ-001`. Immutable once assigned (ADR-008).
+  humanId String @unique @map("human_id")
+  seq     Int
+
+  statement String
+  /// The EARS shape the linter recognised. `unparsed` is stored with a warning, never rejected.
+  earsPattern EarsPattern @default(unparsed) @map("ears_pattern")
+  earsLintOk  Boolean     @default(false) @map("ears_lint_ok")
+  earsLintNote String?    @map("ears_lint_note")
+  priority    Priority    @default(M)
+  source      String?
+  acceptanceTest String?  @map("acceptance_test")
+
+  /// **Nullable on purpose**: an unassigned requirement is legal and meaningful — it is the backlog.
+  phaseId String? @map("phase_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase    Phase?            @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  tasks    TaskRequirement[]
+  findings Finding[]
+
+  @@unique([projectId, seq])
+  @@index([projectId, priority])
+  @@index([phaseId])
+  @@map("requirement")
+}
+
+model Task {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  projectId String  @map("project_id") @db.Uuid
+  phaseId   String? @map("phase_id") @db.Uuid
+
+  /// `BND-T-0.3` — the task ID carries its phase, which is why the sequence segment may be dotted.
+  humanId String     @unique @map("human_id")
+  title   String
+  status  TaskStatus @default(todo)
+  /// Required by a check when `status` is `blocked`; enforced in the domain layer, not by the column.
+  blockedReason String? @map("blocked_reason")
+  size      Size?
+  doneWhen  String? @map("done_when")
+  sortOrder Int     @default(0) @map("sort_order")
+  /// True when the human ID was synthesized by the importer rather than authored, so a synthesized
+  /// ID is never mistaken for a canonical one (FRM-REQ-045, FRM-REQ-151).
+  idSynthesized Boolean @default(false) @map("id_synthesized")
+
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase        Phase?            @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  files        TaskFile[]
+  requirements TaskRequirement[]
+  commits      CommitTask[]
+
+  @@index([projectId, status])
+  @@index([phaseId, sortOrder])
+  @@map("task")
+}
+
+model TaskFile {
+  id     String @id @default(uuid(7)) @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+
+  /// A repo-relative path or glob. This is what the weakest attribution signal matches against —
+  /// and a match alone never marks work complete (ADR-005).
+  path String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, path])
+  @@index([path])
+  @@map("task_file")
+}
+
+/// Many-to-many on purpose: a task satisfies several requirements, and a requirement is covered by
+/// several tasks. The existing scopes of work already work this way.
+model TaskRequirement {
+  taskId        String @map("task_id") @db.Uuid
+  requirementId String @map("requirement_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  task        Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  requirement Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, requirementId])
+  @@index([requirementId])
+  @@map("task_requirement")
+}
+
+// ─── Decision records ──────────────────────────────────────────────────────
+
+/// The only typed document: ADRs alone have a status lifecycle and a supersedes/extends DAG.
+model Adr {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  humanId String    @unique @map("human_id")
+  number  Int
+  title   String
+  status  AdrStatus @default(proposed)
+  decisionAbstract String? @map("decision_abstract")
+  contextMd  String? @map("context_md")
+  decisionMd String? @map("decision_md")
+  consequencesMd String? @map("consequences_md")
+  rejectedMd String? @map("rejected_md")
+  decidedOn  DateTime? @map("decided_on") @db.Date
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  relations AdrRelation[] @relation("adr_from")
+  relatedBy AdrRelation[] @relation("adr_to")
+  findings  Finding[]
+
+  @@unique([projectId, number])
+  @@index([projectId, status])
+  @@map("adr")
+}
+
+model AdrRelation {
+  adrId        String          @map("adr_id") @db.Uuid
+  relatedAdrId String          @map("related_adr_id") @db.Uuid
+  kind         AdrRelationKind
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  adr        Adr @relation("adr_from", fields: [adrId], references: [id], onDelete: Cascade)
+  relatedAdr Adr @relation("adr_to", fields: [relatedAdrId], references: [id], onDelete: Cascade)
+
+  @@id([adrId, relatedAdrId, kind])
+  @@index([relatedAdrId])
+  @@map("adr_relation")
+}
+
+/// A locked decision from discovery — `D-13`. Smaller than an ADR: a question, its answer, and why.
+model Decision {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  humanId   String  @unique @map("human_id")
+  statement String
+  value     String
+  rationale String?
+  lockedAt  DateTime? @map("locked_at") @db.Timestamptz(6)
+  supersededById String? @map("superseded_by") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  supersededBy Decision?  @relation("decision_supersedes", fields: [supersededById], references: [id], onDelete: SetNull)
+  supersedes   Decision[] @relation("decision_supersedes")
+
+  @@index([projectId])
+  @@map("decision")
+}
+
+model Risk {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  projectId String  @map("project_id") @db.Uuid
+  phaseId   String? @map("phase_id") @db.Uuid
+
+  humanId    String     @unique @map("human_id")
+  title      String
+  likelihood RiskLevel  @default(medium)
+  impact     RiskLevel  @default(medium)
+  mitigation String?
+  /// The named condition that forces a re-plan. A risk without one is a worry, not a risk.
+  tripwire   String?
+  status     RiskStatus @default(open)
+  firedAt    DateTime?  @map("fired_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase   Phase?  @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@map("risk")
+}
+
+model Term {
+  id String @id @default(uuid(7)) @db.Uuid
+  /// Nullable: a null project means the term is ecosystem-wide.
+  projectId String? @map("project_id") @db.Uuid
+
+  term       String
+  definition String
+  aliases    String[] @default([])
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, term])
+  @@map("term")
+}
+
+// ─── Documents ─────────────────────────────────────────────────────────────
+
+model Document {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  projectId String  @map("project_id") @db.Uuid
+  /// Phase plans only.
+  phaseId   String? @map("phase_id") @db.Uuid
+
+  kind  DocumentKind
+  title String
+  /// Where this document came from, when it was imported rather than authored here.
+  sourcePath String? @map("source_path")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project   Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phase     Phase?             @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  sections  DocumentSection[]
+  revisions DocumentRevision[]
+
+  @@index([projectId, kind])
+  @@map("document")
+}
+
+model DocumentSection {
+  id         String @id @default(uuid(7)) @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+
+  /// Addressable, and load-bearing: this is the fragment in an MCP resource URI —
+  /// `foreman://bindery/architecture#deployment` resolves to exactly one row. It is what lets
+  /// Claude pull three paragraphs instead of a two-thousand-line document.
+  key       String
+  heading   String
+  bodyMd    String @map("body_md")
+  sortOrder Int    @map("sort_order")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, key])
+  @@index([documentId, sortOrder])
+  @@map("document_section")
+}
+
+model DocumentRevision {
+  id         String @id @default(uuid(7)) @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+
+  revisionNo Int    @map("revision_no")
+  /// The whole document, sections included, as it stood.
+  snapshot   Json
+  actor      String
+  actorKind  ActorKind @default(user) @map("actor_kind")
+  note       String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, revisionNo])
+  @@map("document_revision")
+}
+
+// ─── Audit findings ────────────────────────────────────────────────────────
+
+model Audit {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  humanId String      @unique @map("human_id")
+  kind    AuditKind
+  scope   String?
+  runDate DateTime    @map("run_date") @db.Date
+  verdict String?
+  rounds  Int         @default(1)
+  status  AuditStatus @default(running)
+  /// Where the audit's own write-up lives, for the ones that predate Foreman.
+  vaultPath String?   @map("vault_path")
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  findings Finding[]
+
+  @@index([projectId, kind])
+  @@map("audit")
+}
+
+/// The largest dataset, and not invented: every column here already existed as YAML frontmatter in
+/// 127 finding files, maintained by hand.
+model Finding {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  projectId String  @map("project_id") @db.Uuid
+  auditId   String? @map("audit_id") @db.Uuid
+
+  humanId String   @unique @map("human_id")
+  title   String
+  lenses  String[] @default([])
+  severity   Severity
+  confidence String?
+  verified   Verified?
+  status     FindingStatus @default(open)
+
+  foundRound Int?    @map("found_round")
+  fixedRound Int?    @map("fixed_round")
+  /// Joins to ingested reality: the commit that actually fixed it.
+  fixedCommitSha String? @map("fixed_commit_sha")
+  effort     String?
+  locationPath  String? @map("location_path")
+  locationLines String? @map("location_lines")
+  observedMd    String? @map("observed_md")
+  recommendationMd String? @map("recommendation_md")
+
+  /// What this finding contradicts, when it contradicts something.
+  requirementId String? @map("requirement_id") @db.Uuid
+  adrId         String? @map("adr_id") @db.Uuid
+  phaseId       String? @map("phase_id") @db.Uuid
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  audit       Audit?       @relation(fields: [auditId], references: [id], onDelete: SetNull)
+  requirement Requirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
+  adr         Adr?         @relation(fields: [adrId], references: [id], onDelete: SetNull)
+  phase       Phase?       @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, status])
+  @@index([severity, status])
+  @@index([auditId])
+  @@map("finding")
+}
+
+// ─── Ingested reality ──────────────────────────────────────────────────────
+
+model Commit {
+  id     String @id @default(uuid(7)) @db.Uuid
+  repoId String @map("repo_id") @db.Uuid
+
+  sha         String
+  message     String
+  author      String
+  authorEmail String?  @map("author_email")
+  committedAt DateTime @map("committed_at") @db.Timestamptz(6)
+  additions   Int?
+  deletions   Int?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  repo         Repo         @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  files        CommitFile[]
+  attributions CommitTask[]
+
+  @@unique([repoId, sha])
+  @@index([repoId, committedAt])
+  @@map("commit")
+}
+
+model CommitFile {
+  id       String @id @default(uuid(7)) @db.Uuid
+  commitId String @map("commit_id") @db.Uuid
+
+  path   String
+  status String
+  additions Int?
+  deletions Int?
+
+  commit Commit @relation(fields: [commitId], references: [id], onDelete: Cascade)
+
+  @@unique([commitId, path])
+  @@index([path])
+  @@map("commit_file")
+}
+
+/// **A row with `confirmed = false` is a proposal, not a fact.** No coverage, status, brief or
+/// drift calculation may read an unconfirmed row as truth (ADR-005, never-regress test #1).
+model CommitTask {
+  commitId String @map("commit_id") @db.Uuid
+  taskId   String @map("task_id") @db.Uuid
+
+  source     AttributionSource
+  confidence Decimal           @db.Decimal(4, 3)
+  confirmed  Boolean           @default(false)
+  confirmedAt DateTime?        @map("confirmed_at") @db.Timestamptz(6)
+  confirmedBy String?          @map("confirmed_by")
+  rejectedAt  DateTime?        @map("rejected_at") @db.Timestamptz(6)
+  /// Which paths overlapped, or which ID the message declared — the evidence, kept for review.
+  evidence    Json?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  commit Commit @relation(fields: [commitId], references: [id], onDelete: Cascade)
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([commitId, taskId])
+  @@index([taskId, confirmed])
+  @@index([confirmed])
+  @@map("commit_task")
+}
+
+model CheckRun {
+  id     String @id @default(uuid(7)) @db.Uuid
+  repoId String @map("repo_id") @db.Uuid
+
+  /// Not a foreign key: a check run can arrive before the commit it belongs to.
+  commitSha  String           @map("commit_sha")
+  name       String
+  conclusion CheckConclusion?
+  startedAt   DateTime?       @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime?       @map("completed_at") @db.Timestamptz(6)
+  detailsUrl  String?         @map("details_url")
+  externalId  String?         @map("external_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  repo Repo @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@unique([repoId, commitSha, name])
+  @@index([repoId, completedAt])
+  @@map("check_run")
+}
+
+model Release {
+  id     String @id @default(uuid(7)) @db.Uuid
+  repoId String @map("repo_id") @db.Uuid
+
+  tag         String
+  name        String?
+  bodyMd      String?   @map("body_md")
+  publishedAt DateTime? @map("published_at") @db.Timestamptz(6)
+  prerelease  Boolean   @default(false)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  repo Repo @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@unique([repoId, tag])
+  @@map("release")
+}
+
+/// Exists to serve a standing rule: every production push reports the commit SHA per image and the
+/// schema revision. This table makes that a query instead of a manual check.
+model Deployment {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  environment    String
+  image          String
+  imageSha       String    @map("image_sha")
+  schemaRevision String?   @map("schema_revision")
+  deployedAt     DateTime  @map("deployed_at") @db.Timestamptz(6)
+  note           String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, deployedAt])
+  @@map("deployment")
+}
+
+model TechItem {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  name     String
+  category String
+  version  String?
+  role     String?
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, name])
+  @@index([name])
+  @@map("tech_item")
+}
+
+// ─── Cross-cutting ─────────────────────────────────────────────────────────
+
+/// Generic citation edge. **This is what makes backlinks possible**: opening `BND-ADR-005` lists
+/// every requirement, task, finding and document section that cites it. Written whenever a citation
+/// is parsed out of a body or created directly.
+model Reference {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  fromType EntityType    @map("from_type")
+  fromId   String        @map("from_id") @db.Uuid
+  toType   EntityType    @map("to_type")
+  toId     String        @map("to_id") @db.Uuid
+  kind     ReferenceKind @default(cites)
+  /// The human ID as it was written, so a citation survives the entity being renamed or removed.
+  citedAs  String?       @map("cited_as")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([fromType, fromId, toType, toId, kind])
+  @@index([toType, toId])
+  @@map("reference")
+}
+
+/// Every mutation, no exceptions — MCP writes and importer writes included. Also the substrate for
+/// undo: `before` is what `POST /undo/:id` replays.
+model AuditEvent {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  actor      String
+  actorKind  ActorKind  @default(user) @map("actor_kind")
+  action     AuditAction
+  entityType EntityType @map("entity_type")
+  entityId   String     @map("entity_id") @db.Uuid
+  /// Denormalised so an audit trail stays readable after the entity is gone.
+  entityHumanId String? @map("entity_human_id")
+  before Json?
+  after  Json?
+  /// Set when this event has been undone, and by which event.
+  undoneAt      DateTime? @map("undone_at") @db.Timestamptz(6)
+  undoneByEventId String? @map("undone_by_event_id") @db.Uuid
+  requestId     String?   @map("request_id")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_event")
+}
+
+/// Issued to the MCP stdio shim. Hashed at rest, and the value is shown exactly once.
+model ApiToken {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  name       String
+  tokenHash  String    @unique @map("token_hash")
+  /// A short, non-secret prefix so a token can be identified in a list without revealing it.
+  prefix     String
+  scopes     String[]  @default([])
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdBy  String?   @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([revokedAt])
+  @@map("api_token")
+}
+
+/// The reconciliation report for the vault migration. **Every source file gets a row** — mapped,
+/// partial or unmapped, with a reason. Silence is the failure mode (never-regress test #2).
+model ImportRecord {
+  id String @id @default(uuid(7)) @db.Uuid
+  /// The import run, which is a job.
+  jobId String @map("job_id") @db.Uuid
+
+  sourcePath String       @map("source_path")
+  entityType EntityType?  @map("entity_type")
+  entityId   String?      @map("entity_id") @db.Uuid
+  status     ImportStatus
+  /// Why it is partial or unmapped. Required for anything that is not `mapped`.
+  note       String?
+  /// Bytes of the source file, so a silently truncated parse is visible.
+  sourceBytes Int?        @map("source_bytes")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, sourcePath])
+  @@index([jobId, status])
+  @@map("import_record")
+}
+
+// ─── People, credentials and sessions (dual login, ADR-004) ────────────────
+
+model User {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  email       String     @unique
+  displayName String     @map("display_name")
+  status      UserStatus @default(invited)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  credential Credential?
+  identities Identity[]
+  sessions   Session[]
+
+  @@map("user")
+}
+
+/// The app-native path: Argon2id with a server-side pepper, and TOTP.
+model Credential {
+  userId String @id @map("user_id") @db.Uuid
+
+  passwordHash     String    @map("password_hash")
+  passwordUpdatedAt DateTime @default(now()) @map("password_updated_at") @db.Timestamptz(6)
+  /// Encrypted with the KEK. Null until TOTP is enrolled.
+  totpSecret       String?   @map("totp_secret")
+  totpConfirmedAt  DateTime? @map("totp_confirmed_at") @db.Timestamptz(6)
+  /// Last accepted TOTP step, so a code cannot be replayed inside its window.
+  totpLastStep     BigInt?   @map("totp_last_step")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("credential")
+}
+
+/// The OIDC path. **Identities link by `(iss, sub)`, never by email** — an email is a display
+/// attribute, not an identifier (ADR-004).
+model Identity {
+  id     String @id @default(uuid(7)) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  iss String
+  sub String
+  /// Whatever the issuer last told us, for display only.
+  claims Json?
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([iss, sub])
+  @@index([userId])
+  @@map("identity")
+}
+
+model Session {
+  id     String @id @default(uuid(7)) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  /// The cookie carries this, hashed here, so a leaked database row cannot be replayed as a cookie.
+  tokenHash String     @unique @map("token_hash")
+  method    AuthMethod
+  /// Present for an OIDC session, so RP-initiated logout can be driven from it.
+  idTokenSub String?   @map("id_token_sub")
+  ip        String?
+  userAgent String?    @map("user_agent")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  expiresAt DateTime   @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime?  @map("revoked_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("session")
+}
+
+/// Throttle-before-hash, per account and per IP. Delays with doubling; never locks an account out,
+/// because the operator is the only user and a lockout is a self-inflicted outage.
+model AuthThrottle {
+  scope ThrottleScope
+  key   String
+
+  failures      Int      @default(0)
+  nextAllowedAt DateTime @map("next_allowed_at") @db.Timestamptz(6)
+  lastFailureAt DateTime @default(now()) @map("last_failure_at") @db.Timestamptz(6)
+
+  @@id([scope, key])
+  @@map("auth_throttle")
+}
+
+// ─── Jobs ──────────────────────────────────────────────────────────────────
+
+/// A Postgres job queue, not Redis: the queue is inspectable as a table, and a failed stage
+/// re-runs alone without repeating the stages before it.
+model Job {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  kind    String
+  payload Json      @default("{}")
+  status  JobStatus @default(queued)
+  /// Set while a worker holds the job, with the lease that lets a dead worker's job be reclaimed.
+  lockedBy  String?   @map("locked_by")
+  lockedAt  DateTime? @map("locked_at") @db.Timestamptz(6)
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(6)
+  availableAt DateTime @default(now()) @map("available_at") @db.Timestamptz(6)
+  attempts  Int       @default(0)
+  maxAttempts Int     @default(3) @map("max_attempts")
+  lastError String?   @map("last_error")
+  startedAt  DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+  /// Set for a job that must not run twice — an ingest of one delivery, say.
+  idempotencyKey String? @unique @map("idempotency_key")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  stages        JobStage[]
+  importRecords ImportRecord[]
+
+  @@index([status, availableAt])
+  @@index([kind, status])
+  @@map("job")
+}
+
+model JobStage {
+  id    String @id @default(uuid(7)) @db.Uuid
+  jobId String @map("job_id") @db.Uuid
+
+  name      String
+  sortOrder Int       @map("sort_order")
+  status    JobStatus @default(queued)
+  attempts  Int       @default(0)
+  /// Whatever the stage produced, handed to the next stage.
+  output    Json?
+  lastError String?   @map("last_error")
+  startedAt  DateTime? @map("started_at") @db.Timestamptz(6)
+  finishedAt DateTime? @map("finished_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, name])
+  @@index([jobId, sortOrder])
+  @@map("job_stage")
+}

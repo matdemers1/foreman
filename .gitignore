@@ -28,3 +28,4 @@ backups/
 *.sql.gz
 
 apps/server/prisma/*.db
+apps/server/src/generated/
