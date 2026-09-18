@@ -1,5 +1,9 @@
-import AxeBuilder from '@axe-core/playwright';
+// The named export, not the default: the package ships both, and under NodeNext the default
+// resolves to the module namespace rather than to the class — "not constructable", at the one
+// line the whole suite depends on.
+import { AxeBuilder } from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import type { NodeResult, Result } from 'axe-core';
 
 /**
  * The accessibility pass (T-9.2, T-9.3, FRM-REQ-012).
@@ -55,10 +59,10 @@ async function violationsOn(page: Page): Promise<string[]> {
     .analyze();
 
   return results.violations.map(
-    (v) =>
+    (v: Result) =>
       `${v.id} (${v.impact ?? 'unknown'}): ${v.help}\n      ${v.nodes
         .slice(0, 3)
-        .map((n) => n.target.join(' '))
+        .map((n: NodeResult) => n.target.join(' '))
         .join('\n      ')}`,
   );
 }
