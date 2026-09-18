@@ -115,6 +115,36 @@ describe.skipIf(url === undefined)('app-native login', () => {
     expect(await wrongPassword.json()).toEqual(await unknownAccount.json());
   });
 
+  it('offers the D3 Auth button to an anonymous caller when it is reachable', async () => {
+    // A second server, this time with a provider that answers, so the positive case is covered
+    // as well as the negative one in oidc-unavailable.test.ts.
+    const configured = loadConfig({
+      NODE_ENV: 'test',
+      BASE_URL: 'http://localhost:3200',
+      DATABASE_URL: url ?? '',
+      KEK: Buffer.alloc(32, 1).toString('base64'),
+      PEPPER: Buffer.alloc(32, 2).toString('base64'),
+      COOKIE_KEYS: Buffer.alloc(32, 3).toString('base64'),
+    });
+    const fake = { issuer: 'https://auth.example', beginSignIn: () => Promise.resolve({ url: '', tx: '' }), completeSignIn: () => Promise.reject(new Error('unused')), endSessionUrl: () => Promise.resolve(null) };
+
+    const withOidc = createApp({ config: configured, db, oidc: fake });
+    const listening = await new Promise<Server>((resolve) => {
+      const s = withOidc.listen(0, () => { resolve(s); });
+    });
+    try {
+      const address = listening.address();
+      if (address === null || typeof address === 'string') throw new Error('no port');
+      const res = await fetch(`http://127.0.0.1:${String(address.port)}/auth/session`);
+
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { oidcAvailable: boolean };
+      expect(body.oidcAvailable).toBe(true);
+    } finally {
+      await new Promise<void>((resolve) => listening.close(() => { resolve(); }));
+    }
+  });
+
   it('answers /auth/session for a signed-in cookie and 401 without one', async () => {
     const anonymous = await fetch(`${origin}/auth/session`);
     expect(anonymous.status).toBe(401);

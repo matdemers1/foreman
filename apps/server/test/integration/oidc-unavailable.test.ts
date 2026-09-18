@@ -96,6 +96,20 @@ describe.skipIf(url === undefined)('D3 Auth unreachable', () => {
     expect(session.status).toBe(200);
   });
 
+  it('tells an anonymous caller whether to offer the button at all', async () => {
+    // The login screen is the only place the D3 Auth button matters, and it is reached by people
+    // with no session — so the 401 has to carry this. Sending it only to signed-in callers meant
+    // the button could never appear, which is how it shipped before this test existed.
+    const res = await fetch(`${origin}/auth/session`);
+    expect(res.status).toBe(401);
+
+    const body = (await res.json()) as { authenticated: boolean; oidcAvailable?: boolean };
+    expect(body.authenticated).toBe(false);
+    expect(body.oidcAvailable, 'the 401 must say whether D3 Auth can be offered').toBeDefined();
+    // Unreachable here, so the answer is no.
+    expect(body.oidcAvailable).toBe(false);
+  });
+
   it('does not offer a button that leads nowhere', async () => {
     const res = await fetch(`${origin}/auth/login`, {
       method: 'POST',

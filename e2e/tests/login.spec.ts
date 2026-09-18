@@ -43,10 +43,34 @@ test.describe('the console', () => {
     await expect(page.getByRole('navigation')).toBeHidden();
   });
 
-  test('does not offer a sign-in provider that is not reachable', async ({ page }) => {
+  test('offers the D3 Auth link only when the server says it is reachable', async ({ page, request }) => {
+    // Whichever way the dev stack is configured, the screen must agree with the server — and the
+    // server's answer reaches an anonymous caller in the body of the 401, which is the only place
+    // the login screen can learn it.
+    const anonymous = await request.get('/auth/session');
+    expect(anonymous.status()).toBe(401);
+    const { oidcAvailable } = (await anonymous.json()) as { oidcAvailable: boolean };
+
     await page.goto('/');
-    // Nothing is configured in the dev stack, and the console asks before offering the button.
-    await expect(page.getByRole('link', { name: /D3 Auth/ })).toBeHidden();
+    const link = page.getByRole('link', { name: /D3 Auth/ });
+    if (oidcAvailable) await expect(link).toBeVisible();
+    else await expect(link).toBeHidden();
+  });
+
+  test('the D3 Auth link leaves the app rather than being swallowed by the router', async ({
+    page,
+    request,
+  }) => {
+    const anonymous = await request.get('/auth/session');
+    const { oidcAvailable } = (await anonymous.json()) as { oidcAvailable: boolean };
+    test.skip(!oidcAvailable, 'no provider configured in this environment');
+
+    await page.goto('/');
+    // `/auth/oidc/start` is a server route: the console's click interceptor once treated it as an
+    // internal path and pushState'd, which made the button a link that did nothing at all.
+    await page.getByRole('link', { name: /D3 Auth/ }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith('/auth/oidc/start'), { timeout: 15_000 });
+    expect(page.url()).not.toContain('127.0.0.1');
   });
 
   test('sets a session cookie that JavaScript cannot read', async ({ page, context }) => {

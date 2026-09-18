@@ -43,11 +43,9 @@ export function App() {
     void fetchSession()
       .then((session) => {
         setState(
-          session === null
-            ? // 401 carries no `oidcAvailable`, so the button is offered once signed-in state is
-              // known. Until then the password path — the one that always works — is the only one.
-              { status: 'anonymous', oidcAvailable: false }
-            : { status: 'signed-in', session },
+          session.authenticated
+            ? { status: 'signed-in', session }
+            : { status: 'anonymous', oidcAvailable: session.oidcAvailable },
         );
       })
       .catch(() => {

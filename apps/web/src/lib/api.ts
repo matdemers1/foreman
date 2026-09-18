@@ -73,13 +73,23 @@ export interface SessionState {
   oidcAvailable: boolean;
 }
 
-export async function fetchSession(): Promise<SessionState | null> {
+export async function fetchSession(): Promise<SessionState | AnonymousState> {
   try {
     return await api.get<SessionState>('/auth/session');
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return null;
+    if (error instanceof ApiError && error.status === 401) {
+      // The body of a 401 is where the login screen learns whether to offer the second path.
+      const body = error.body as Partial<AnonymousState> | undefined;
+      return { authenticated: false, oidcAvailable: body?.oidcAvailable ?? false };
+    }
     throw error;
   }
+}
+
+/** What the 401 carries: no session, but enough to render the right login screen. */
+export interface AnonymousState {
+  authenticated: false;
+  oidcAvailable: boolean;
 }
 
 export type LoginResult = { status: 'signed_in' } | { status: 'totp_required' };

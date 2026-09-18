@@ -8,6 +8,9 @@ import { useEffect, useState } from 'react';
  * it without a reload, and the back button working.
  */
 
+/** Paths the API serves. A click on one must leave the SPA rather than route inside it. */
+const SERVER_PATHS = ['/auth', '/api', '/webhooks', '/healthz', '/readyz', '/health'];
+
 export function usePath(): string {
   const [path, setPath] = useState(() => window.location.pathname);
 
@@ -26,6 +29,9 @@ export function usePath(): string {
       const href = anchor.getAttribute('href');
       if (href === null || !href.startsWith('/')) return;
       if (anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      // The server owns these, and they are real navigations — `/auth/oidc/start` redirects to the
+      // identity provider. Intercepting one turns the D3 Auth button into a link that does nothing.
+      if (SERVER_PATHS.some((prefix) => href === prefix || href.startsWith(`${prefix}/`))) return;
 
       event.preventDefault();
       window.history.pushState({}, '', href);

@@ -113,7 +113,11 @@ export function authRoutes(deps: AuthRouteDeps): Router {
     void (async () => {
       const userId = req.auth?.userId;
       if (userId === undefined || userId === null) {
-        res.status(401).json({ authenticated: false });
+        // `oidcAvailable` rides on the 401 too, and must: the login screen is the *only* place the
+        // D3 Auth button matters, and it is reached by exactly the people this branch answers.
+        // Sending it only to signed-in callers meant the button could never appear at all.
+        // It leaks nothing — whether a login button should render is not a secret.
+        res.status(401).json({ authenticated: false, oidcAvailable: deps.oidcAvailable ?? false });
         return;
       }
       const user = await deps.db.user.findUniqueOrThrow({
