@@ -17,6 +17,17 @@ const EMAIL = 'tokens@example.com';
 const PASSWORD = 'a-password-for-the-token-tests';
 const CODE = 'TOK';
 
+/** Poll until a fire-and-forget write lands, rather than sleeping a guessed interval. */
+async function waitFor<T>(read: () => Promise<T | undefined>, what: string, ms = 2000): Promise<T> {
+  const deadline = Date.now() + ms;
+  for (;;) {
+    const value = await read();
+    if (value !== undefined) return value;
+    if (Date.now() > deadline) throw new Error(`timed out waiting: ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
 describe.skipIf(url === undefined)('scoped API tokens', () => {
   let db: Db;
   let server: Server;
@@ -130,11 +141,20 @@ describe.skipIf(url === undefined)('scoped API tokens', () => {
     expect(await db.requirement.count({ where: { project: { code: CODE } } })).toBe(0);
 
     // And the attempt is in the trail, with what was needed and what was held.
-    const denial = await db.auditEvent.findFirstOrThrow({
-      where: { entityId: id },
-      orderBy: { createdAt: 'desc' },
-    });
-    const after = denial.after as { event: string; required: string; held: string[]; path: string };
+    //
+    // Polled, and matched on the event rather than taken as the newest row for this token: the
+    // middleware records the denial with `void` so that a failure to write the trail can never
+    // stop the denial itself, which means the 403 can arrive before the row does. Reading "the
+    // most recent event" also raced the token's own creation event.
+    const after = await waitFor(async () => {
+      const rows = await db.auditEvent.findMany({ where: { entityId: id } });
+      return rows
+        .map(
+          (row) => row.after as { event?: string; required?: string; held?: string[]; path?: string },
+        )
+        .find((a) => a.event === 'scope_denied');
+    }, 'the scope denial should reach the audit trail');
+
     expect(after.event).toBe('scope_denied');
     expect(after.required).toBe('write');
     expect(after.held).toEqual(['read']);
