@@ -28,12 +28,45 @@ curl -s https://foreman.d3cloud.io/health | jq '{schemaRevision, oidcReachable}'
 `/health` is the deploy probe and answers JSON. The console's health *screen* is at `/system` —
 they are different things, and a request to `/health` never reaches the SPA.
 
+## Where it runs
+
+`/DATA/foreman` on the Zima, behind its own Cloudflare Tunnel. That directory holds the host's own
+copy of the stack — it is **not** a checkout of this repo:
+
+| File | What |
+|---|---|
+| `docker-compose.yml` | The stack, pinned to image tags rather than building |
+| `docker-compose.tunnel.yml` | The cloudflared container |
+| `postgres.env` | `POSTGRES_PASSWORD`, and nothing else |
+| `server.env` | Everything the server and worker read |
+| `tunnel.env` | `TUNNEL_TOKEN` |
+
+Two deliberate differences from the compose file in this repo:
+
+- **Images, not builds.** CI publishes `ghcr.io/matdemers1/foreman/{server,worker}` tagged by long
+  SHA, from `main`, once the whole gate is green.
+- **No `${...}` interpolation anywhere.** ZimaOS parses compose files with its own loader, which
+  does not read `.env`. One unresolved variable makes the whole stack fail to load, and it then
+  appears in the dashboard as anonymous container tiles rather than one Foreman app. This is why
+  the image tag is written out literally and every secret arrives through an `env_file`.
+
+The tunnel is **remotely managed**: its ingress (`foreman.d3cloud.io` → `http://server:3200`) lives
+in Cloudflare, not in a file on the host, so the container needs only its token.
+
 ## Deploying
 
+CI builds the artifact; it does not ship it. Deploying is a deliberate act on the host:
+
 ```bash
-git pull
-docker compose -f docker-compose.yml up -d --build --wait
+ssh root@192.168.1.231
+cd /DATA/foreman
+# Edit both image: lines to the new sha-<40 hex> tag, then:
+export DOCKER_CONFIG=/DATA/.docker
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml pull
+docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d --wait
 ```
+
+`DOCKER_CONFIG` is needed because the host's default config path is not writable.
 
 `--wait` blocks until every healthcheck passes. The server's is `node dist/healthcheck.js`; the
 worker's checks that its heartbeat file was touched in the last two minutes, which is the only way
@@ -44,10 +77,7 @@ the old container keeps serving — which is the behaviour to want.
 
 ## Rolling back
 
-```bash
-git checkout <previous sha>
-docker compose -f docker-compose.yml up -d --build --wait
-```
+Put the previous SHA back in the two `image:` lines and bring it up again.
 
 **Migrations do not roll back.** If the release included one, restore from the dump taken before it
 instead — see [backup-restore.md](backup-restore.md). This is the case the standing rule exists to
@@ -56,7 +86,7 @@ combination nobody has tested.
 
 ## Configuration
 
-Everything comes from `.env`, except the two things Compose sets itself:
+In development everything comes from `.env`, except the two things Compose sets itself:
 
 - `DATABASE_URL` — inside the network the database is `postgres:5432`, not the host's port.
 - `BACKUP_DIR` — `/backups`, the only writable path in the image.
@@ -64,6 +94,9 @@ Everything comes from `.env`, except the two things Compose sets itself:
 A developer's `.env` points at the host, which is why these are set in `docker-compose.yml`
 rather than inherited. Getting this wrong is an afternoon: the container reads a host-shaped URL,
 cannot resolve it, and the error names DNS rather than configuration.
+
+On the Zima the same two values are written into `server.env` directly, because that file is only
+ever read by containers — there is no host-shaped copy to disagree with.
 
 ## Health after a deploy
 
