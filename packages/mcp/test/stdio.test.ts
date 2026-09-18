@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
  */
 
 const ENTRY = fileURLToPath(new URL('../src/index.ts', import.meta.url));
+const PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 interface RunOptions {
   readonly input?: string;
@@ -37,7 +38,10 @@ function run(
   delete base['FOREMAN_TOKEN'];
 
   return new Promise((resolve) => {
-    const child = spawn('npx', ['tsx', ENTRY], {
+    const child = spawn(process.execPath, ['--import', 'tsx', ENTRY], {
+      // Node with the tsx loader rather than `npx tsx`: pnpm does not hoist, so `tsx` is only on
+      // PATH here by accident of a local install, and CI finds nothing (exit 127).
+      cwd: PACKAGE_ROOT,
       env: unset ? { ...base, ...env } : { FOREMAN_URL: '', FOREMAN_TOKEN: '', ...base, ...env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
