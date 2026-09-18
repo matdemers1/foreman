@@ -3,6 +3,7 @@ import {
   BriefInput,
   CACHE,
   CoverageInput,
+  FindingsInput,
   gateForDelete,
   gateForLink,
   gateForPriority,
@@ -84,6 +85,7 @@ describe('schemas are generated from packages/shared (FRM-REQ-081)', () => {
     foreman_search: SearchInput,
     foreman_get: GetInput,
     foreman_coverage: CoverageInput,
+    foreman_findings: FindingsInput,
   };
 
   it.each(READ_TOOLS.map((tool) => [tool.name, tool] as const))(
@@ -311,6 +313,39 @@ describe('the gate in front of the write tools (T-2.9, FRM-REQ-090, FRM-REQ-091)
     const setStatus = WRITE_TOOLS.find((t) => t.name === 'foreman_set_status');
     const decision = await setStatus?.gate({ get } as never, { id: 'BND-T-0.3', status: 'in_progress' });
     expect(decision?.gated).toBe(false);
+  });
+});
+
+describe('foreman_findings (T-6.6, FRM-REQ-120)', () => {
+  const tool = READ_TOOLS.find((t) => t.name === 'foreman_findings');
+
+  it('asks for every project by default', async () => {
+    const get = vi.fn().mockResolvedValue({ items: [] });
+    await tool?.run({ get } as never, {});
+
+    // Cross-project is the whole point: "the worst thing outstanding anywhere" was not a question
+    // the vault could answer.
+    expect(get).toHaveBeenCalledWith('/api/findings', {
+      project: undefined,
+      severity: undefined,
+      status: undefined,
+      lens: undefined,
+      limit: 50,
+    });
+  });
+
+  it('passes a narrowing through', async () => {
+    const get = vi.fn().mockResolvedValue({ items: [] });
+    await tool?.run({ get } as never, { severity: 'critical', lens: 'security', limit: 10 });
+
+    expect(get).toHaveBeenCalledWith(
+      '/api/findings',
+      expect.objectContaining({ severity: 'critical', lens: 'security', limit: 10 }),
+    );
+  });
+
+  it('is cached globally, because it spans projects', () => {
+    expect(tool?.cache.cacheScope).toBe('global');
   });
 });
 

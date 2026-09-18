@@ -134,14 +134,20 @@ enum Severity {
   low
 }
 
+/// The adversarial verifier's verdict. **`unverified` is a real state, not a missing value**: 123
+/// of the 127 real findings carry it, because a verifier was cut off or never ran. Conflating it
+/// with null would lose the difference between "nobody checked" and "no verdict was recorded".
 enum Verified {
   confirmed
   plausible
+  unverified
 }
 
 enum FindingStatus {
   open
   fixed
+  /// Real, and distinct from `wont_fix`: a decision to do it later, not a decision not to.
+  deferred
   skipped
   wont_fix
 }
@@ -695,8 +701,11 @@ model Finding {
   /// Joins to ingested reality: the commit that actually fixed it.
   fixedCommitSha String? @map("fixed_commit_sha")
   effort     String?
-  locationPath  String? @map("location_path")
-  locationLines String? @map("location_lines")
+  /// The location **as it was written**, kept verbatim alongside the parsed rows. A real one reads
+  /// `api/config.py:12-14; api/settings_store.py:70; api/main.py (no startup check in lifespan)` —
+  /// prose and all — and a parse that silently dropped the prose would lose the only part naming
+  /// what is wrong with the third file.
+  locationRaw   String? @map("location_raw")
   observedMd    String? @map("observed_md")
   recommendationMd String? @map("recommendation_md")
 
@@ -714,6 +723,7 @@ model Finding {
   requirement Requirement? @relation(fields: [requirementId], references: [id], onDelete: SetNull)
   adr         Adr?         @relation(fields: [adrId], references: [id], onDelete: SetNull)
   phase       Phase?       @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  locations   FindingLocation[]
 
   @@index([projectId, status])
   @@index([severity, status])
@@ -722,6 +732,34 @@ model Finding {
 }
 
 // ─── Ingested reality ──────────────────────────────────────────────────────
+
+/// One file a Finding points at, with the lines within it.
+///
+/// A child table rather than two columns on `finding`, because the real corpus needs it: **28 of
+/// 127 findings name more than one file**, and eleven name several ranges within one. Two flat
+/// columns can hold the first path and nothing else, which is how a location silently becomes
+/// wrong rather than absent.
+model FindingLocation {
+  id        String @id @default(uuid(7)) @db.Uuid
+  findingId String @map("finding_id") @db.Uuid
+
+  path String
+  /// `12-14`, or `42,67,69,144`, or null when the finding names a file without pinning a line.
+  lines String?
+  /// What the raw location said about this file in prose — "(no startup check in `lifespan`)".
+  note  String?
+  sortOrder Int  @default(0) @map("sort_order")
+
+  /// Set when the file has changed since the finding was fixed (FRM-REQ-123). The regression
+  /// watch: a fix whose file moved again is worth a second look, and nothing else notices.
+  changedSinceFixAt DateTime? @map("changed_since_fix_at") @db.Timestamptz(6)
+
+  finding Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+
+  @@unique([findingId, path])
+  @@index([path])
+  @@map("finding_location")
+}
 
 model Commit {
   id     String @id @default(uuid(7)) @db.Uuid

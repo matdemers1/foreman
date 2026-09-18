@@ -214,8 +214,7 @@ describe.skipIf(url === undefined)('the session brief', () => {
           title: 'A critical that is open',
           severity: 'critical',
           status: 'open',
-          locationPath: 'apps/server/src/x.ts',
-          locationLines: '10-20',
+          locationRaw: 'apps/server/src/x.ts:10-20',
         },
         {
           projectId,

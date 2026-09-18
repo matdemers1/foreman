@@ -2,6 +2,7 @@ import {
   BriefInput,
   CACHE,
   CoverageInput,
+  FindingsInput,
   GetInput,
   PortfolioInput,
   SearchInput,
@@ -100,6 +101,25 @@ export const READ_TOOLS: readonly ToolDefinition[] = [
       return args.phase === undefined
         ? client.get(`/api/projects/${args.project}/coverage`)
         : client.get(`/api/projects/${args.project}/phases/${args.phase}/gate`);
+    },
+  },
+  {
+    name: 'foreman_findings',
+    title: 'Findings inbox',
+    description:
+      'Open audit findings across every project, ranked by severity. Narrow by project, severity ' +
+      'or lens. Each carries its location, the audit it came from and its fix state.',
+    inputSchema: FindingsInput,
+    cache: CACHE.findings,
+    run: async (client, input) => {
+      const args = FindingsInput.parse(input);
+      return client.get('/api/findings', {
+        project: args.project,
+        severity: args.severity,
+        status: args.status,
+        lens: args.lens,
+        limit: args.limit,
+      });
     },
   },
 ];

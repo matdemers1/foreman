@@ -1,0 +1,189 @@
+import {
+  AuditCreate,
+  AuditUpdate,
+  FindingCreate,
+  FindingsInput,
+  FindingUpdate,
+  PageQuery,
+} from '@foreman/shared';
+import { Router } from 'express';
+import { z } from 'zod';
+import { requireAuth, requireScope } from '../auth/middleware.js';
+import type { Db } from '../db.js';
+import {
+  createAudit,
+  createFinding,
+  fixStateFor,
+  inbox,
+  updateAudit,
+  updateFinding,
+} from '../domain/findings.js';
+import { findProject } from '../domain/projects.js';
+import { recurrencesOf, regressionWatch } from '../domain/recurrence.js';
+import { actorOf, handler, param, parseBody, parseQuery } from './helpers.js';
+
+/**
+ * Findings over HTTP, and the one route that is deliberately cross-project.
+ *
+ * `GET /api/findings` is mounted outside `/projects/:code` because scoping it to a project would
+ * make the inbox answer a question nobody has. "Every open Critical, all projects, ranked" is the
+ * question (FRM-REQ-120), and it is the one the vault could never answer.
+ */
+export function findingRoutes(db: Db): Router {
+  const router = Router();
+  router.use(requireAuth);
+  // Read-only: every write goes through a project, because a finding belongs to one.
+  router.use(requireScope(db, 'read'));
+
+  // ─── The cross-project inbox (T-6.6) ─────────────────────────────────────
+
+  router.get(
+    '/findings',
+    handler(async (req, res) => {
+      const query = parseQuery(FindingsInput, req, res);
+      if (query === null) return;
+
+      const items = await inbox(db, {
+        project: query.project,
+        severity: query.severity,
+        status: query.status,
+        lens: query.lens,
+        limit: query.limit,
+      });
+      res.json({ items, nextCursor: null, total: items.length });
+    }),
+  );
+
+  router.get(
+    '/findings/:humanId',
+    handler(async (req, res) => {
+      const humanId = param(req, 'humanId');
+      const finding = await db.finding.findFirst({
+        where: { humanId, deletedAt: null },
+        include: {
+          project: { select: { code: true, name: true } },
+          audit: { select: { humanId: true, kind: true, runDate: true, verdict: true } },
+          locations: { orderBy: { sortOrder: 'asc' } },
+          adr: { select: { humanId: true, title: true } },
+          requirement: { select: { humanId: true, statement: true } },
+          phase: { select: { humanId: true, name: true } },
+        },
+      });
+      if (finding === null) {
+        res.status(404).json({ error: `no finding called ${humanId}` });
+        return;
+      }
+
+      res.json({ ...finding, fix: await fixStateFor(db, finding) });
+    }),
+  );
+
+  /** Candidate recurrences in other projects — proposed, never judged (FRM-REQ-122). */
+  router.get(
+    '/findings/:humanId/recurrences',
+    handler(async (req, res) => {
+      res.json(await recurrencesOf(db, param(req, 'humanId')));
+    }),
+  );
+
+  router.get(
+    '/regression-watch',
+    handler(async (req, res) => {
+      const code = typeof req.query['project'] === 'string' ? req.query['project'] : undefined;
+      const items = await regressionWatch(db, code);
+      res.json({ items, nextCursor: null, total: items.length });
+    }),
+  );
+
+  return router;
+}
+
+/** The per-project half: creating audits and findings, and listing a project's own. */
+export function projectFindingRoutes(db: Db): Router {
+  const router = Router();
+  router.use(requireAuth);
+  router.use(requireScope(db, 'read'));
+  const canWrite = requireScope(db, 'write');
+
+  const FindingQuery = PageQuery.extend({
+    severity: z.enum(['critical', 'high', 'medium', 'low']).optional(),
+    status: z.enum(['open', 'fixed', 'deferred', 'skipped', 'wont_fix']).optional(),
+    lens: z.string().max(40).optional(),
+    audit: z.string().optional(),
+  });
+
+  router.get(
+    '/:code/findings',
+    handler(async (req, res) => {
+      const query = parseQuery(FindingQuery, req, res);
+      if (query === null) return;
+      const project = await findProject(db, param(req, 'code'));
+
+      const filters = {
+        projectId: project.id,
+        deletedAt: null,
+        ...(query.severity === undefined ? {} : { severity: query.severity }),
+        ...(query.status === undefined ? {} : { status: query.status }),
+        ...(query.lens === undefined ? {} : { lenses: { has: query.lens } }),
+        ...(query.audit === undefined ? {} : { audit: { humanId: query.audit } }),
+      };
+
+      const [items, total] = await Promise.all([
+        db.finding.findMany({
+          where: filters,
+          orderBy: [{ severity: 'asc' }, { humanId: 'asc' }],
+          take: query.limit,
+          include: {
+            audit: { select: { humanId: true, kind: true } },
+            locations: { orderBy: { sortOrder: 'asc' } },
+          },
+        }),
+        db.finding.count({ where: filters }),
+      ]);
+
+      res.json({ items, nextCursor: null, total });
+    }),
+  );
+
+  router.post(
+    '/:code/findings',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(FindingCreate, req, res);
+      if (body === null) return;
+      res.status(201).json(await createFinding(db, actorOf(req), param(req, 'code'), body));
+    }),
+  );
+
+  router.patch(
+    '/:code/findings/:humanId',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(FindingUpdate, req, res);
+      if (body === null) return;
+      res.json(await updateFinding(db, actorOf(req), param(req, 'humanId'), body));
+    }),
+  );
+
+  router.post(
+    '/:code/audits',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(AuditCreate, req, res);
+      if (body === null) return;
+      res.status(201).json(await createAudit(db, actorOf(req), param(req, 'code'), body));
+    }),
+  );
+
+  router.patch(
+    '/:code/audits/:humanId',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(AuditUpdate, req, res);
+      if (body === null) return;
+      res.json(await updateAudit(db, actorOf(req), param(req, 'humanId'), body));
+    }),
+  );
+
+  return router;
+}

@@ -1,0 +1,1145 @@
+[
+  {
+    "project": "bindery",
+    "findingId": "CR-014",
+    "location": "api/config.py:12-14; api/settings_store.py:70; infra/zimaos/bindery.zimaos.yaml:42,67,69,144; .env.example:5,8; api/main.py (no startup check in `lifespan`)",
+    "lens": "operability, security",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-029",
+    "location": "infra/zimaos/bindery.zimaos.yaml:107-122 (worker service, no healthcheck key); infra/docker-compose.yml:40-50; worker/runner.py:266-273",
+    "lens": "operability",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-084",
+    "location": "api/vault/boundary.py:27",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-092",
+    "location": "api/health_panel.py:36-38 vs api/queue.py:49-51",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-032",
+    "location": "api/vault/search.py:81-112, reached from api/routers/vault.py:334",
+    "lens": "performance",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-090",
+    "location": "api/schemas.py:894",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-016",
+    "location": "web/src/features/edit/EditPanel.tsx:353",
+    "lens": "accessibility",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-083",
+    "location": "README.md:11",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-116",
+    "location": "api/notify.py:79-92 (urllib.request.Request(self.webhook_url, ...) then urlopen) with api/routers/settings.py:169-174 (any writable-library account may set it)",
+    "lens": "security",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-022",
+    "location": "worker/stages/classify.py:378",
+    "lens": "correctness",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-071",
+    "location": "api/db/models/document.py:117-119",
+    "lens": "data",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-108",
+    "location": "api/routers/library.py:190-205 and 208-269",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-050",
+    "location": "web/src/features/search/SearchPage.tsx:332",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-036",
+    "location": "api/routers/entities.py:235-241 (preview_merge), 249-262 (merge_correspondents), 274-296 (merge_tags), 298-311 (undo_merge), api/routers/imports.py:428-440 (bulk_undo, no check at all)",
+    "lens": "security",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-099",
+    "location": "api/cli.py:142-190 (`lifecycle-check`), api/offsite.py:1027 (`audit_lifecycle`) and :1074 (`live_lifecycle_rules`); Makefile:44-45; no caller in worker/runner.py or api/health_panel.py",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-114",
+    "location": "api/routers/vault.py:99-120 (unlock) \u2192 api/vault/service.py:101-111 (unlock_with_passphrase) \u2192 api/vault/crypto.py:36-37, 90-102",
+    "lens": "security",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-076",
+    "location": "api/quota.py:93-109",
+    "lens": "data",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-008",
+    "location": "api/vault/sweep.py:112-137 and tests/test_no_destructive_paths.py:30-42",
+    "lens": "data",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-011",
+    "location": "api/offsite.py:844 and :882 and :509; worker/runner.py:387",
+    "lens": "operability, performance",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-102",
+    "location": "api/search/query.py:293-296, 302-308, 362-381",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-098",
+    "location": "docs/zimaos-deploy.md:135-168, :239, :322, :325 vs the warning at :277-284",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-064",
+    "location": "api/bulk.py:105-121,226-238",
+    "lens": "correctness",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-068",
+    "location": "worker/stages/segment.py:172-181",
+    "lens": "correctness",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-062",
+    "location": "worker/stages/classify.py:364-375, api/undo.py:29-36,115-127",
+    "lens": "correctness",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-015",
+    "location": "web/src/features/vault/MoveToVault.tsx:83 (also VaultGrid.tsx:86, VaultVideos.tsx:79, PhotosPage.tsx:283, AskPage.tsx:432)",
+    "lens": "accessibility",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-121",
+    "location": "api/routers/trust.py:111-134 (export_full), 175-198 (integrity_check), 200-215 (mirror_rebuild), 218-256 (backup_run) \u2014 each guarded only by _visible at api/routers/trust.py:55-59",
+    "lens": "security",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-122",
+    "location": "tests/test_vault_leak.py:140-151 (test_it_is_absent_from_counts_and_facets)",
+    "lens": "testing",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-103",
+    "location": "api/routers/files.py:108-112",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-105",
+    "location": "api/routers/entities.py:101-118",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-001",
+    "location": "api/vault/store.py:196-206,299-310",
+    "lens": "correctness, data",
+    "severity": "Critical",
+    "verified": "CONFIRMED",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-066",
+    "location": "api/backlog/session.py:153-165, api/vault/sweep.py:34-48",
+    "lens": "correctness",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-026",
+    "location": ".github/workflows/build.yml:44 (`npm ci --no-audit --no-fund`), :36-38 and :86-89 (pip install with no audit step); absence of .github/dependabot.yml or renovate.json (.github/ contains only workflows",
+    "lens": "dependencies",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-120",
+    "location": "api/routers/upload.py:41-50 (declared = getattr(file, 'size', None); if declared: quota.check(...)) then unconditional store_stream",
+    "lens": "security",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-019",
+    "location": "web/src/features/vault/UnlockForm.tsx:106",
+    "lens": "accessibility",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-077",
+    "location": ".github/workflows/build.yml:254-269 \u2014 `actions/checkout@v5`, `docker/setup-buildx-action@v3`, `docker/login-action@v3`, `docker/metadata-action@v5`, `docker/build-push-action@v6`; also :27-31, :78-85,",
+    "lens": "dependencies",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-051",
+    "location": "web/src/features/palette/CommandPalette.tsx:82",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-003",
+    "location": "api/vault/store.py:306-312, called from api/routers/vault.py:250-260 and api/vault/sweep.py:118-133",
+    "lens": "correctness, data",
+    "severity": "Critical",
+    "verified": "CONFIRMED",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-052",
+    "location": "web/src/features/edit/EditPanel.tsx:243",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-046",
+    "location": "web/src/features/ask/AskPage.tsx:373",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-118",
+    "location": "api/routers/settings.py:89-121 (read_settings \u2014 no _owner_only, no require_admin)",
+    "lens": "security",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-045",
+    "location": "web/src/features/vault/VaultPage.tsx:220",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-104",
+    "location": "api/taxonomy_health.py:150-195, invoked from api/routers/entities.py:529",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-009",
+    "location": "web/src/features/review/ReviewPage.tsx:74",
+    "lens": "accessibility, correctness",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-012",
+    "location": "api/offsite.py:535-598",
+    "lens": "correctness, data, operability",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-005",
+    "location": "api/routers/imports.py:110-116 (root_path accepted, only checked for is_absolute) \u2192 api/backlog/session.py:46 (Path(import_session.root_path)) \u2192 api/backlog/session.py:150-156 (store_stream + ingest.r",
+    "lens": "security",
+    "severity": "Critical",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-027",
+    "location": ".github/workflows/build.yml:280-281 (`cache-from: type=gha` / `cache-to: type=gha,mode=max`); infra/Dockerfile.api:23-27; infra/Dockerfile.worker:58-61",
+    "lens": "dependencies",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-081",
+    "location": "Makefile:88",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-047",
+    "location": "web/index.html:2",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-123",
+    "location": "web/package.json (no vitest/jest/testing-library), web/src/ (13,981 lines), web/e2e/ (687 lines across 12 specs)",
+    "lens": "testing",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-018",
+    "location": "web/src/features/ask/AskPage.tsx:375",
+    "lens": "accessibility",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-094",
+    "location": "worker/runner.py:67 and :487-502; infra/zimaos/bindery.zimaos.yaml (no `stop_grace_period` on any service); infra/docker-compose.yml (same)",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-021",
+    "location": "api/search/query.py:139 and 421 (fail-open defaults); api/routers/trust.py:78-100 (`GET /api/vital`, no vault clause); api/routers/logs.py:168 (`GET /api/pipeline/files`, no hidden-file exclusion); ap",
+    "lens": "architecture",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-010",
+    "location": "api/routers/trust.py:182 (integrity_check), :117 (export_full), :205 (mirror_rebuild), :146 (export_go_bag), :227 (backup_run's pre-check); api/export/integrity.py:84-91, api/export/archive_export.py:",
+    "lens": "operability, performance",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-113",
+    "location": "api/backlog/session.py:56-64",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-040",
+    "location": "tests/test_vault_leak.py (no /api/ask test), api/ask.py:124-171 (gather_sources), tests/test_ask_and_health.py:162",
+    "lens": "testing",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-093",
+    "location": "api/notify.py:79-92 (called synchronously from worker/runner.py:288)",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-030",
+    "location": "web/src/components/Shell.tsx:173-181, calling api/health_panel.py:210",
+    "lens": "performance",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-107",
+    "location": "api/routers/logs.py:307-345; client at web/src/features/photos/PhotosPage.tsx:44-64",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-082",
+    "location": "CLAUDE.md:78",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-091",
+    "location": "infra/Dockerfile.api:32-38, infra/Dockerfile.worker:63-66, infra/Dockerfile.web:10-12 (no `USER` directive in any stage); infra/zimaos/bindery.zimaos.yaml:90,116 (`/media/Main-Storage/bindery/data:/da",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-007",
+    "location": "api/routers/trust.py:78-103 (vital_records)",
+    "lens": "security",
+    "severity": "High",
+    "verified": "CONFIRMED",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-109",
+    "location": "infra/nginx.conf:56-58; web/src/App.tsx:5-30; web/dist/assets/index-D884X2mY.js",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-070",
+    "location": "api/db/enums.py:58-66 vs alembic/versions/0001_baseline.py:46",
+    "lens": "data",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-020",
+    "location": "web/src/features/rules/RulesPage.tsx:216",
+    "lens": "accessibility",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-080",
+    "location": "docs/access-setup.md:11",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-087",
+    "location": "D3 Cloud Vault/Bindery/Glossary.md (row: Confidence gate)",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-100",
+    "location": "infra/nginx.conf:40 (`proxy_pass http://api:8000/api/;` with no `resolver` and no variable); docs/zimaos-deploy.md:322",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-115",
+    "location": "api/routers/auth.py:40-56, api/auth/throttle.py:86-119 (check), api/auth/passwords.py:20,84-88 (module-level PasswordHasher, verify_password)",
+    "lens": "security",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-023",
+    "location": "api/vault/sweep.py:96, api/vault/session.py:57-71",
+    "lens": "correctness",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-006",
+    "location": "api/routers/settings.py:34-37 (_owner_only) and api/routers/settings.py:124-191 (update_settings) \u2192 api/routers/trust.py:286-300 (offsite_replicate_now, guarded only by _visible) \u2192 api/offsite.py:794-",
+    "lens": "security",
+    "severity": "Critical",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-042",
+    "location": "tests/conftest.py:29-40 (migrated_database), alembic/versions/ (27 revisions)",
+    "lens": "testing",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-056",
+    "location": "web/src/features/review/ReviewPage.tsx:132",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-095",
+    "location": "infra/zimaos/bindery.zimaos.yaml (no `logging:` key on any service); infra/docker-compose.yml (same); infra/zimaos/bindery.zimaos.yaml:48 (`/DATA/AppData/bindery/pgdata`)",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-117",
+    "location": "api/routers/auth.py:27-30 and api/routers/accounts.py:62-66 (_client_ip), with infra/nginx.conf (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for`)",
+    "lens": "security",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-125",
+    "location": "tests/test_no_destructive_paths.py:20-27 (FORBIDDEN)",
+    "lens": "testing",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-079",
+    "location": "infra/zimaos/bindery.zimaos.yaml:141 (`image: cloudflare/cloudflared:latest`, `restart: unless-stopped`); infra/docker-compose.yml:69 (same image in the `tunnel` profile)",
+    "lens": "dependencies",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-043",
+    "location": "web/src/features/search/SearchPage.tsx:144",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-024",
+    "location": "api/export/integrity.py:107-116, 135-151",
+    "lens": "data",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-028",
+    "location": "web/src/api.ts:1438",
+    "lens": "maintainability",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-049",
+    "location": "web/src/features/search/SearchPage.tsx:126",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-078",
+    "location": "pyproject.toml:57-61 (dev extra: httpx, pytest, python-docx, openpyxl, mypy, ruff); tests/test_layering.py:48-58 (the guard that covers the other half); infra/Dockerfile.api:57-66 and infra/Dockerfile",
+    "lens": "dependencies",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-074",
+    "location": "api/routers/vault.py:273-310",
+    "lens": "data",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-039",
+    "location": "tests/test_vault_leak.py:223-262 (test_every_route_that_selects_documents_applies_the_vault_boundary)",
+    "lens": "testing",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-075",
+    "location": "api/db/models/tag.py:51-67 with api/editing.py:178-190",
+    "lens": "data",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "deferred"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-013",
+    "location": "api/db/scope.py:1-30 (the docstring claim) vs api/db/repository.py; ~27 hand-written clauses, e.g. api/routers/entities.py:94,150,183,207,336,430,505; api/routers/library.py:89,214,220,239,249,259,306",
+    "lens": "architecture, maintainability",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-053",
+    "location": "web/src/features/vault/VaultSearchPanel.tsx:70",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-060",
+    "location": "web/src/features/trust/TrustPage.tsx:361-368; api/events.py:51-59 (Topic); worker/runner.py:_offsite_replication (no publish call)",
+    "lens": "architecture",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-067",
+    "location": "api/backlog/session.py:142-175",
+    "lens": "correctness",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-035",
+    "location": "api/routers/accounts.py:126-139 (totp_start sets user.totp_confirmed_at = None and commits) with api/db/models/user.py:59-61 (totp_enabled requires totp_confirmed_at)",
+    "lens": "security",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-059",
+    "location": "api/schemas.py (123 BaseModel classes, 1382 lines) vs web/src/api.ts (96 exported interfaces, 1505 lines); api/main.py:88 publishes `/api/openapi.json`; .github/workflows/build.yml runs `tsc --noEmit`",
+    "lens": "architecture",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-119",
+    "location": "api/auth/service.py:89-105 (revoke_session / revoke_all_for_user touch RefreshToken only), api/auth/dependencies.py:49-56 (decode and load user; no revocation check), api/auth/cookies.py:35-37 (logout",
+    "lens": "security",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-101",
+    "location": "docs/zimaos-deploy.md:286-313; alembic/versions/ (27 revisions, all with a `downgrade`)",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-127",
+    "location": "web/e2e/vault.spec.ts:116,131 (test.skip guards), .github/workflows/build.yml (no vault seeding)",
+    "lens": "testing",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-111",
+    "location": "api/routers/logs.py:121; api/db/models/event_log.py:43-70; web/src/components/LogViewer.tsx (useLiveQuery ['logs','jobs'], fallbackMs 10_000)",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-054",
+    "location": "web/src/features/segmentation/SegmentationPage.tsx:262",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-004",
+    "location": "api/auth/dependencies.py:65-119 (current_scope, require_scope); api/routers/household.py is the only importer; contrast api/routers/documents.py:50, api/routers/trust.py:56, api/routers/logs.py:163, a",
+    "lens": "architecture, security",
+    "severity": "Critical",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-058",
+    "location": "api/undo.py:29-36 (UNDOABLE) and :55-103 (already_undone); api/bulk.py:186-206; api/segments.py:177-212; api/entities.py:339-355",
+    "lens": "architecture",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-065",
+    "location": "api/routers/imports.py:428-440, api/bulk.py:186-192",
+    "lens": "correctness",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-033",
+    "location": "api/routers/vault.py:441",
+    "lens": "performance",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-055",
+    "location": "web/src/features/search/SearchPage.tsx:237",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-002",
+    "location": "api/vault/store.py:310",
+    "lens": "correctness, data",
+    "severity": "Critical",
+    "verified": "CONFIRMED",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-072",
+    "location": "api/export/backup.py:113-127",
+    "lens": "data",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-097",
+    "location": "docs/backup-and-restore.md:94-112",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-031",
+    "location": "api/routers/documents.py:86-89, calling api/db/repository.py:178",
+    "lens": "performance",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-057",
+    "location": "tests/test_permission_boundary.py:394-412",
+    "lens": "architecture",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-017",
+    "location": "web/src/index.css:9",
+    "lens": "accessibility",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-025",
+    "location": "pyproject.toml:14-56 (dependencies, worker extra); infra/extract-deps.py:20-24; infra/Dockerfile.api:24-27; infra/Dockerfile.worker:58-61; .github/workflows/build.yml:36-38,86-89",
+    "lens": "dependencies",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-086",
+    "location": "api/routers/logs.py:251",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-096",
+    "location": "docs/zimaos-deploy.md:254-273 vs scripts/restore-drill.sh:103-108 and api/export/backup.py:189-195",
+    "lens": "operability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-110",
+    "location": "api/vault/sweep.py:83-111, 140-153",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-034",
+    "location": "api/routers/vault.py:9-11 (the claim), api/routers/vault.py:23 (imports current_user only), api/routers/vault.py:51-57 (_key_or_423 reads sessions.key(user.id) directly)",
+    "lens": "security",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-112",
+    "location": "api/health_panel.py:346-364",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-069",
+    "location": "worker/media.py:131,146",
+    "lens": "correctness",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-044",
+    "location": "web/src/components/Shell.tsx:417",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-085",
+    "location": "web/src/features/review/ReviewPage.tsx:36",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-106",
+    "location": "api/routers/entities.py:134-148; schema at alembic/versions/0001_baseline.py:273-284 and 0004_tag_removal.py:36",
+    "lens": "performance",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-061",
+    "location": "D3 Cloud Vault/Bindery/Architecture.md \u2014 frontmatter `updated: 2026-08-27`, line 33 (system diagram), line 73 (`WORKER -->|classify, segment, Q&A| CLAUDE`), line 64 (`BULK --> WORKER`), lines 267-268",
+    "lens": "architecture",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-038",
+    "location": "tests/test_permission_boundary.py:381 (`if '{' in path \u2026 continue`), tests/test_permission_boundary.py:270 (test_a_blob_url_is_not_a_way_in), tests/test_files.py:159",
+    "lens": "testing",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-063",
+    "location": "api/health_panel.py:255-265,405-411",
+    "lens": "correctness",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-089",
+    "location": "pyproject.toml:58",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-041",
+    "location": "tests/test_trust_and_export.py:376 (test_the_restore_drill_fails_loudly_when_it_cannot_find_the_document), scripts/restore-drill.sh, .github/workflows/build.yml",
+    "lens": "testing",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-124",
+    "location": "tests/test_docs.py:97-135 (test_no_screenshot_is_older_than_the_screen_it_shows)",
+    "lens": "testing",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-088",
+    "location": "web/src/api.ts:713",
+    "lens": "maintainability",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-048",
+    "location": "web/src/App.tsx:102",
+    "lens": "accessibility",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-037",
+    "location": "tests/test_ocr_accuracy.py:119 (test_golden_corpus_word_accuracy), tests/corpus/",
+    "lens": "testing",
+    "severity": "High",
+    "verified": "unverified",
+    "status": "open"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-126",
+    "location": ".github/workflows/build.yml:202-220 (Wait for the pipeline to finish the seeded corpus)",
+    "lens": "testing",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  },
+  {
+    "project": "bindery",
+    "findingId": "CR-073",
+    "location": "api/vault/boundary.py:49-61, applied at api/db/scope.py:117-144 and api/db/repository.py:105, 152, 172, 190",
+    "lens": "data",
+    "severity": "Medium",
+    "verified": "unverified",
+    "status": "fixed"
+  }
+]

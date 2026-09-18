@@ -359,8 +359,9 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
             ? { fixedRound: 2, fixedCommitSha: 'c0175a6' }
             : {}),
           effort: 'S',
-          locationPath: 'apps/server/src/example.ts',
-          locationLines: '196-206',
+          // A real location's shape: several files, ranges, and prose the parse keeps as a note.
+          locationRaw:
+            'apps/server/src/example.ts:196-206, 299-310; apps/web/src/App.tsx:12 (no guard)',
           observedMd: `What was seen, and why it is ${severity}.`,
           recommendationMd: 'What to do about it.',
           requirementId: requirements[index]?.id ?? null,

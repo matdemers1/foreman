@@ -88,10 +88,15 @@ export type AuditStatus = z.infer<typeof AuditStatus>;
 export const Severity = z.enum(['critical', 'high', 'medium', 'low']);
 export type Severity = z.infer<typeof Severity>;
 
-export const Verified = z.enum(['confirmed', 'plausible']);
+/**
+ * The adversarial verifier's verdict. **`unverified` is a real state, not a missing value**:
+ * 123 of the 127 real findings carry it, because a verifier was cut off or never ran.
+ */
+export const Verified = z.enum(['confirmed', 'plausible', 'unverified']);
 export type Verified = z.infer<typeof Verified>;
 
-export const FindingStatus = z.enum(['open', 'fixed', 'skipped', 'wont_fix']);
+/** `deferred` is in the real corpus and distinct from `wont_fix`: later, not never. */
+export const FindingStatus = z.enum(['open', 'fixed', 'deferred', 'skipped', 'wont_fix']);
 export type FindingStatus = z.infer<typeof FindingStatus>;
 
 export const CheckConclusion = z.enum([

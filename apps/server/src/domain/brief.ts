@@ -129,8 +129,7 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
           humanId: true,
           severity: true,
           title: true,
-          locationPath: true,
-          locationLines: true,
+          locationRaw: true,
         },
       }),
       db.checkRun.findFirst({
@@ -202,10 +201,9 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
       humanId: finding.humanId,
       severity: finding.severity,
       title: finding.title,
-      location:
-        finding.locationPath === null
-          ? null
-          : `${finding.locationPath}${finding.locationLines === null ? '' : `:${finding.locationLines}`}`,
+      // The raw location, as written. It may name several files; the brief shows what the
+      // author wrote rather than the first row of a parse.
+      location: finding.locationRaw,
     })),
     ci: {
       conclusion: latestCheck?.conclusion ?? null,

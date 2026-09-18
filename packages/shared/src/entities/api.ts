@@ -86,4 +86,5 @@ export const CACHE = {
   search: { ttlMs: 15_000, cacheScope: 'global' },
   get: { ttlMs: 30_000, cacheScope: 'project' },
   coverage: { ttlMs: 30_000, cacheScope: 'project' },
+  findings: { ttlMs: 30_000, cacheScope: 'global' },
 } as const satisfies Record<string, CacheMeta>;
