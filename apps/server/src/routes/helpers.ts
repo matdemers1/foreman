@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Actor } from '../domain/audit.js';
 import { Conflict, Invalid, NotFound } from '../domain/errors.js';
 import { ImmutableHumanIdError } from '../domain/humanId.js';
+import { StaleWrite } from './concurrency.js';
 
 /**
  * The plumbing every route shares: who is acting, what a body must look like, and what a domain
@@ -45,6 +46,13 @@ function respondToError(error: unknown, res: Response, next: NextFunction): void
 
   if (error instanceof NotFound) {
     res.status(404).json({ error: error.message });
+    return;
+  }
+  if (error instanceof StaleWrite) {
+    // 412, and the current state with it: a caller that lost a race should be able to see what it
+    // lost to without a second request.
+    res.setHeader('ETag', error.currentEtag);
+    res.status(412).json({ error: error.message, current: error.current });
     return;
   }
   if (error instanceof Conflict) {

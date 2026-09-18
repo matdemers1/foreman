@@ -24,6 +24,7 @@ import {
   updateTask,
 } from '../domain/projects.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
+import { assertFresh, setEtag } from './concurrency.js';
 import {
   actorOf,
   decodeCursor,
@@ -95,6 +96,7 @@ export function projectRoutes(db: Db): Router {
         db.task.count({ where: { projectId: project.id, deletedAt: null } }),
         db.finding.count({ where: { projectId: project.id, status: 'open', deletedAt: null } }),
       ]);
+      setEtag(res, project);
       res.json({ ...project, counts: { phases, requirements, tasks, openFindings } });
     }),
   );
@@ -105,7 +107,13 @@ export function projectRoutes(db: Db): Router {
     handler(async (req, res) => {
       const body = parseBody(ProjectUpdate, req, res);
       if (body === null) return;
-      res.json(await updateProject(db, actorOf(req), param(req, 'code'), body));
+
+      const code = param(req, 'code');
+      assertFresh(req, await findProject(db, code));
+
+      const updated = await updateProject(db, actorOf(req), code, body);
+      setEtag(res, updated);
+      res.json(updated);
     }),
   );
 
@@ -194,7 +202,14 @@ export function projectRoutes(db: Db): Router {
     handler(async (req, res) => {
       const body = parseBody(RequirementUpdate, req, res);
       if (body === null) return;
-      res.json(await updateRequirement(db, actorOf(req), param(req, 'humanId'), body));
+
+      const humanId = param(req, 'humanId');
+      const current = await db.requirement.findFirst({ where: { humanId, deletedAt: null } });
+      if (current !== null) assertFresh(req, current);
+
+      const updated = await updateRequirement(db, actorOf(req), humanId, body);
+      setEtag(res, updated);
+      res.json(updated);
     }),
   );
 
@@ -258,7 +273,14 @@ export function projectRoutes(db: Db): Router {
     handler(async (req, res) => {
       const body = parseBody(TaskUpdate, req, res);
       if (body === null) return;
-      res.json(await updateTask(db, actorOf(req), param(req, 'humanId'), body));
+
+      const humanId = param(req, 'humanId');
+      const current = await db.task.findFirst({ where: { humanId, deletedAt: null } });
+      if (current !== null) assertFresh(req, current);
+
+      const updated = await updateTask(db, actorOf(req), humanId, body);
+      setEtag(res, updated);
+      res.json(updated);
     }),
   );
 

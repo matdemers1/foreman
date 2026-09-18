@@ -6,6 +6,7 @@ import { generateSecret, provisioningUri, TOTP_PERIOD } from '../../src/auth/tot
 import { encryptSecret } from '../../src/auth/totp.js';
 import { loadConfig, type Config } from '../../src/config.js';
 import { createDb, type Db } from '../../src/db.js';
+import { FREE_ATTEMPTS } from '../../src/auth/throttle.js';
 
 /**
  * The app-native login path, over real HTTP (T-0.6).
@@ -177,21 +178,25 @@ describe.skipIf(url === undefined)('app-native login', () => {
   });
 
   it('throttles after repeated failures, and says how long to wait', async () => {
-    let throttled: Response | null = null;
-    for (let i = 0; i < 6; i++) {
-      const res = await login({ email: EMAIL, password: 'wrong' });
-      if (res.status === 429) {
-        throttled = res;
-        break;
-      }
+    // Enough wrong passwords to be past the free attempts, whatever the machine's speed. The
+    // count is asserted from the recorded state rather than from how many responses were 429:
+    // the delay runs from the *last* failure, so on a slow box each attempt can arrive after the
+    // previous delay has already expired — a real property of a delay-not-lockout design, and one
+    // that would otherwise make this test fail for a reason that is not a defect.
+    for (let i = 0; i < FREE_ATTEMPTS + 1; i++) {
+      await login({ email: EMAIL, password: 'wrong' });
     }
 
-    expect(throttled, 'six wrong passwords should have been throttled').not.toBeNull();
-    expect(throttled?.headers.get('retry-after')).toMatch(/^\d+$/);
-
-    // And it is a delay, not a lockout: the row carries a time, and the account is never disabled.
     const rows = await db.authThrottle.findMany({ where: { scope: 'account', key: EMAIL } });
+    expect(rows[0]?.failures).toBeGreaterThan(FREE_ATTEMPTS);
     expect(rows[0]?.nextAllowedAt.getTime()).toBeGreaterThan(Date.now());
+
+    // An attempt made now — inside the window that was just set — is refused with how long to wait.
+    const throttled = await login({ email: EMAIL, password: 'wrong' });
+    expect(throttled.status).toBe(429);
+    expect(throttled.headers.get('retry-after')).toMatch(/^\d+$/);
+
+    // And it is a delay, not a lockout: the account is never disabled.
     expect((await db.user.findUniqueOrThrow({ where: { id: userId } })).status).toBe('active');
   });
 
@@ -237,5 +242,127 @@ describe.skipIf(url === undefined)('app-native login', () => {
 
   it('provisions a TOTP URI labelled with the account', () => {
     expect(provisioningUri(generateSecret(), EMAIL)).toContain(encodeURIComponent(EMAIL));
+  });
+
+  describe('TOTP enrolment (T-2.7, FRM-REQ-022)', () => {
+    const signIn = async (): Promise<string> => {
+      const res = await login({ email: EMAIL, password: PASSWORD });
+      return (res.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+    };
+
+    const codeFor = async (secret: string, at = new Date()): Promise<string> => {
+      const { Secret, TOTP } = await import('otpauth');
+      return new TOTP({
+        issuer: 'Foreman',
+        label: EMAIL,
+        algorithm: 'SHA1',
+        digits: 6,
+        period: TOTP_PERIOD,
+        secret: Secret.fromBase32(secret),
+      }).generate({ timestamp: at.getTime() });
+    };
+
+    it('hands out a secret and a URI an authenticator app can read', async () => {
+      const cookie = await signIn();
+      const res = await fetch(`${origin}/auth/totp/enrol`, { method: 'POST', headers: { cookie } });
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as { secret: string; uri: string };
+      expect(body.secret).toMatch(/^[A-Z2-7]+$/);
+      expect(body.uri.startsWith('otpauth://totp/')).toBe(true);
+      expect(body.uri).toContain('issuer=Foreman');
+    });
+
+    it('stores the secret encrypted, never in the clear', async () => {
+      const cookie = await signIn();
+      const res = await fetch(`${origin}/auth/totp/enrol`, { method: 'POST', headers: { cookie } });
+      const { secret } = (await res.json()) as { secret: string };
+
+      const credential = await db.credential.findUniqueOrThrow({ where: { userId } });
+      expect(credential.totpSecret).not.toBeNull();
+      expect(credential.totpSecret).not.toContain(secret);
+      // Not in force until confirmed: an enrolment that fails halfway must not lock anyone out.
+      expect(credential.totpConfirmedAt).toBeNull();
+    });
+
+    it('is not in force until a code confirms it works', async () => {
+      const cookie = await signIn();
+      await fetch(`${origin}/auth/totp/enrol`, { method: 'POST', headers: { cookie } });
+
+      // Enrolled but unconfirmed: the password alone still signs in, which is the point.
+      const stillWorks = await login({ email: EMAIL, password: PASSWORD });
+      expect(stillWorks.status).toBe(200);
+      expect(await stillWorks.json()).toEqual({ status: 'signed_in' });
+    });
+
+    it('refuses a wrong code, and confirms a right one', async () => {
+      const cookie = await signIn();
+      const enrol = await fetch(`${origin}/auth/totp/enrol`, { method: 'POST', headers: { cookie } });
+      const { secret } = (await enrol.json()) as { secret: string };
+
+      const wrong = await fetch(`${origin}/auth/totp/confirm`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({ code: '000000' }),
+      });
+      expect(wrong.status).toBe(400);
+      expect((await db.credential.findUniqueOrThrow({ where: { userId } })).totpConfirmedAt).toBeNull();
+
+      const right = await fetch(`${origin}/auth/totp/confirm`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({ code: await codeFor(secret) }),
+      });
+      expect(right.status).toBe(204);
+      expect(
+        (await db.credential.findUniqueOrThrow({ where: { userId } })).totpConfirmedAt,
+      ).not.toBeNull();
+    });
+
+    it('is required from the next sign-in, once confirmed', async () => {
+      const cookie = await signIn();
+      const enrol = await fetch(`${origin}/auth/totp/enrol`, { method: 'POST', headers: { cookie } });
+      const { secret } = (await enrol.json()) as { secret: string };
+      await fetch(`${origin}/auth/totp/confirm`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({ code: await codeFor(secret) }),
+      });
+
+      const withoutCode = await login({ email: EMAIL, password: PASSWORD });
+      expect(await withoutCode.json()).toEqual({ status: 'totp_required' });
+    });
+
+    it('cannot be enrolled by an anonymous request', async () => {
+      expect((await fetch(`${origin}/auth/totp/enrol`, { method: 'POST' })).status).toBe(401);
+      expect(
+        (
+          await fetch(`${origin}/auth/totp/confirm`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ code: '123456' }),
+          })
+        ).status,
+      ).toBe(401);
+    });
+
+    it('audits the enrolment', async () => {
+      const cookie = await signIn();
+      const enrol = await fetch(`${origin}/auth/totp/enrol`, { method: 'POST', headers: { cookie } });
+      const { secret } = (await enrol.json()) as { secret: string };
+      await fetch(`${origin}/auth/totp/confirm`, {
+        method: 'POST',
+        headers: { cookie, 'content-type': 'application/json' },
+        body: JSON.stringify({ code: await codeFor(secret) }),
+      });
+
+      const events = await db.auditEvent.findMany({ where: { entityId: userId } });
+      const enrolled = events.find(
+        (e) => (e.after as { event?: string }).event === 'totp_enrolled',
+      );
+      expect(enrolled).toBeDefined();
+      // The secret never reaches the trail.
+      expect(JSON.stringify(events)).not.toContain(secret);
+    });
   });
 });

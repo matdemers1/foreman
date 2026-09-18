@@ -401,4 +401,81 @@ describe.skipIf(url === undefined)('the spine', () => {
       expect(res.status).toBe(404);
     });
   });
+
+  describe('optimistic concurrency (T-2.5, FRM-REQ-146)', () => {
+    it('hands out a version, and accepts a write that carries it', async () => {
+      await makeProject();
+      const read = await api('/projects/SPN');
+      const etag = read.headers.get('etag');
+      expect(etag).toMatch(/^"[0-9a-f]{16}"$/);
+
+      const res = await api('/projects/SPN', {
+        method: 'PATCH',
+        headers: { 'if-match': etag ?? '' },
+        body: JSON.stringify({ name: 'Renamed once' }),
+      });
+      expect(res.status).toBe(200);
+      // The response carries the new version, so a second write needs no extra read.
+      expect(res.headers.get('etag')).not.toBe(etag);
+    });
+
+    it('refuses a write against a version somebody else has moved past', async () => {
+      await makeProject();
+      const stale = (await api('/projects/SPN')).headers.get('etag') ?? '';
+
+      // Somebody else writes first.
+      await patch('/projects/SPN', { name: 'Theirs' });
+
+      const res = await api('/projects/SPN', {
+        method: 'PATCH',
+        headers: { 'if-match': stale },
+        body: JSON.stringify({ name: 'Mine' }),
+      });
+
+      expect(res.status).toBe(412);
+      const body = (await res.json()) as { error: string; current: { name: string } };
+      expect(body.error).toContain('changed since you read it');
+      // The current state comes back with the refusal: a caller that lost a race can see what it
+      // lost to without going and asking.
+      expect(body.current.name).toBe('Theirs');
+      expect(res.headers.get('etag')).not.toBe(stale);
+
+      // And the losing write did not land.
+      const now = (await (await api('/projects/SPN')).json()) as { name: string };
+      expect(now.name).toBe('Theirs');
+    });
+
+    it('writes unconditionally when no version is presented', async () => {
+      await makeProject();
+      // Opt-in: requiring it would make every simple call a two-step.
+      const res = await patch('/projects/SPN', { name: 'No if-match here' });
+      expect(res.status).toBe(200);
+    });
+
+    it('accepts * as "it must still exist"', async () => {
+      await makeProject();
+      const res = await api('/projects/SPN', {
+        method: 'PATCH',
+        headers: { 'if-match': '*' },
+        body: JSON.stringify({ name: 'Star' }),
+      });
+      expect(res.status).toBe(200);
+    });
+
+    it('guards a task the same way', async () => {
+      await makeProject();
+      await post('/projects/SPN/tasks', { title: 'Raced over' });
+      const first = await patch('/projects/SPN/tasks/SPN-T-001', { size: 'S' });
+      const stale = first.headers.get('etag') ?? '';
+
+      await patch('/projects/SPN/tasks/SPN-T-001', { size: 'L' });
+
+      const res = await api('/projects/SPN/tasks/SPN-T-001', {
+        method: 'PATCH',
+        headers: { 'if-match': stale },
+        body: JSON.stringify({ size: 'XS' }),
+      });
+      expect(res.status).toBe(412);
+    });
+  });
 });
