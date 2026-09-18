@@ -424,6 +424,33 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
     });
   }
 
+  // Two commits that are not proposals: one nothing explains, and one the remote no longer has.
+  // Both are states the Activity screen has to render, and both are easy to get wrong by
+  // accident — an unattributed commit is the coverage gap (R-02), and an orphan is history that
+  // was rewritten but is still cited.
+  await db.commit.create({
+    data: {
+      repoId: repo.id,
+      sha: randomBytes(20).toString('hex'),
+      message: 'Tidy the imports and fix a typo',
+      author: 'matt',
+      authorEmail: 'matt@example.com',
+      committedAt: new Date(Date.now() - 4 * 86_400_000),
+      files: { create: [{ path: 'apps/web/src/App.tsx', status: 'modified' }] },
+    },
+  });
+
+  await db.commit.create({
+    data: {
+      repoId: repo.id,
+      sha: randomBytes(20).toString('hex'),
+      message: 'A commit whose SHA a force push rewrote',
+      author: 'matt',
+      committedAt: new Date(Date.now() - 5 * 86_400_000),
+      orphanedAt: new Date(),
+    },
+  });
+
   await db.release.create({
     data: {
       repoId: repo.id,

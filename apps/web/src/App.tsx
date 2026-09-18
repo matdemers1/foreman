@@ -20,6 +20,7 @@ import { PhaseDetail } from './screens/PhaseDetail';
 import { Phases } from './screens/Phases';
 import { Portfolio } from './screens/Portfolio';
 import { ProjectOverview } from './screens/ProjectOverview';
+import { Activity } from './screens/Activity';
 import { Adrs } from './screens/Adrs';
 import { AuditIndex } from './screens/AuditIndex';
 import { DocumentEditor } from './screens/DocumentEditor';
@@ -175,6 +176,8 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <Glossary code={route.code ?? ''} />;
     case 'audits':
       return <AuditIndex code={route.code ?? ''} />;
+    case 'activity':
+      return <Activity code={route.code ?? ''} />;
     case 'search':
       return <SearchScreen key={search} search={search} />;
     case 'task':

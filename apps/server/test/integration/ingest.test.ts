@@ -5,7 +5,7 @@ import { createApp } from '../../src/app.js';
 import { setPassword } from '../../src/auth/native.js';
 import { loadConfig, type Config } from '../../src/config.js';
 import { createDb, type Db } from '../../src/db.js';
-import { buildRegistry, drainOne } from '../../src/jobs/index.js';
+import { buildRegistry, drainOne, enqueue } from '../../src/jobs/index.js';
 import { logger } from '../../src/logger.js';
 
 /**
@@ -435,5 +435,204 @@ describe.skipIf(url === undefined)('ingest', () => {
       expect(listed.total).toBe(2);
       expect(listed.items.map((c) => c.sha.slice(0, 1)).sort()).toEqual(['6', '7']);
     });
+  });
+});
+
+/**
+ * Backfill, reconcile and orphan detection against a stubbed GitHub (T-5.4 … T-5.6).
+ *
+ * The client is a stub rather than a recording: what is under test is the *stages* — that a
+ * backfill is idempotent, that a reconcile heals a dropped delivery, and that a rewritten SHA is
+ * marked rather than deleted. None of that is a property of GitHub's JSON.
+ */
+describe.skipIf(url === undefined)('backfill and reconcile', () => {
+  let db: Db;
+  let projectId: string;
+  let repoId: string;
+
+  /** A GitHub whose history the test controls. */
+  const remote = {
+    commits: [] as { sha: string; commit: { message: string; author: { name: string; date: string } } }[],
+    releases: [] as { tag_name: string; name: string; published_at: string }[],
+    gone: new Set<string>(),
+  };
+
+  const github = {
+    get: <T>(path: string): Promise<T> => {
+      const single = /\/commits\/([0-9a-f]+)$/.exec(path);
+      if (single !== null) {
+        const sha = single[1] ?? '';
+        if (remote.gone.has(sha)) {
+          const error = new Error('Not Found') as Error & { status: number };
+          error.status = 404;
+          return Promise.reject(error);
+        }
+        return Promise.resolve({} as T);
+      }
+      if (path.includes('/check-runs')) return Promise.resolve({ check_runs: [] } as T);
+      return Promise.resolve({} as T);
+    },
+    paginate: <T>(path: string): Promise<T[]> => {
+      if (path.endsWith('/releases')) return Promise.resolve(remote.releases as T[]);
+      return Promise.resolve(remote.commits as T[]);
+    },
+    tokenExpiresAt: () => null,
+  };
+
+  const registry = () => buildRegistry({ github });
+
+  const drain = async (): Promise<void> => {
+    for (let i = 0; i < 30; i += 1) {
+      const outcome = await drainOne({ db, logger, registry: registry(), workerId: 'test' });
+      if (outcome === null) return;
+      if (outcome.status === 'failed') throw new Error(`stage ${outcome.failedStage ?? '?'} failed`);
+    }
+    throw new Error('the queue did not drain');
+  };
+
+  const remoteCommit = (sha: string, message: string) => ({
+    sha,
+    commit: { message, author: { name: 'Matthew', date: '2026-09-18T09:00:00Z' } },
+  });
+
+  beforeAll(() => {
+    // No app and no config: these tests drive the job stages directly, which is the whole surface
+    // under test. A server here would be something else that could fail.
+    db = createDb(url ?? '');
+  });
+
+  beforeEach(async () => {
+    remote.commits = [];
+    remote.releases = [];
+    remote.gone.clear();
+
+    await db.job.deleteMany({ where: { kind: { in: ['backfill-repo', 'reconcile-repo'] } } });
+    await db.project.deleteMany({ where: { code: 'BFL' } });
+
+    const project = await db.project.create({
+      data: { code: 'BFL', name: 'Backfill Test', slug: 'backfill-test' },
+    });
+    projectId = project.id;
+    const repo = await db.repo.create({
+      data: { projectId, fullName: 'matdemers1/backfill-test' },
+    });
+    repoId = repo.id;
+  });
+
+  afterAll(async () => {
+    await db.project.deleteMany({ where: { code: 'BFL' } });
+    await db.job.deleteMany({ where: { kind: { in: ['backfill-repo', 'reconcile-repo'] } } });
+    await db.$disconnect();
+  });
+
+  const enqueueJob = async (kind: string) => {
+    await enqueue(db, registry(), kind, { payload: { repoId } });
+    await drain();
+  };
+
+  it('backfills history and marks the repository done, last', async () => {
+    remote.commits = [remoteCommit('1'.repeat(40), 'Old work'), remoteCommit('2'.repeat(40), 'Older')];
+    remote.releases = [{ tag_name: 'v0.1.0', name: 'First', published_at: '2026-09-01T00:00:00Z' }];
+
+    await enqueueJob('backfill-repo');
+
+    expect(await db.commit.count({ where: { repoId } })).toBe(2);
+    expect(await db.release.count({ where: { repoId } })).toBe(1);
+    const repo = await db.repo.findUniqueOrThrow({ where: { id: repoId } });
+    // Only on success: a half-finished backfill claiming completeness leaves a permanent hole.
+    expect(repo.backfilledAt).not.toBeNull();
+  });
+
+  it('runs twice without duplicating anything', async () => {
+    remote.commits = [remoteCommit('3'.repeat(40), 'Once')];
+    await enqueueJob('backfill-repo');
+    await db.job.deleteMany({ where: { kind: 'backfill-repo' } });
+    await enqueueJob('backfill-repo');
+
+    expect(await db.commit.count({ where: { repoId } })).toBe(1);
+  });
+
+  it('heals a dropped delivery on the next reconcile (FRM-REQ-103)', async () => {
+    // The webhook for this commit never arrived — the state after a delivery GitHub gave up on.
+    remote.commits = [remoteCommit('4'.repeat(40), 'The delivery that went missing')];
+    expect(await db.commit.count({ where: { repoId } })).toBe(0);
+
+    await enqueueJob('reconcile-repo');
+
+    expect(await db.commit.count({ where: { repoId } })).toBe(1);
+    const job = await db.job.findFirstOrThrow({
+      where: { kind: 'reconcile-repo' },
+      include: { stages: { orderBy: { sortOrder: 'asc' } } },
+    });
+    // Reported as a number somebody can watch, not buried in a log line.
+    expect(JSON.stringify(job.stages[0]?.output)).toContain('"healed":1');
+  });
+
+  it('marks a rewritten SHA orphaned and keeps the row (FRM-REQ-105)', async () => {
+    remote.commits = [remoteCommit('5'.repeat(40), 'About to be rewritten')];
+    await enqueueJob('reconcile-repo');
+    const before = await db.commit.findFirstOrThrow({ where: { repoId, sha: '5'.repeat(40) } });
+
+    // The force push: the SHA is gone from the remote, and history now has a different one.
+    remote.gone.add('5'.repeat(40));
+    remote.commits = [remoteCommit('6'.repeat(40), 'The rewritten version')];
+    await db.job.deleteMany({ where: { kind: 'reconcile-repo' } });
+    await enqueueJob('reconcile-repo');
+
+    const after = await db.commit.findFirstOrThrow({ where: { id: before.id } });
+    expect(after.orphanedAt).not.toBeNull();
+    // Kept: an attribution or a release note may already cite this SHA.
+    expect(after.message).toBe('About to be rewritten');
+    expect(await db.commit.count({ where: { repoId } })).toBe(2);
+  });
+
+  it('does not orphan anything when GitHub is merely unhappy', async () => {
+    remote.commits = [remoteCommit('7'.repeat(40), 'Still there')];
+    await enqueueJob('reconcile-repo');
+
+    // A rate limit is a 403, not a 404. Marking on one would orphan a whole history.
+    const rateLimited = {
+      ...github,
+      get: <T>(path: string): Promise<T> => {
+        if (/\/commits\/[0-9a-f]+$/.test(path)) {
+          const error = new Error('rate limited') as Error & { status: number };
+          error.status = 403;
+          return Promise.reject(error);
+        }
+        return github.get<T>(path);
+      },
+    };
+
+    const limitedRegistry = buildRegistry({ github: rateLimited });
+    await db.job.deleteMany({ where: { kind: 'reconcile-repo' } });
+    await enqueue(db, limitedRegistry, 'reconcile-repo', { payload: { repoId } });
+    const outcome = await drainOne({ db, logger, registry: limitedRegistry, workerId: 'test' });
+
+    // The stage fails and will be retried; nothing is marked.
+    expect(outcome?.status).toBe('failed');
+    const commit = await db.commit.findFirstOrThrow({ where: { repoId, sha: '7'.repeat(40) } });
+    expect(commit.orphanedAt).toBeNull();
+  });
+
+  it('un-orphans a commit that comes back', async () => {
+    remote.commits = [remoteCommit('8'.repeat(40), 'Gone and back')];
+    await enqueueJob('reconcile-repo');
+
+    remote.gone.add('8'.repeat(40));
+    await db.job.deleteMany({ where: { kind: 'reconcile-repo' } });
+    await enqueueJob('reconcile-repo');
+    expect(
+      (await db.commit.findFirstOrThrow({ where: { sha: '8'.repeat(40) } })).orphanedAt,
+    ).not.toBeNull();
+
+    // A revert of the force push, or a branch that had it all along.
+    remote.gone.clear();
+    await db.job.deleteMany({ where: { kind: 'reconcile-repo' } });
+    await enqueueJob('reconcile-repo');
+
+    expect(
+      (await db.commit.findFirstOrThrow({ where: { sha: '8'.repeat(40) } })).orphanedAt,
+    ).toBeNull();
+    expect(projectId).toBeDefined();
   });
 });

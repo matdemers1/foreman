@@ -417,6 +417,73 @@ export interface AuditRow {
   findings: { total: number; open: number; critical: number; high: number };
 }
 
+export interface CommitRow {
+  id: string;
+  sha: string;
+  message: string;
+  author: string;
+  committedAt: string;
+  orphanedAt: string | null;
+  repo: { fullName: string };
+  files: string[];
+  attributions: {
+    task: { humanId: string; title: string; status: string };
+    source: string;
+    confidence: number;
+    confirmed: boolean;
+    rejectedAt: string | null;
+    evidence: unknown;
+  }[];
+}
+
+export interface CiState {
+  conclusion: string | null;
+  commitSha: string | null;
+  name: string | null;
+  at: string | null;
+  unknown: boolean;
+}
+
+export interface Cadence {
+  lastCommitAt: string | null;
+  commitsLast7: number;
+  commitsLast30: number;
+  dormantDays: number | null;
+}
+
+export interface DeploymentRow {
+  id: string;
+  environment: string;
+  image: string;
+  imageSha: string;
+  schemaRevision: string | null;
+  deployedAt: string;
+  note: string | null;
+}
+
+export interface ReleaseRow {
+  id: string;
+  tag: string;
+  name: string | null;
+  publishedAt: string | null;
+  prerelease: boolean;
+}
+
+export interface ReleaseNotes {
+  from: string | null;
+  to: string;
+  tasks: { humanId: string; title: string; status: string }[];
+  commits: number;
+  unattributed: number;
+}
+
+export interface RepoRow {
+  id: string;
+  fullName: string;
+  defaultBranch: string;
+  backfilledAt: string | null;
+}
+
 interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -481,6 +548,19 @@ export const foreman = {
     if (project !== null) query.set('project', project);
     return api.get<Page<SearchHit>>(`/api/search?${query.toString()}`);
   },
+  commits: (code: string, attributed: 'none' | 'proposed' | 'confirmed' | 'any' = 'any') =>
+    api.get<Page<CommitRow>>(`/api/projects/${code}/commits?attributed=${attributed}&limit=100`),
+  confirmAttribution: (code: string, sha: string, task: string) =>
+    api.post<{ confirmed: boolean }>(`/api/projects/${code}/attributions/${sha}/confirm`, { task }),
+  rejectAttribution: (code: string, sha: string, task: string) =>
+    api.post<{ confirmed: boolean }>(`/api/projects/${code}/attributions/${sha}/reject`, { task }),
+  ci: (code: string) => api.get<CiState>(`/api/projects/${code}/ci`),
+  cadence: (code: string) => api.get<Cadence>(`/api/projects/${code}/cadence`),
+  deployments: (code: string) => api.get<Page<DeploymentRow>>(`/api/projects/${code}/deployments`),
+  releases: (code: string) => api.get<Page<ReleaseRow>>(`/api/projects/${code}/releases`),
+  releaseNotes: (code: string, tag: string) =>
+    api.get<ReleaseNotes>(`/api/projects/${code}/releases/${encodeURIComponent(tag)}/notes`),
+  repos: (code: string) => api.get<Page<RepoRow>>(`/api/projects/${code}/repos`),
   brief: (code: string) => api.get<Brief>(`/api/brief/${code}`),
   entity: (humanId: string) => api.get<EntityResult>(`/api/entities/${humanId}`),
 };

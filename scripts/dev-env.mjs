@@ -26,6 +26,8 @@ COOKIE_KEYS=${secret()}
 OPERATOR_EMAIL=dev@localhost
 OPERATOR_DISPLAY_NAME=Developer
 BACKUP_DIR=./backups
+# Local only. The e2e suite signs its own deliveries with this to exercise the ingest path.
+GITHUB_WEBHOOK_SECRET=dev-webhook-secret
 `,
   { mode: 0o600 },
 );
