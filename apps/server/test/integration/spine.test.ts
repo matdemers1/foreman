@@ -161,15 +161,29 @@ describe.skipIf(url === undefined)('the spine', () => {
   describe('requirements (FRM-REQ-036)', () => {
     it('lints EARS as a warning, never a rejection', async () => {
       await makeProject();
+      // A feature name rather than a behaviour — the warning the lint exists for. It is stored
+      // anyway, which is the half that matters (FRM-REQ-051, FRM-REQ-052).
       const res = await post('/projects/SPN/requirements', {
-        statement: 'This is not EARS notation in the slightest.',
+        statement: 'Per-user recovery codes',
       });
 
       expect(res.status).toBe(201);
       const body = (await res.json()) as { earsPattern: string; earsLintOk: boolean; earsLintNote: string };
       expect(body.earsPattern).toBe('unparsed');
       expect(body.earsLintOk).toBe(false);
-      expect(body.earsLintNote).toContain('shall');
+      expect(body.earsLintNote).toContain('names a feature');
+    });
+
+    it('does not warn on the indicative mood, which is how most registers are written', async () => {
+      await makeProject();
+      const res = await post('/projects/SPN/requirements', {
+        statement: 'Original bytes are stored content-addressed by SHA-256 and never modified.',
+      });
+
+      const body = (await res.json()) as { earsPattern: string; earsLintOk: boolean };
+      expect(body.earsPattern).toBe('ubiquitous');
+      // No "shall", and that is not a defect: 210 of Bindery's requirements are written this way.
+      expect(body.earsLintOk).toBe(true);
     });
 
     it('stores a requirement with no phase — that is the backlog', async () => {

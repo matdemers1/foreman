@@ -1,0 +1,2957 @@
+[
+  {
+    "project": "Bindery",
+    "id": "REQ-001",
+    "statement": "Web drag-and-drop upload accepts multiple files with per-file progress"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-002",
+    "statement": "A watched folder ingests files automatically, one subdirectory per library"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-003",
+    "statement": "Watched-folder ingest waits for write stability before pickup"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-004",
+    "statement": "Original bytes are stored content-addressed by SHA-256 and never modified"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-005",
+    "statement": "Byte-identical re-uploads are detected and not stored twice"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-006",
+    "statement": "Supported input types: PDF, JPEG, PNG, TIFF, HEIC"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-007",
+    "statement": "Browser camera capture uploads to the same ingest endpoint"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-008",
+    "statement": "Ingest provenance (source, adapter, original filename, timestamp) is recorded"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-009",
+    "statement": "Scan-to-SMB from the Brother MFC-L2820DW reaches the watched folder"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-010",
+    "statement": "Scan-to-FTP fallback is available if SMB negotiation fails"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-011",
+    "statement": "Every source file is normalized to a searchable PDF with a hidden text layer"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-012",
+    "statement": "The original image resolution is preserved during normalization"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-013",
+    "statement": "Deskew and clean are applied before OCR"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-014",
+    "statement": "Raw OCR text is written as a sidecar artifact"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-015",
+    "statement": "Word bounding boxes are persisted for highlight overlay"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-016",
+    "statement": "Full-resolution page renders and thumbnails are generated per page"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-017",
+    "statement": "Documents that already contain a text layer skip redundant OCR"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-018",
+    "statement": "OCR word accuracy on the golden corpus is measured and reported"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-019",
+    "statement": "Every page is a separately indexed row with its own text and tsvector"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-020",
+    "statement": "Search returns **page-anchored** results: file, page number, snippet, thumbnail"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-021",
+    "statement": "Opening a result opens the viewer **on that page**"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-022",
+    "statement": "Matched terms are visually highlighted on the page image"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-023",
+    "statement": "Trigram fuzzy matching covers title, tag, correspondent, and asset names"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-024",
+    "statement": "Faceted filtering by library, date range, correspondent, asset, type, form, tag, review state"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-025",
+    "statement": "Search query p95 latency is under 300 ms at 100K pages"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-026",
+    "statement": "The viewer opens on the hit page in under 2 seconds"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-027",
+    "statement": "⌘K command palette jumps to documents, tags, correspondents, and assets in under 100 ms"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-028",
+    "statement": "Every search and filter state is URL-addressable"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-029",
+    "statement": "Search results are always scoped to the caller's visible libraries"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-030",
+    "statement": "Page numbers are displayed disambiguated (\"page 3 of this document, page 49 of the file\")"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-031",
+    "statement": "A document is a page range over a source file; originals are never split on disk"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-032",
+    "statement": "Page ranges over one source file may not overlap"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-033",
+    "statement": "All documents from one source file belong to the same library"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-034",
+    "statement": "Heuristic proposers detect candidate boundaries (blank page, layout shift, page-number reset, form number)"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-035",
+    "statement": "Claude confirms or rejects each candidate boundary over a sliding page window"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-036",
+    "statement": "A manual segmentation editor allows drawing, adjusting, and naming boundaries"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-037",
+    "statement": "Segmentation is fully reversible without touching the source file"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-038",
+    "statement": "A known-form registry matches documents deterministically by fingerprint"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-039",
+    "statement": "The registry is seeded with DD-214, DD-215, VA award/rating letters, W-2, 1099, 1098, deed, title, mortgage note, birth certificate, passport, marriage licence"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-040",
+    "statement": "Known-form matches are boosted in search ranking"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-041",
+    "statement": "Known forms may declare typed field extractors (e.g. separation date, character of service)"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-042",
+    "statement": "A segment can be exported as a standalone PDF without modifying the source"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-043",
+    "statement": "Bundles appear in the mirror tree under `_bundles/` with a generated index of contents and page ranges"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-044",
+    "statement": "All AI calls go through an `AIProvider` adapter"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-045",
+    "statement": "Classification uses `claude-opus-5` with strict structured output"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-046",
+    "statement": "The response separates `existing_ids` from `new_names` for tags, type, and correspondent"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-047",
+    "statement": "Candidate taxonomy is derived from the document's top ~15 embedding neighbours"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-048",
+    "statement": "Candidate taxonomy is permission-filtered before the prompt, and returned IDs re-validated after"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-049",
+    "statement": "Every AI-written field records provenance: page, snippet, confidence"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-050",
+    "statement": "Every classification records model and `prompt_version`"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-051",
+    "statement": "Titles follow `Correspondent - Type - Identifier`, ≤ 12 words, account numbers masked to last 4"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-052",
+    "statement": "Date extraction prefers explicitly-labeled dates over header/footer dates"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-053",
+    "statement": "Prompt caching is used; cache hit rate is monitored"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-054",
+    "statement": "~~Bulk and backlog classification uses the Batch API~~ **Withdrawn 2026-08-30 (T-9.9)** — built in Phase 4, never once run, and deleted rather than left looking finished. Half price, but the saving is a few pounds per household and results take 24 hours, which is a worse import experience than the real-time one it would replace"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-055",
+    "statement": "If the AI provider is unavailable, documents are still OCR'd, paged, and searchable"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-056",
+    "statement": "Classification retries with exponential backoff and never silently drops a document"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-057",
+    "statement": "Auto-file gating uses **structural signals**, not the model's self-reported confidence"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-058",
+    "statement": "Auto-file precision on the golden corpus is ≥ 95%"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-059",
+    "statement": "Documents below the gate enter the review queue rather than filing"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-060",
+    "statement": "A deterministic rules engine can override classification, recorded as rule-sourced"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-061",
+    "statement": "Rules support a dry-run against existing documents before being enabled"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-062",
+    "statement": "Documents are embedded for neighbour retrieval, find-similar, and Q&A"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-063",
+    "statement": "A why-panel shows the source snippet and page for every AI-written field"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-064",
+    "statement": "AI-written values are visually distinguishable from human- and rule-set values"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-065",
+    "statement": "Per-field confidence is displayed in the UI, not only used at the gate"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-066",
+    "statement": "Every mutation writes an append-only audit event with actor type and before/after state"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-067",
+    "statement": "Every automated action is undoable, including un-filing and un-segmenting"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-068",
+    "statement": "Bulk operations are recorded as a single operation with an affected-row manifest, undoable as a unit"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-069",
+    "statement": "An audit log viewer allows filtering by document, actor type, and time"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-070",
+    "statement": "Nothing fails silently — every failed document is visible in a surface a human will see"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-071",
+    "statement": "Correspondent is a first-class entity with aliases"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-072",
+    "statement": "Correspondents can be merged, with a preview and full reversibility"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-073",
+    "statement": "Asset is a first-class entity with typed attributes and a kind"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-074",
+    "statement": "Documents relate to assets many-to-many"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-075",
+    "statement": "An asset timeline shows every attached document chronologically"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-076",
+    "statement": "Tags can be renamed and merged with retroactive application"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-077",
+    "statement": "A taxonomy health view surfaces near-duplicate tags, orphans, and usage counts"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-078",
+    "statement": "Tag provenance (ai / rule / human) is recorded on the document-tag link"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-079",
+    "statement": "Saved searches persist as smart shelves"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-080",
+    "statement": "A shelf can be exported as a packet (organized archive of its documents)"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-081",
+    "statement": "Near-duplicate detection surfaces likely rescans for review with a comparison view"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-082",
+    "statement": "Bulk import walks a directory tree and produces a dry-run preview before processing"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-083",
+    "statement": "Backlog items are flagged and never enter the daily review queue"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-084",
+    "statement": "Backlog import runs in two passes with human taxonomy curation between them"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-085",
+    "statement": "Backlog items use a lower auto-file bar than live intake"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-086",
+    "statement": "Import survives interruption and resumes without duplicating work"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-087",
+    "statement": "Bulk edit supports selection, a dry-run preview of changes, apply, and a single undo"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-088",
+    "statement": "Segmentation cost is measured on a sample before the full backlog run"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-089",
+    "statement": "Sensitivity and redundancy tiers exist as columns from the first migration"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-090",
+    "statement": "**Nothing is ever automatically deleted**"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-091",
+    "statement": "A Vital Records tier pins documents to the home screen"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-092",
+    "statement": "One-click encrypted export of all Vital Records (go-bag)"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-093",
+    "statement": "Full export produces originals in a folder tree, metadata as JSON, and a static HTML index usable without Bindery"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-094",
+    "statement": "A regenerated hardlink mirror tree exists for whole files; deleting it is non-destructive"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-095",
+    "statement": "An integrity check job rehashes every blob and reports mismatches"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-096",
+    "statement": "Backups follow 3-2-1 with an offsite encrypted copy"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-097",
+    "statement": "A restore drill restores to a clean stack and **the DD-214 is findable**"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-098",
+    "statement": "A printed emergency index with QR codes to vital-record pages can be generated"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-158",
+    "statement": "A single-purpose S3 bucket exists with versioning, Block Public Access, SSE-KMS under a customer-managed key, and S3 Bucket Keys enabled"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-159",
+    "statement": "AWS credentials, bucket, region and KMS key id are configured **in the application**, credentials encrypted at rest and masked on read"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-160",
+    "statement": "A connection test performs a real put/get round-trip and reports the KMS key the object was encrypted under"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-161",
+    "statement": "Blob replication is incremental and never re-uploads an object already present"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-162",
+    "statement": "The database dump and a manifest replicate on the same integrity gate as the local backup"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-163",
+    "statement": "Replication runs daily and weekly on separate prefixes, with expiry performed by S3 lifecycle rules and never by Bindery"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-164",
+    "statement": "The Trust screen shows the age of the last **successful** replication, per-run history, and the failure reason"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-165",
+    "statement": "Replication older than 48 hours raises the same health alert as a stalled pipeline"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-166",
+    "statement": "No lifecycle rule expires objects without a prefix filter, and none matches the blob prefix"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-167",
+    "statement": "An input the pipeline correctly refuses is recorded as `declined`, a terminal state distinct from failure"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-168",
+    "statement": "Declined work is excluded from the health panel and from any badge, and is still listed on the Pipeline screen"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-169",
+    "statement": "A dead-lettered job can be acknowledged without being deleted, retried or hidden"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-170",
+    "statement": "A sidebar badge counts only work a person can still act on"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-171",
+    "statement": "The sidebar shows at most the destinations used regularly; setup and account screens are reachable without occupying it"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-172",
+    "statement": "Every route remains reachable from the shell after the reorganisation"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-173",
+    "statement": "No image is published unless lint, unit, integration and end-to-end tests have all passed, in that order"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-174",
+    "statement": "The web app is linted and typechecked as its own gate, before any image is built"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-175",
+    "statement": "End-to-end tests drive the real stack — built images, explicit migrations, seeded corpus, a browser"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-176",
+    "statement": "No end-to-end test may skip silently; the fixture provides every state they assert on"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-177",
+    "statement": "One data key, wrapped separately by a passphrase and by a PIN; per-file keys derived from it"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-178",
+    "statement": "The PIN-wrapped key is useless without a host pepper that is excluded from backup, export and offsite replication"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-179",
+    "statement": "The data key exists only in api process memory while unlocked, and is dropped on timeout, sign-out and restart"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-180",
+    "statement": "Without an unlocked session, vaulted rows do not exist for any query, enforced at the repository layer"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-181",
+    "statement": "Moving into the vault encrypts, **verifies the ciphertext decrypts byte-identically**, and only then deletes the plaintext, renders and pages"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-182",
+    "statement": "Moving out of the vault restores the original bytes and returns the document to the archive"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-183",
+    "statement": "Page text, titles and dates are encrypted at rest for vaulted items; taxonomy links are revoked, not carried"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-184",
+    "statement": "An unlocked vault is searchable at page level; the cost is measured and has a documented ceiling"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-185",
+    "statement": "Documents and photos can be moved to the vault from their own screens, and search offers the vault behind the PIN"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-186",
+    "statement": "Export and offsite carry vaulted ciphertext and an explicit manifest of what they cannot read"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-187",
+    "statement": "A locked vault leaks nothing through snippets, hit counts, facets, the palette or the archive browser"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-188",
+    "statement": "A person can correct a document's title, summary, date, correspondent and type, and the correction is audited and undoable"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-189",
+    "statement": "Tags can be added and removed on a single document, recorded as human-set and revoked rather than deleted"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-190",
+    "statement": "A correspondent or document type can be created inline while editing, resolved by id and never by name"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-191",
+    "statement": "Classification never overwrites a field a human set, and reports which fields it skipped"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-192",
+    "statement": "Vault objects are encrypted in independently decryptable chunks so a byte range is served without decrypting the whole file; existing objects are re-sealed"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-193",
+    "statement": "Image metadata (capture date, camera, dimensions, location) is read from the file and recorded; a capture date fills the document date as source `file`"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-194",
+    "statement": "Video files are imported, probed for metadata and a poster frame, stored as one document, and never enter OCR or classification"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-195",
+    "statement": "Photos and videos are shown separately, in and out of the vault; unvaulted video streams with ranges"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-196",
+    "statement": "The import screen imports the inbox in one click and shows, for every run, what was imported, duplicated, skipped and failed, with reasons"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-197",
+    "statement": "An import can be sent to the vault: each file is sealed as its pipeline finishes while the vault is open, and waits visibly when it is locked"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-198",
+    "statement": "Code entry is one box per character with paste, keyboard and tap navigation, and motion that respects reduced motion"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-199",
+    "statement": "Password fields offer a reveal toggle, and new-password fields show strength in words as well as bars"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-200",
+    "statement": "A fresh install is claimed in the browser with a setup code only the host's operator can read"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-201",
+    "statement": "The claiming account becomes administrator only after enrolling TOTP, and an abandoned setup resumes there"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-202",
+    "statement": "Every unauthenticated screen uses the entry shell and the design system's form components"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-203",
+    "statement": "SSO is configured by the operator, off until configured, and the client secret is never readable back"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-204",
+    "statement": "A D3 Auth sign-in produces an ordinary Bindery session, with the OIDC transaction bound to the browser that began it"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-205",
+    "statement": "First sign-in carrying a role provisions the account, its library and its quota; an identity with no role provisions nothing"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-206",
+    "statement": "Linking a D3 Auth identity is explicit; unlinking requires the local password; both are audited"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-207",
+    "statement": "A role change at the provider takes effect on the next request after renewal, with no re-login"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-208",
+    "statement": "Back-channel logout ends the named session, is idempotent by `jti`, and survives a signing-key rotation"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-209",
+    "statement": "Every SSO affordance is absent when SSO is off and explains itself when the provider is unreachable"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-210",
+    "statement": "Signing in with a recovery code retires the authenticator it replaced: the TOTP enrolment is cleared, the remaining codes are superseded, administrator rights are revoked until a factor is enrolled again, and the next sign-in resumes at Secure when no other administrator remains"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-099",
+    "statement": "Library is the access boundary; every document belongs to exactly one"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-100",
+    "statement": "Users hold memberships with role owner / contributor / reader"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-101",
+    "statement": "Every document query filters on the caller's visible library set at the repository layer"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-102",
+    "statement": "Moving a document between libraries is explicit and audited"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-103",
+    "statement": "JWT auth with HTTP-only cookie, refresh rotation, and Argon2 hashing"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-104",
+    "statement": "No host ports are published; ingress is via Cloudflare Tunnel"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-105",
+    "statement": "~~Cloudflare Access is configured, with a service-token path for programmatic API access~~ **Withdrawn 2026-08-30** by [[Bindery/ADR-008 — App-Native Authentication as the Front Door\\"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-106",
+    "statement": "Blob serving is authenticated and library-scoped; no unauthenticated static routes"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-107",
+    "statement": "A REST API with scoped tokens is exposed deliberately and documented"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-108",
+    "statement": "The job table is the observability surface; stuck and failed jobs are queryable"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-109",
+    "statement": "An in-app health panel shows queue depth, failures, stuck jobs, and API spend"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-110",
+    "statement": "A push notification fires on permanent failure or a stalled pipeline"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-111",
+    "statement": "All jobs are idempotent; replaying a job produces an identical end state"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-112",
+    "statement": "Every pipeline stage is independently replayable against its stored artifact"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-113",
+    "statement": "Targeted reprocessing by prompt version is supported"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-114",
+    "statement": "Migrations are applied explicitly, never automatically on container boot"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-115",
+    "statement": "A staging compose stack mirrors production for migration rehearsal"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-116",
+    "statement": "Natural-language Q&A answers questions over the archive with **every answer cited to a page**"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-117",
+    "statement": "Find-similar returns related documents using embeddings"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-118",
+    "statement": "Search can be scoped to a single bundle"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-119",
+    "statement": "First-run ingests one document and narrates the pipeline end to end"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-120",
+    "statement": "Expiry tracking with reminders for passports, registrations, policies, and warranties"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-121",
+    "statement": "~~Cloud replication of the redundancy tier to S3 or Azure, client-side encrypted~~ **Superseded by REQ-158 – REQ-166.** Server-side encryption (SSE-KMS) replaces client-side by explicit operator decision"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-122",
+    "statement": "Learn-from-corrections injects prior corrections as few-shot examples"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-123",
+    "statement": "Native iOS app with share-sheet ingest and offline capture queue"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-124",
+    "statement": "Document annotation, markup, redaction, or page rearranging"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-125",
+    "statement": "Comments, approvals, or collaborative review workflows"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-126",
+    "statement": "Automatic retention-based deletion"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-127",
+    "statement": "Missing-document detection for recurring series"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-128",
+    "statement": "Weekly digest notifications"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-129",
+    "statement": "Telemetry or analytics of any kind"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-130",
+    "statement": "Semantic search as the primary retrieval path"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-131",
+    "statement": "General file storage as a peer of documents *(boundary held; crossing requires a new ADR)*"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-132",
+    "statement": "Bindery's own login page is the front door; no external identity challenge precedes it"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-133",
+    "statement": "Login is rate-limited per IP and per account, with escalating cost"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-134",
+    "statement": "Repeated failures lock an account for a bounded window, visible and clearable by an admin"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-135",
+    "statement": "Authentication failures are indistinguishable between \"no such user\" and \"wrong password\""
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-136",
+    "statement": "An admin can issue a one-time, expiring password-reset code; an admin can never set a password directly"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-137",
+    "statement": "A user can change their own password, which invalidates every other session they hold"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-138",
+    "statement": "TOTP two-factor is available to any user, self-enrolled with recovery codes"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-156",
+    "statement": "TOTP is mandatory for any account holding administrator rights; the grant is refused without it"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-157",
+    "statement": "The admin panel shows, per account, whether TOTP is enrolled"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-139",
+    "statement": "Accounts are created only by invitation; there is no public sign-up"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-140",
+    "statement": "An invitation is a single-use, expiring link that provisions exactly one account and one personal library"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-141",
+    "statement": "Each account carries a storage quota, set at invite time and adjustable by an admin"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-142",
+    "statement": "The admin panel shows per-account storage, file counts and last activity"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-143",
+    "statement": "An administrator cannot read any document, page, text or title outside their own libraries"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-144",
+    "statement": "The event log is library-scoped; global entries carry no document content"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-145",
+    "statement": "Suspending an account preserves its data and blocks its sessions immediately"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-146",
+    "statement": "A first-run welcome flow explains ingest, search and review, and can be re-opened later"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-147",
+    "statement": "Onboarding ends with the user's first document ingested and found by search"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-148",
+    "statement": "Guided documentation is served from the app itself, at stable routes, with no external dependency"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-149",
+    "statement": "Documentation screenshots are captured automatically from the running application"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-150",
+    "statement": "A documentation page exists for every user-facing screen, and CI fails when a route has none"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-151",
+    "statement": "An FAQ covers ingest, search, review, sharing, storage and account recovery"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-152",
+    "statement": "Every service reports a version derived from the build, not hand-maintained"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-153",
+    "statement": "The UI surfaces the running version of api, worker and web, and flags a mismatch between them"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-154",
+    "statement": "The schema revision and its drift from the code's head revision are visible in the health panel"
+  },
+  {
+    "project": "Bindery",
+    "id": "REQ-155",
+    "statement": "A user-facing changelog records what changed in each version"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-001",
+    "statement": "Authenticate via OAuth 2.0 authorization code + PKCE (installed-app client id) in ASWebAuthenticationSession"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-002",
+    "statement": "Request `duration=permanent`; refresh access tokens silently; surface re-auth badge only when refresh fails"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-003",
+    "statement": "Support multiple accounts with switching via long-press Profile tab and in-profile menu"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-004",
+    "statement": "Add-account flows use an ephemeral web session (no cookie reuse)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-005",
+    "statement": "Store tokens exclusively in Keychain; never in SwiftData, snapshots, logs, or exports"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-006",
+    "statement": "Register installed-app client id and file the RBP data-access request before API-consuming builds"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-042",
+    "statement": "Provide no post-submission UI anywhere"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-007",
+    "statement": "Meter all API calls through a token bucket (soft 60 QPM) honoring `X-Ratelimit-*`, with exponential backoff and a countdown banner on 429"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-008",
+    "statement": "Send a descriptive User-Agent and `raw_json=1` on every request"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-009",
+    "statement": "Decode tolerantly: unknown kinds/shapes render placeholder cells and log, never crash"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-010",
+    "statement": "Provide a debug console (Settings → Advanced): request log, bucket gauge, decode-failure log"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-011",
+    "statement": "Capture MetricKit crash diagnostics locally and list them in the debug console"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-085",
+    "statement": "No third-party dependencies except Apple-maintained OSS (`swift-markdown`)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-086",
+    "statement": "No telemetry or analytics; no data leaves the device except Reddit API + iCloud"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-012",
+    "statement": "App opens to the Home feed (`/best`) of the active account"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-013",
+    "statement": "Feed scrolling drops no frames at ProMotion rates on the dogfood device"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-014",
+    "statement": "Relaunch paints the last feed snapshot in < 0.5s, then refreshes"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-015",
+    "statement": "Title-tap feed switcher lists Home, multireddits, and recent subreddits"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-016",
+    "statement": "Remember sort (incl. time range) per feed and per subreddit indefinitely"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-017",
+    "statement": "Dim read posts in every post-list context"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-018",
+    "statement": "Prune read-state older than 90 days"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-019",
+    "statement": "Hide posts matching keyword filters"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-020",
+    "statement": "Support advanced filter rules: domain, flair, author, subreddit, with optional expiry"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-021",
+    "statement": "Hide posts natively via `POST /api/hide` from swipe/menu"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-022",
+    "statement": "Paginate with `after` cursors, deduplicate by fullname, prefetch next page at ~75% scroll"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-023",
+    "statement": "Offer card and compact layouts with per-subreddit overrides"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-024",
+    "statement": "Pull-to-refresh shows the mascot dig; exhausted feeds show the end-of-burrow state"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-025",
+    "statement": "Restore scroll position per feed across launches and devices"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-026",
+    "statement": "Render comment trees with tap-to-collapse and depth indicators"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-027",
+    "statement": "Provide a jump-to-next-top-level-comment FAB"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-028",
+    "statement": "Expand `more` stubs on tap via `morechildren`, batching ≤100 ids per call"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-029",
+    "statement": "Render core Reddit markdown: bold, italic, strikethrough, quotes, lists, code, links, spoilers (tap-to-reveal)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-030",
+    "statement": "Render exotic markdown: tables, superscript, subreddit emotes, inline images/GIFs in comments"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-031",
+    "statement": "Honor subreddit suggested comment sort unless the user has an explicit remembered choice"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-032",
+    "statement": "Search within the loaded comment tree with match jumping"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-033",
+    "statement": "Filter a thread to OP's comments with ancestor context (OP lens)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-035",
+    "statement": "Vote, save, and unsave posts and comments with optimistic UI and failure rollback"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-036",
+    "statement": "Compose with a markdown toolbar, live preview, and quote-reply of selected text"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-037",
+    "statement": "Auto-save drafts per target, restore in place, never sync"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-038",
+    "statement": "Edit and delete own comments"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-039",
+    "statement": "Provide four two-stage swipe slots (defaults: votes left; collapse/reply on comments, save/hide on posts right), all remappable"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-040",
+    "statement": "Block a user from any comment/post context menu"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-041",
+    "statement": "Follow/unfollow posts for inbox updates"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-043",
+    "statement": "Report posts and comments with the sub's reason list"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-044",
+    "statement": "Haptic feedback on vote and collapse"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-045",
+    "statement": "Long-press context menus with previews on every Reddit entity"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-046",
+    "statement": "Fullscreen media viewer: pinch-zoom, swipe-through galleries, swipe-down dismiss"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-047",
+    "statement": "Gallery grid overview for direct jump to any image"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-048",
+    "statement": "Play v.redd.it via `hls_url` in AVPlayer with audio, scrubbing, speed control, and double-tap ±10s; use `fallback_url` when HLS is absent"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-049",
+    "statement": "Treat GIF/MP4 loops as scrubbable media"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-050",
+    "statement": "Autoplay setting: off / on / Wi-Fi-only; inline players muted and recycled"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-051",
+    "statement": "Swipe up from fullscreen media to peek comments"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-052",
+    "statement": "Blur NSFW thumbnails until tapped; respect account `over_18`; quarantined subs require opt-in interstitial"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-053",
+    "statement": "Empirically verify the mod-status NSFW exception before building NSFW UI"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-054",
+    "statement": "Subs tab lists subscriptions (paged, searchable)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-055",
+    "statement": "Create, edit, delete multireddits and add/remove subs from anywhere"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-056",
+    "statement": "Subscribe/unsubscribe from any sub surface"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-057",
+    "statement": "Subreddit screen: feed + header chip row (About · Rules · Wiki · sort)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-058",
+    "statement": "Show subreddit rules before the first comment in that sub"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-059",
+    "statement": "Render subreddit wiki pages with internal link navigation"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-060",
+    "statement": "Discovery via `subreddits/popular`, autocomplete-v2, and similar-sub recommendations"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-061",
+    "statement": "Search posts, subreddits, and users with sort and time filters, scoped or global"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-062",
+    "statement": "Keep search history (cap 100) and saved searches"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-080",
+    "statement": "Other Discussions tab on posts via `/duplicates`"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-063",
+    "statement": "Inbox with segments (replies, mentions, messages; modmail if mod), unread badge, foreground-only refresh"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-064",
+    "statement": "Read and reply to private messages"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-065",
+    "statement": "Modmail: list conversations, read threads, reply, archive"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-066",
+    "statement": "Mod actions on own sub: remove, approve, lock"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-067",
+    "statement": "Own profile: karma breakdown, trophies, history segments (overview/comments/submitted/saved/up/down/hidden)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-068",
+    "statement": "View other users' profiles with block/follow actions"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-069",
+    "statement": "Sync settings, filters, gestures, read-state, accounts metadata, sort memory via SwiftData CloudKit (private DB)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-070",
+    "statement": "Merge semantics: read-state = union; settings = LWW; drafts local-only"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-071",
+    "statement": "Deploy the CloudKit schema to production before the first TestFlight build"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-072",
+    "statement": "Export/import full app config as JSON"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-073",
+    "statement": "iPad: Mail-style three-column layout (sidebar · posts · detail)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-074",
+    "statement": "Open reddit links via share extension, `burrow://` scheme, and paste-in-search; comment permalinks open focused with ancestor trail"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-075",
+    "statement": "Open external links in SFSafariViewController with a Reader-mode preference"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-076",
+    "statement": "Themes: light, dark, OLED-black + accent colors"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-077",
+    "statement": "Alternate app icons"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-078",
+    "statement": "Optional off-by-default sounds (vote, collapse)"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-079",
+    "statement": "Respect Dynamic Type at system defaults across all screens"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-081",
+    "statement": "First-run: single sign-in screen straight into OAuth"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-082",
+    "statement": "Five-surface tab bar: Home, Subs, Inbox, Profile + iOS 26 search-role tab"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-083",
+    "statement": "Render tombstones for deleted/removed/suspended content everywhere it appears"
+  },
+  {
+    "project": "Burrow",
+    "id": "REQ-084",
+    "statement": "Shared banner component for rate-limit countdowns and offline/degraded states on all network screens"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-001",
+    "statement": "The service shall be an OpenID Connect provider built on `oidc-provider` 9.x with a PostgreSQL adapter implementing all seven adapter methods"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-002",
+    "statement": "The service shall publish `/.well-known/openid-configuration` and a JWKS endpoint"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-003",
+    "statement": "The service shall support only the authorization code grant with PKCE `S256`, for every client type"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-004",
+    "statement": "Authorization codes shall be single-use; replay shall revoke every token derived from that code"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-005",
+    "statement": "`redirect_uri` and `post_logout_redirect_uri` shall match a registered value exactly; no wildcards"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-006",
+    "statement": "The service shall sign tokens only with asymmetric keys (ES256 default, RS256 available), include `kid`, and never accept `alg=none`"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-007",
+    "statement": "The authorization response shall include `iss` (RFC 9207)"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-008",
+    "statement": "Access tokens shall be opaque with a 10-minute lifetime"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-009",
+    "statement": "Refresh tokens shall rotate on every use with a 30-day absolute lifetime, and reuse of a rotated token shall revoke the grant family"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-010",
+    "statement": "The service shall implement RP-Initiated Logout requiring `id_token_hint` and a pre-registered post-logout URI"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-011",
+    "statement": "The service shall implement Back-Channel Logout with signed logout tokens (`sid`, `sub`, `events`, `jti`, `exp` ≤ 2 min) sent on logout, suspension, grant revocation and revoke-all"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-012",
+    "statement": "Back-channel delivery shall retry three times and then mark the app *slow revoke* and write an audit event"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-013",
+    "statement": "The service shall expose `userinfo` returning standard claims plus `roles` for the token's client"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-014",
+    "statement": "The service shall not implement dynamic client registration, WebFinger, implicit, password or `client_credentials` grants"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-015",
+    "statement": "Confidential clients shall authenticate at the token endpoint with `client_secret_basic`; secrets ≥ 256 bits, hashed at rest, shown once"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-016",
+    "statement": "Public native clients shall be supported with custom-scheme and loopback redirects per RFC 8252, no secret"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-017",
+    "statement": "The ID token shall carry `sub`, `email`, `email_verified`, `preferred_username`, `name`, `auth_time`, `amr`, `sid`, and `roles` when `d3:roles` is requested"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-018",
+    "statement": "Tokens shall tolerate ±60 s clock skew"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-019",
+    "statement": "The provider shall run with `provider.proxy = true` and compute `https://auth.d3cloud.io` as issuer behind the tunnel"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-020",
+    "statement": "Device Authorization Grant (RFC 8628)"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-021",
+    "statement": "Email shall be the unique, case-insensitive login identifier"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-022",
+    "statement": "Each user shall have a stable, unique username exposed as `preferred_username`, never derived from email"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-023",
+    "statement": "`sub` shall be an opaque UUIDv7 per user, identical across all clients"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-024",
+    "statement": "Passwords shall be hashed with Argon2id at ≥ 19 MiB / t=2 / p=1 plus a pepper from the environment"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-025",
+    "statement": "Password policy: ≥ 12 characters, rejected if in a common/breached list that includes entries ≥ 12 chars, no composition rules, no expiry, checked at set time only"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-026",
+    "statement": "Unknown-email login attempts shall perform a decoy hash so timing is indistinguishable"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-027",
+    "statement": "Per-account throttling: 4 free attempts then doubling delay to a 10-minute cap, evaluated before hashing, never a hard lockout, reset works while throttled"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-028",
+    "statement": "Per-IP throttling keyed on `CF-Connecting-IP`: 20 free attempts then doubling delay"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-029",
+    "statement": "Login shall be a state machine whose only terminal state completes the interaction; there shall be no boolean MFA-pending flag"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-030",
+    "statement": "SSO session: 30-day remember-me, `__Host-` cookie, `Secure; HttpOnly; SameSite=Lax; Path=/`, regenerated at login and privilege change"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-031",
+    "statement": "Every interaction form POST shall carry a CSRF token"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-032",
+    "statement": "The login screen shall present an email field and a prominent *Sign in with a passkey* control supporting discoverable credentials and conditional UI; the password step follows email entry"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-033",
+    "statement": "TOTP enrolment (QR + manual key + confirm) and verification with ±1 step window, single-use via last-used-step tracking"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-034",
+    "statement": "Passkey registration and authentication via `@simplewebauthn/server` with an opaque random `webauthn_user_id`, RP ID `auth.d3cloud.io`, counter and `backedUp` stored"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-035",
+    "statement": "Second factor optional for guests; mandatory for owner and admins as *any* factor with user verification (passkey UV or TOTP); the API shall refuse admin grant to an account with zero verified factors"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-036",
+    "statement": "Trusted device: after a successful second factor the user may opt into a signed 30-day device cookie that skips MFA; listed and revocable"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-037",
+    "statement": "Owner-only console actions shall require a second-factor step-up within the last 5 minutes"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-038",
+    "statement": "Users shall have states `invited → active → suspended`; suspension revokes sessions and sends back-channel logout"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-039",
+    "statement": "Admin-initiated reset shall clear password and all factors, revoke sessions and trusted devices, send back-channel logouts, and email a re-enrol link"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-040",
+    "statement": "`email_verified` shall be true only after the user proves mailbox control (invite acceptance or verification link) and shall flip to false when an admin edits the address"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-041",
+    "statement": "The trusted-device and session cookies shall never be issued to a suspended user"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-042",
+    "statement": "Removing the last verified factor from an owner or admin shall be refused"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-043",
+    "statement": "Per-app MFA requirement via `acr_values`"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-044",
+    "statement": "Per-user recovery codes"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-045",
+    "statement": "Sessions shall record IP, user agent, created, last-seen, expiry, revoked"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-046",
+    "statement": "Apps shall be registered from a JSON manifest (client id, name, type, redirect URIs, post-logout URIs, back-channel URI, roles) via console or seed file only"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-047",
+    "statement": "Roles shall be declared by the app manifest with key, display name, description, sort order and optional default; the console shall not create roles outside a manifest"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-048",
+    "statement": "Re-registering a manifest shall diff roles and block removal of a role currently granted unless confirmed"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-049",
+    "statement": "A grant shall associate one user with one app and a set of that app's roles"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-050",
+    "statement": "Effective roles shall be the union of direct-grant roles and group-grant roles for that app"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-051",
+    "statement": "An authorization request by a user with no grant for the client shall end in `access_denied` before any consent or interstitial and write an audit event"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-052",
+    "statement": "The `roles` claim shall contain only the requesting client's effective roles and shall be omitted unless `d3:roles` is requested"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-053",
+    "statement": "Groups shall exist with members and group grants (group × app × roles); groups shall never appear in tokens or userinfo"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-054",
+    "statement": "Disabling an app shall reject new authorizations and revoke its tokens"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-055",
+    "statement": "Client secrets shall be rotatable; the new secret is shown once"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-056",
+    "statement": "Grant creation, change and revocation shall trigger back-channel logout for that user × app"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-057",
+    "statement": "The seed file `d3auth.seed.json` shall register apps and roles idempotently on boot"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-058",
+    "statement": "The system shall store no organisation/tenant assumption that would block adding one later (no global-unique names beyond email/username/client id)"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-059",
+    "statement": "A first-party interstitial *Continue to {app} as {username}* shall be shown on a user's first login to each app, with a *Not you?* switch"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-060",
+    "statement": "No scope-consent screen shall be shown for registered apps"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-061",
+    "statement": "The console shall be a React 19 + Vite app on `@d3cloud/ui`, served as static assets by the server process at `/admin`, `/account`, `/login`"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-062",
+    "statement": "Console access shall require role admin or owner; guests get a denied page; owner-only areas are Apps, Keys, Settings, Export/Import"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-063",
+    "statement": "Users list with search, kind, MFA status, last login, status; cursor-paginated"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-064",
+    "statement": "User detail with profile, factors (view/remove), grants editor, groups, sessions with revoke, audit tail, and actions suspend / reset / delete / make admin"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-065",
+    "statement": "Invite screen: email, name, groups, initial grants; on mail failure the invite is saved and a copy-link fallback is shown"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-066",
+    "statement": "Apps list and detail with manifest view/re-paste diff, redirect URIs, secret rotation, roles table, **Access** tab (who has access, roles, last sign-in, revoke), logout delivery log"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-067",
+    "statement": "Register app screen: paste JSON or form → preview → create → secret shown once"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-068",
+    "statement": "Groups list and detail with members and group grants"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-069",
+    "statement": "Audit log screen with filters (actor, target, event, range) and CSV/JSON export"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-070",
+    "statement": "Keys screen: current/next/retiring, generate, promote (blocked before overlap window), retire, runbook text"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-071",
+    "statement": "Settings: mail driver config with test send, alert recipients, trusted-device and session lifetimes"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-072",
+    "statement": "Export/import: download admin state JSON; upload → dry-run diff → apply; imported apps are marked *secret pending*"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-073",
+    "statement": "Console home: health tiles (DB, current key, mail relay last test), recent audit events, counts; first-run checklist"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-074",
+    "statement": "Every console mutation shall be an authenticated API call (no server-rendered form posts) so a CLI can reuse it"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-075",
+    "statement": "Console shall show per-user second-factor status and kind"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-076",
+    "statement": "Interaction screens (sign-in, factor, trusted-device offer, continue-as, denied, invite wizard, re-enrol, logged-out, error, unavailable) shall render correctly at 390 px and desktop, light and dark"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-077",
+    "statement": "The interaction route bundle shall be ≤ 150 KB gzipped"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-078",
+    "statement": "Invite wizard: set username and password → protect account (passkey / TOTP / skip for guests) → done; expired or used invites explain themselves"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-079",
+    "statement": "Account: My apps launcher listing apps the user can open"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-080",
+    "statement": "Account: profile (display name, username), email read-only with admin note"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-081",
+    "statement": "Account: change password requiring current password and step-up"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-082",
+    "statement": "Account: security screen to add/rename/remove TOTP and passkeys with empty-state nudge"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-083",
+    "statement": "Account: sessions & devices with revoke one / revoke all others / revoke trusted device"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-084",
+    "statement": "A static *sign-in unavailable* page shall be served when readiness fails, without touching the database"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-085",
+    "statement": "All interaction and account screens shall be completable by keyboard alone with AA contrast from tokens"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-086",
+    "statement": "Error messages on sign-in shall be generic (never distinguishing unknown email from wrong password)"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-087",
+    "statement": "Operator display name (e.g. \"Ask Matthew\") shall be configurable and used in guest-facing copy"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-088",
+    "statement": "`@d3cloud/auth-client` (TS) shall provide discovery, PKCE, state/nonce, ID token verification with a pinned algorithm list, `(iss, sub)` identity, roles helper, userinfo role refresh, and a back-channel logout handler idempotent by `jti`"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-089",
+    "statement": "`@d3cloud/auth-client` shall export a React *Sign in with D3 Auth* button/hook built on `@d3cloud/ui`, disabled with a reason when the health probe fails"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-090",
+    "statement": "`d3auth-client` (Python) shall wrap Authlib's Starlette client enforcing iss/aud/nonce/alg, roles refresh and a back-channel handler for FastAPI"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-091",
+    "statement": "Examples gallery: Express, FastAPI, iOS snippet, each runnable against Docker Compose"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-092",
+    "statement": "The consumer contract document shall specify the ten rules in [[D3 Auth/API Contract]] §2"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-093",
+    "statement": "Consumers shall identify users by `(iss, sub)` only; SDKs shall offer no email-based lookup helper"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-094",
+    "statement": "Consumers shall verify `iss`, `aud`, `nonce`, `exp` and a pinned algorithm list on every ID token"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-095",
+    "statement": "SDKs shall refuse `alg=none` and symmetric algorithms"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-096",
+    "statement": "SDKs shall support an `ssoMode` of `off`, `optional`, `required`"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-097",
+    "statement": "SDKs shall refresh roles from `userinfo` on each access-token renewal"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-098",
+    "statement": "SDKs shall verify logout tokens (signature, `iss`, `aud`, `iat`, `exp`, `events`, no `nonce`)"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-099",
+    "statement": "Back-channel handlers shall be idempotent by `jti`"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-100",
+    "statement": "Consumers shall JIT-provision a local account on first SSO login only when `roles` is non-empty or a grant exists"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-101",
+    "statement": "Dual-login consumers shall link explicitly while signed in locally; unlink requires the local password"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-102",
+    "statement": "The provider shall expose an unauthenticated health probe consumers can poll to decide whether to show the SSO button"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-103",
+    "statement": "In `required` mode consumers shall keep existing sessions through an outage, show *sign-in unavailable*, and retain a local owner break-glass login"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-104",
+    "statement": "Python SDK published to PyPI and TS SDK to npm at public release"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-105",
+    "statement": "A `MailAdapter` interface with `send({to, subject, text, html})` and two drivers: Cloudflare Worker relay and SMTP"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-106",
+    "statement": "The mail-relay Worker shall accept `POST /send` with a bearer shared secret and send via the `send_email` binding from `no-reply.d3cloud.io`"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-107",
+    "statement": "Invite, re-enrol, email-verification and alert emails shall be templated, plain-text first with HTML alternative"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-108",
+    "statement": "Mail failures shall never lose the underlying action (invite saved, link copyable)"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-109",
+    "statement": "Settings shall offer a test-send that reports the driver's error verbatim"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-110",
+    "statement": "Every mutation and every auth event (login success/failure incl. unknown email, MFA enrol/remove, grant change, app change, key rotation, session revoke, admin actions, break-glass) shall append an audit event with actor, target, IP, user agent, detail"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-111",
+    "statement": "Audit events shall be append-only and retained indefinitely; deleting a user keeps its UUID in audit rows"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-112",
+    "statement": "Logs shall be structured JSON to stdout and shall never contain tokens, secrets, passwords or codes"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-113",
+    "statement": "`/healthz` and `/readyz` (DB, current signing key, migrations current)"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-114",
+    "statement": "Email alerts to configured recipients on refresh-token reuse, admin/owner role change, failed-login spike, mail-relay failure; deduplicated per hour"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-115",
+    "statement": "The mail-relay Worker shall run a scheduled probe and email when `/readyz` has failed for 5 minutes"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-116",
+    "statement": "Request logs shall include `client_id`, interaction id and `sub` when known"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-117",
+    "statement": "Signing private keys and TOTP secrets shall be encrypted at rest with AES-256-GCM under a KEK from the environment; boot fails without the KEK"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-118",
+    "statement": "Signing keys shall follow `next → current → retiring → retired`; promotion blocked until the overlap window elapses; retiring keys stay in JWKS until max token lifetime + buffer"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-119",
+    "statement": "A single command shall produce a backup bundle (Postgres dump, encrypted keys, KEK reference, export JSON) and upload it to S3 with SSE-KMS nightly"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-120",
+    "statement": "A CI job shall restore the latest bundle into a fresh Postgres, boot, and verify discovery and JWKS `kid`s"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-121",
+    "statement": "Migrations shall run on container start after an automatic pre-migration dump, and readiness shall stay false until they succeed"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-122",
+    "statement": "Break-glass CLI: `recover --user <email> --minutes N` mints a one-time link that signs in with `amr: [recovery]`, forces MFA re-enrolment, and audits"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-123",
+    "statement": "The sealed second admin procedure shall be documented and verified at go-live"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-124",
+    "statement": "Runbooks: deploy checklist (incl. WAF rate rules), key rotation, backup/restore, break-glass, upgrade/rollback"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-125",
+    "statement": "The service shall bind only to the container network; no host ports published"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-126",
+    "statement": "The OpenID Conformance Suite Basic and Config OP test plans shall run in CI and be green on `main`"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-127",
+    "statement": "The RP-Initiated and Back-Channel Logout conformance plans shall be green in CI"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-128",
+    "statement": "An adversarial integration suite shall cover the cases in [[D3 Auth/Test Strategy]]"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-129",
+    "statement": "An ASVS 5.0 Level 2 self-assessment for V6, V7, V9, V10 shall be recorded in the vault with evidence per item"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-130",
+    "statement": "Semgrep (`p/jwt`, `p/owasp-top-ten`, custom rules) shall run in CI with zero findings"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-131",
+    "statement": "ZAP authenticated scan of `/login`, `/account`, `/admin` shall run nightly with no High findings"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-132",
+    "statement": "Security headers and a CSP shall be set on every response including errors"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-133",
+    "statement": "Playwright e2e for flows F1–F7 at phone and desktop viewports"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-134",
+    "statement": "CI order: lint → unit → integration → conformance → e2e → images; only the last publishes to GHCR"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-135",
+    "statement": "Paid OpenID certification"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-136",
+    "statement": "Deploy is a deliberate manual pull-and-restart on Zima from GHCR images"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-137",
+    "statement": "Install guide for other self-hosters: compose, env, seed, first-run, tunnel or reverse proxy"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-138",
+    "statement": "Repo goes public with MIT or Apache-2.0 only after REQ-126–131 pass and Bindery Phase 20 is in production"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-139",
+    "statement": "No telemetry, phone-home or automatic update checks"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-140",
+    "statement": "Organisations / multi-tenant"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-141",
+    "statement": "A freshly deployed instance with no accounts shall offer a first-run setup screen that creates the owner, guarded by a one-time setup code printed in the server log; it shall disappear permanently once any account exists"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-142",
+    "statement": "Every app's page shall show a connection sheet — issuer, discovery URL, client id, token endpoint auth method, ID token signing algorithm, PKCE, scopes, roles claim, redirect/post-logout URIs and back-channel state — derived from the app and provider configuration, each value copyable, never a stored secret"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-143",
+    "statement": "App presets shall register through the same manifest validation and registration path as a pasted manifest, record the preset and inputs, and require step-up"
+  },
+  {
+    "project": "D3 Auth",
+    "id": "REQ-144",
+    "statement": "An Immich preset shall produce a registration and a paste sheet in Immich's own field names that sign a granted person in to stock Immich"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-001",
+    "statement": "Foreman shall run as a pnpm monorepo on Node 22 with TypeScript strict across every package"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-002",
+    "statement": "Foreman shall persist all state in PostgreSQL 16 via Prisma migrations"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-003",
+    "statement": "Foreman shall define every domain entity once in `packages/shared` and derive the API, console types and MCP schemas from it"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-004",
+    "statement": "Foreman shall deploy as Docker Compose services with **no host ports**"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-005",
+    "statement": "Where the tunnel overlay is applied, Foreman shall be reachable at `foreman.d3cloud.io`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-006",
+    "statement": "Foreman shall refuse to boot when a required secret is absent"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-007",
+    "statement": "Foreman shall run migrations on boot only after taking a pre-migration database dump"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-008",
+    "statement": "Foreman's CI shall gate merges on lint, then unit, then integration, then e2e"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-009",
+    "statement": "Foreman's GitHub Actions shall be pinned to commit SHAs"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-010",
+    "statement": "`@d3cloud/ui` shall provide a `Table` component supporting sort, sticky headers and virtualization, released as v1.2"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-011",
+    "statement": "Foreman's console shall use only `@d3cloud/ui` tokens — no raw hex and no shadow literals"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-012",
+    "statement": "Foreman shall render correctly in both light and dark themes"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-013",
+    "statement": "Foreman shall never call an LLM API from the server"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-014",
+    "statement": "Foreman shall seed a disposable example project for development and testing"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-015",
+    "statement": "Foreman shall provide a CLI command to delete the example project and all its rows"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-016",
+    "statement": "Foreman shall offer both an app-native credential login and a \"Sign in with D3 Auth\" OIDC login"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-017",
+    "statement": "While D3 Auth is unreachable, Foreman shall still permit app-native login"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-018",
+    "statement": "Foreman shall hash app-native passwords with Argon2id and a pepper"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-019",
+    "statement": "Foreman shall link OIDC identities by `(iss, sub)` and never by email address"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-020",
+    "statement": "Foreman shall validate the `iss` parameter before redeeming an authorization code"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-021",
+    "statement": "Foreman shall use authorization code flow with PKCE, `state` and `nonce`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-022",
+    "statement": "Foreman shall support TOTP as a second factor on the app-native path"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-023",
+    "statement": "Foreman shall throttle authentication attempts before hashing, per account and per IP"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-024",
+    "statement": "Foreman shall set session cookies with the `__Host-` prefix, `Secure`, `HttpOnly` and `SameSite=Lax`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-025",
+    "statement": "Foreman shall issue scoped API tokens, hashing them at rest and displaying the value exactly once"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-026",
+    "statement": "Foreman shall permit revocation of any API token, taking effect on the next request"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-027",
+    "statement": "If a request presents a token lacking the required scope, then Foreman shall return a typed authorization error and audit it"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-028",
+    "statement": "Foreman shall not expose any unauthenticated route other than health checks and the GitHub webhook"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-029",
+    "statement": "Foreman shall verify GitHub webhook payloads by HMAC before enqueueing them"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-030",
+    "statement": "Foreman shall not implement sharing, public views or share tokens"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-031",
+    "statement": "Foreman shall represent each tracked codebase as a Project with an immutable, unique short code"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-032",
+    "statement": "Foreman shall record a Project lifecycle of `planned`, `scaffolded`, `building`, `deployed`, `parked` or `scrapped`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-033",
+    "statement": "Foreman shall permit a Project to have one or more linked GitHub repositories"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-034",
+    "statement": "Foreman shall store a Phase number as a decimal value"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-035",
+    "statement": "Foreman shall order Phases by an explicit sort order independent of their number"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-036",
+    "statement": "Foreman shall record a Phase status of `planned`, `active`, `complete` or `parked`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-037",
+    "statement": "Foreman shall record an exit demo on every Phase"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-038",
+    "statement": "Foreman shall record a Task with a status of `todo`, `in_progress`, `blocked`, `done` or `cancelled`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-039",
+    "statement": "If a Task is set to `blocked`, then Foreman shall require a blocked reason"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-040",
+    "statement": "Foreman shall record a T-shirt size of `XS`, `S`, `M`, `L` or `XL` on Tasks and Phases"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-041",
+    "statement": "Foreman shall never record, display or accept a time estimate, duration or due date"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-042",
+    "statement": "Foreman shall relate Tasks and Requirements many-to-many"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-043",
+    "statement": "Foreman shall permit a Task to declare the file paths it touches"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-044",
+    "statement": "Foreman shall assign every entity a readable, project-prefixed, immutable human ID"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-045",
+    "statement": "Where a human ID was generated rather than authored, Foreman shall flag it as synthesized"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-046",
+    "statement": "Foreman shall permit a Requirement to exist without a Phase assignment"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-047",
+    "statement": "Foreman shall record a Requirement priority of `M`, `S`, `C` or `W`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-048",
+    "statement": "Foreman shall record an acceptance test on every Requirement"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-049",
+    "statement": "Foreman shall record the source that produced each Requirement"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-050",
+    "statement": "When a Requirement is written, Foreman shall parse its statement against the five EARS patterns"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-051",
+    "statement": "If a Requirement statement does not parse as EARS, then Foreman shall store it and record a warning"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-052",
+    "statement": "Foreman shall display the detected EARS pattern and any warning on the Requirement"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-053",
+    "statement": "Foreman shall identify every Must-priority Requirement with no satisfying Task"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-054",
+    "statement": "Foreman shall identify every Task citing no Requirement"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-055",
+    "statement": "Foreman shall generate the requirement-to-task traceability matrix on demand rather than storing it"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-056",
+    "statement": "When a Phase completion is requested, Foreman shall refuse it unless an exit demo is recorded and every Must Requirement in that Phase has a passing acceptance"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-057",
+    "statement": "Foreman shall present the Requirements Register as a generated view, not an authored document"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-058",
+    "statement": "Foreman shall store ADRs as a typed entity with status `proposed`, `accepted`, `superseded` or `rejected`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-059",
+    "statement": "Foreman shall record `extends` and `supersedes` relationships between ADRs"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-060",
+    "statement": "If an ADR's supersedes chain is broken or circular, then Foreman shall surface it as a drift item"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-061",
+    "statement": "Foreman shall store all non-ADR document kinds in one Document entity discriminated by kind"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-062",
+    "statement": "Foreman shall store Document content as addressable, ordered sections"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-063",
+    "statement": "Foreman shall permit editing a single Document section without rewriting the document"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-064",
+    "statement": "Foreman shall store a revision for every Document and ADR edit"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-065",
+    "statement": "Foreman shall render a diff between any two revisions"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-066",
+    "statement": "Foreman shall render Mermaid diagrams in document previews"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-067",
+    "statement": "Foreman shall record the citations between entities and expose the inverse as backlinks"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-068",
+    "statement": "Foreman shall store Decisions as records distinct from ADRs"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-069",
+    "statement": "Foreman shall store Risks as records, each with a named tripwire"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-070",
+    "statement": "Foreman shall record whether a Risk's tripwire has fired"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-071",
+    "statement": "Foreman shall store Glossary terms as records, scoped to a project or to the ecosystem"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-072",
+    "statement": "Foreman shall link occurrences of a Glossary term to its definition"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-073",
+    "statement": "Foreman shall present Risk Register, Glossary and Audit Index as generated views"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-074",
+    "statement": "Foreman shall present the Scope of Work as a generated view over Phases and Tasks"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-075",
+    "statement": "Foreman shall provide an MCP server as a local stdio process"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-076",
+    "statement": "The MCP shim shall authenticate to the Foreman API with a scoped bearer token"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-077",
+    "statement": "Foreman shall implement MCP specification revision 2026-07-28"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-078",
+    "statement": "Foreman shall not use any MCP primitive deprecated as of 2026-07-28"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-079",
+    "statement": "Foreman shall expose no more than twelve MCP tools"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-080",
+    "statement": "Foreman shall keep total MCP tool-definition size inside a declared token budget"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-081",
+    "statement": "Foreman shall generate MCP tool schemas from `packages/shared`"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-082",
+    "statement": "Foreman shall provide a session brief returning active phase, next unblocked tasks, open critical findings, CI state and drift count for one project"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-083",
+    "statement": "The session brief shall exclude tasks whose blockers are unresolved"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-084",
+    "statement": "Foreman shall provide a cross-project portfolio tool"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-085",
+    "statement": "Foreman shall provide a typed search tool across requirements, tasks, findings, ADRs, decisions, risks and terms"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-086",
+    "statement": "Foreman shall provide a get tool returning one entity by human ID together with its backlinks"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-087",
+    "statement": "Foreman shall expose documents and document sections as MCP resources addressed by URI"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-088",
+    "statement": "Foreman shall include cache metadata on MCP tool and resource listings"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-089",
+    "statement": "Foreman shall provide MCP tools to create, update, set status on and link entities"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-090",
+    "statement": "When an MCP write is irreversible or regressive, Foreman shall request confirmation before applying it"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-091",
+    "statement": "When an MCP write is ordinary forward progress, Foreman shall apply it without confirmation"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-092",
+    "statement": "Foreman shall return no unbounded list from any tool or endpoint"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-093",
+    "statement": "Foreman shall authenticate to GitHub as a GitHub App"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-094",
+    "statement": "Foreman shall refresh the GitHub installation token before expiry"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-095",
+    "statement": "Foreman shall ingest commits with SHA, message, author, timestamp and changed file paths"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-096",
+    "statement": "Foreman shall ingest check runs and their conclusions"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-097",
+    "statement": "Foreman shall ingest releases and tags"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-098",
+    "statement": "Foreman shall record deployments with image, image SHA and schema revision"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-099",
+    "statement": "Foreman shall not ingest pull requests"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-100",
+    "statement": "When a GitHub webhook arrives, Foreman shall enqueue it and respond before processing"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-101",
+    "statement": "Foreman shall process each webhook delivery idempotently"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-102",
+    "statement": "When a repository is first linked, Foreman shall backfill its history"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-103",
+    "statement": "Foreman shall reconcile each linked repository on a schedule and heal gaps from dropped deliveries"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-104",
+    "statement": "If a reconcile finds a gap it cannot heal, then Foreman shall surface it rather than fail silently"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-105",
+    "statement": "Where a commit's SHA no longer exists after a force push, Foreman shall mark it orphaned and retain it"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-106",
+    "statement": "Foreman shall attribute a commit to a Task by agent declaration first, commit-message reference second and file-path overlap third"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-107",
+    "statement": "Foreman shall parse task and requirement human IDs out of commit messages"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-108",
+    "statement": "Foreman shall record an unconfirmed attribution as a proposal and never as a fact"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-109",
+    "statement": "Foreman shall permit confirming or rejecting attribution proposals from both the console and the MCP"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-110",
+    "statement": "Foreman shall display unattributed commits so the coverage gap is visible"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-111",
+    "statement": "Foreman shall report current CI state per project"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-112",
+    "statement": "Foreman shall generate release notes from Tasks whose commits landed between two tags"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-113",
+    "statement": "Foreman shall report commit cadence and last-touched date per project"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-114",
+    "statement": "Foreman shall store an Audit run with kind, scope, date, verdict and round count"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-115",
+    "statement": "Foreman shall store a Finding with severity, confidence, verification verdict, lens, status and effort"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-116",
+    "statement": "Foreman shall record a Finding's location as a file path with line ranges"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-117",
+    "statement": "Foreman shall record the commit that fixed a Finding"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-118",
+    "statement": "Foreman shall report whether CI was green on a Finding's fix commit"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-119",
+    "statement": "If a fix commit has not been ingested, then Foreman shall report the fix as unverified rather than green"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-120",
+    "statement": "Foreman shall list every open Finding across all projects, ranked by severity"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-121",
+    "statement": "Foreman shall propose candidate recurrences of a Finding in other projects"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-122",
+    "statement": "Foreman shall not judge recurrence candidates itself"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-123",
+    "statement": "When a fixed Finding's location file changes again, Foreman shall flag it for re-look"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-124",
+    "statement": "Foreman shall relate Findings to ADRs and Requirements"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-125",
+    "statement": "Foreman shall not provide general issue or bug tracking"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-126",
+    "statement": "Foreman shall present a per-project drift view covering coverage holes, stale tasks, fired tripwires, failed exit gates and orphan ADRs"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-127",
+    "statement": "Foreman shall show a drift count per project on the portfolio"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-128",
+    "statement": "Foreman shall include the drift count in the session brief"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-129",
+    "statement": "While a Task is `in_progress` with no commits touching its declared files, Foreman shall report it as stale"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-130",
+    "statement": "Foreman shall report which technologies each project uses at which version"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-131",
+    "statement": "Where a repository manifest cannot be parsed, Foreman shall record the technology as unknown rather than omit it"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-132",
+    "statement": "Foreman shall search ADRs across all projects"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-133",
+    "statement": "Foreman shall present a portfolio view showing lifecycle, active phase, open criticals, CI state, drift and last activity per project"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-134",
+    "statement": "Foreman shall present a board view of the active Phase as an alternate to the task list"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-135",
+    "statement": "Foreman shall not provide drag-and-drop as the primary means of changing status"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-136",
+    "statement": "Foreman shall write an audit event for every mutation, including MCP and importer writes"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-137",
+    "statement": "Foreman shall never write tokens, secrets or password material to a log or audit event"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-138",
+    "statement": "Foreman shall permit reversing any single mutation"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-139",
+    "statement": "If an undo cannot be applied consistently, then Foreman shall refuse it with a typed error rather than apply it partially"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-140",
+    "statement": "Foreman shall delete records only softly"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-141",
+    "statement": "Foreman shall process background work through a Postgres job queue with individually replayable stages"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-142",
+    "statement": "Foreman shall expose queue depth, stage failures, last ingest, last reconcile, last backup and last restore drill"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-143",
+    "statement": "When ingestion fails, a queue stalls, or a backup fails, Foreman shall send an email alert"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-144",
+    "statement": "Foreman shall dump the database nightly"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-145",
+    "statement": "Foreman shall provide a documented, exercised restore drill"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-146",
+    "statement": "Foreman shall return a conflict with current state, rather than overwriting, when a concurrent edit is detected"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-147",
+    "statement": "Foreman shall import vault documents for Bindery, Burrow, D3 Auth, Clearwhen, the Design System, d3cloud.io, Sarah Byrne LICSW and the Personal Website"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-148",
+    "statement": "The importer shall account for every source file as mapped, partial or unmapped, with a reason"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-149",
+    "statement": "The importer shall run in dry-run mode without writing"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-150",
+    "statement": "The importer shall be idempotent"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-151",
+    "statement": "Where a source task has no authored ID, the importer shall synthesize one from its phase and position and flag it"
+  },
+  {
+    "project": "Foreman",
+    "id": "FRM-REQ-152",
+    "statement": "The importer shall rewrite inline entity citations in prose to project-prefixed human IDs"
+  }
+]

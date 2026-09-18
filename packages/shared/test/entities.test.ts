@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   FORBIDDEN_ESTIMATE_FIELDS,
-  lintEars,
   PageQuery,
   Phase,
   ProjectCreate,
@@ -120,58 +119,5 @@ describe('paging (FRM-REQ-092)', () => {
   it('refuses an unbounded request', () => {
     expect(PageQuery.safeParse({ limit: 100_000 }).success).toBe(false);
     expect(PageQuery.safeParse({ limit: 0 }).success).toBe(false);
-  });
-});
-
-describe('the EARS lint warns and never blocks', () => {
-  it.each([
-    ['The system shall persist all state in PostgreSQL.', 'ubiquitous'],
-    ['While the queue is draining, the system shall report its depth.', 'state'],
-    ['When a webhook arrives, the system shall enqueue it.', 'event'],
-    ['If the issuer is unreachable, then the system shall accept a password.', 'unwanted'],
-    ['Where the tunnel overlay is applied, the system shall serve the console.', 'optional'],
-    ['While ingest is running, when a commit arrives, the system shall attribute it.', 'complex'],
-  ])('classifies %s as %s', (statement, pattern) => {
-    const result = lintEars(statement);
-    expect(result.pattern).toBe(pattern);
-    expect(result.ok).toBe(true);
-  });
-
-  it('stores a non-conforming statement as unparsed, with a note that says what to do', () => {
-    const result = lintEars('This is just a sentence about the system.');
-    expect(result.pattern).toBe('unparsed');
-    expect(result.ok).toBe(false);
-    expect(result.note).toContain('shall');
-  });
-
-  it('flags an If with no then, but still classifies it', () => {
-    const result = lintEars('If the disk fills the system shall stop writing.');
-    expect(result.pattern).toBe('unwanted');
-    expect(result.ok).toBe(false);
-    expect(result.note).toContain('then');
-  });
-
-  it('flags a missing comma without discarding the pattern', () => {
-    const result = lintEars('While draining the system shall report depth.');
-    expect(result.pattern).toBe('state');
-    expect(result.ok).toBe(false);
-  });
-
-  it('never throws, whatever it is handed', () => {
-    for (const input of ['', '   ', '🙂', 'shall', 'SHALL SHALL SHALL']) {
-      expect(() => lintEars(input)).not.toThrow();
-    }
-  });
-
-  it('accepts the real register verbatim — the statements it has to survive', () => {
-    const real = [
-      'Foreman shall run as a pnpm monorepo on Node 22 with TypeScript strict across every package',
-      'Foreman shall refuse to boot when a required secret is absent',
-      'Where the tunnel overlay is applied, Foreman shall be reachable at foreman.d3cloud.io',
-      'Foreman shall never call an LLM API from the server',
-    ];
-    for (const statement of real) {
-      expect(lintEars(statement).pattern).not.toBe('unparsed');
-    }
   });
 });
