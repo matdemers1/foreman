@@ -14,8 +14,13 @@ import {
 } from '@d3cloud/ui';
 import { FolderKanban, Home as HomeIcon, ListChecks, Search } from 'lucide-react';
 import { fetchSession, logout, type SessionState } from './lib/api';
+import { routeFor, usePath } from './lib/router';
 import { Login } from './screens/Login';
-import { Home } from './screens/Home';
+import { PhaseDetail } from './screens/PhaseDetail';
+import { Phases } from './screens/Phases';
+import { Portfolio } from './screens/Portfolio';
+import { ProjectOverview } from './screens/ProjectOverview';
+import { TaskDetail } from './screens/TaskDetail';
 
 /**
  * The console shell.
@@ -32,6 +37,7 @@ type State =
 
 export function App() {
   const [state, setState] = useState<State>({ status: 'loading' });
+  const path = usePath();
 
   const load = useCallback(() => {
     void fetchSession()
@@ -88,8 +94,13 @@ export function App() {
         nav={
           <SideNav>
             {/* Phase 0 wires the shell; each destination arrives with the screen behind it. */}
-            <SideNavItem href="/" icon={<HomeIcon />} label="Portfolio" current />
-            <SideNavItem href="/projects" icon={<FolderKanban />} label="Projects" />
+            <SideNavItem href="/" icon={<HomeIcon />} label="Portfolio" current={path === '/'} />
+            <SideNavItem
+              href="/projects"
+              icon={<FolderKanban />}
+              label="Projects"
+              current={path.startsWith('/projects')}
+            />
             <SideNavItem href="/findings" icon={<ListChecks />} label="Findings" />
             <SideNavItem href="/search" icon={<Search />} label="Search" />
           </SideNav>
@@ -109,8 +120,32 @@ export function App() {
           </AccountMenu>
         }
       >
-        <Home displayName={user.displayName} />
+        <Screen path={path} />
       </AppShell>
     </ThemeProvider>
   );
+}
+
+/** One screen, chosen by the path. */
+function Screen({ path }: { path: string }) {
+  const route = routeFor(path);
+
+  switch (route.screen) {
+    case 'portfolio':
+      return <Portfolio />;
+    case 'project':
+      return <ProjectOverview code={route.code ?? ''} />;
+    case 'phases':
+      return <Phases code={route.code ?? ''} />;
+    case 'phase':
+      return <PhaseDetail code={route.code ?? ''} phaseHumanId={route.humanId ?? ''} />;
+    case 'task':
+      return <TaskDetail humanId={route.humanId ?? ''} />;
+    case 'not-found':
+      return (
+        <EmptyState kind="no-results" heading="That page does not exist">
+          Nothing is served at {path}.
+        </EmptyState>
+      );
+  }
 }

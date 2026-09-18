@@ -1,0 +1,9 @@
+/* The console's own handful of rules. Everything else is @d3cloud/ui.
+
+   `fm-muted` is the one thing used often enough to name: a value that is absent, unknown, or a
+   secondary line under a row. It is a token, not a colour — the usage gate would refuse a hex. */
+.fm-muted {
+  color: var(--color-fg-muted);
+  font-size: var(--text-13);
+  line-height: var(--leading-13);
+}

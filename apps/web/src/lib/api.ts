@@ -93,3 +93,99 @@ export function login(email: string, password: string, totpCode?: string): Promi
 export async function logout(): Promise<void> {
   await api.post<undefined>('/auth/logout');
 }
+
+// ─── The read surface the console renders ──────────────────────────────────
+
+export interface PortfolioRow {
+  code: string;
+  name: string;
+  lifecycle: string;
+  phase: { humanId: string; number: string; name: string } | null;
+  tasks: { open: number; blocked: number; done: number };
+  openCriticals: number;
+  /** `unknown` is a third state, and renders grey rather than green (S-04). */
+  ci: { conclusion: string | null; unknown: boolean };
+  drift: { uncoveredRequirements: number; unconfirmedAttributions: number };
+  lastActivityAt: string | null;
+}
+
+export interface ProjectDetail {
+  code: string;
+  name: string;
+  lifecycle: string;
+  pitch: string | null;
+  counts: { phases: number; requirements: number; tasks: number; openFindings: number };
+}
+
+export interface PhaseRow {
+  id: string;
+  humanId: string;
+  number: string;
+  sortOrder: number;
+  name: string;
+  objective: string | null;
+  status: string;
+  exitDemo: string | null;
+  size: string | null;
+}
+
+export interface TaskRow {
+  id: string;
+  humanId: string;
+  title: string;
+  status: string;
+  blockedReason: string | null;
+  size: string | null;
+  doneWhen: string | null;
+  phaseId: string | null;
+  files: string[];
+  requirements: string[];
+}
+
+export interface Brief {
+  project: { code: string; name: string; lifecycle: string; pitch: string | null };
+  activePhase: {
+    humanId: string;
+    number: string;
+    name: string;
+    objective: string | null;
+    exitDemo: string | null;
+    tasks: { done: number; total: number };
+  } | null;
+  nextTasks: { humanId: string; title: string; status: string; size: string | null }[];
+  blocked: { humanId: string; title: string; reason: string | null }[];
+  openCriticals: { humanId: string; severity: string; title: string; location: string | null }[];
+  ci: { conclusion: string | null; commitSha: string | null; at: string | null; unknown: boolean };
+  drift: {
+    uncoveredRequirements: number;
+    unconfirmedAttributions: number;
+    firedRisks: number;
+  };
+  recentCommits: { sha: string; message: string; at: string }[];
+}
+
+export interface EntityResult {
+  type: string;
+  humanId: string;
+  projectCode: string;
+  entity: Record<string, unknown>;
+  backlinks: { fromType: string; humanId: string | null; title: string; kind: string }[];
+}
+
+interface Page<T> {
+  items: T[];
+  nextCursor: string | null;
+  total: number | null;
+}
+
+export const foreman = {
+  portfolio: () => api.get<Page<PortfolioRow>>('/api/portfolio'),
+  project: (code: string) => api.get<ProjectDetail>(`/api/projects/${code}`),
+  phases: (code: string) => api.get<Page<PhaseRow>>(`/api/projects/${code}/phases`),
+  tasks: (code: string, phaseHumanId?: string) =>
+    api.get<Page<TaskRow>>(
+      `/api/projects/${code}/tasks?limit=200${phaseHumanId === undefined ? '' : `&phase=${phaseHumanId}`}`,
+    ),
+  brief: (code: string) => api.get<Brief>(`/api/brief/${code}`),
+  entity: (humanId: string) => api.get<EntityResult>(`/api/entities/${humanId}`),
+};

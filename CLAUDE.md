@@ -61,6 +61,25 @@ No sprints, velocity, story points or burndown · no time tracking · **no freef
 
 Each of these is recorded as a requirement asserting its **absence**, so it cannot quietly arrive: `FRM-REQ-013`, `030`, `041`, `099`, `125`, `135`.
 
+## Bumping `@d3cloud/ui`
+
+The library is consumed as a **GitHub release tarball**, and pnpm has a trap here that has cost an
+hour twice. After changing the version in `apps/web/package.json`, a plain `pnpm install` writes a
+lockfile entry with **no `integrity` field** — it reuses a URL-keyed entry in the store instead of
+re-resolving. Local installs work; `pnpm fetch --frozen-lockfile` in the Docker build fails with
+`ERR_PNPM_MISSING_TARBALL_INTEGRITY`, so it only shows up when the image is built.
+
+```bash
+# After bumping the version, do this, or the image build fails later:
+rm -rf ~/Library/pnpm/store/v10/https+++github.com+matdemers1+d3-design-system+releases+download+v<VERSION>+d3cloud-ui-<VERSION>.tgz
+rm -f pnpm-lock.yaml
+pnpm install
+grep -A1 "d3cloud-ui-<VERSION>.tgz':" pnpm-lock.yaml   # must show `integrity: sha512-…`
+```
+
+Removing `node_modules` alone is not enough once the bad entry is in the lockfile: pnpm reads it
+and refuses rather than re-resolving.
+
 ## Cross-repo work
 | Repo | What | Phase |
 |---|---|---|
