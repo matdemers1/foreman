@@ -92,6 +92,11 @@ jobs:
   compose:
     needs: integration
     runs-on: ubuntu-latest
+    # Every step here interpolates the compose file, and the file requires this variable
+    # (`${POSTGRES_PASSWORD:?}`) rather than defaulting it — so `config` and `build` need it just
+    # as much as the step that boots the stack.
+    env:
+      POSTGRES_PASSWORD: ci-postgres-password
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
@@ -105,11 +110,11 @@ jobs:
         run: |
           docker compose build server worker
       - name: Boot on an empty database, and prove the dump precedes the migration
-        env:
-          POSTGRES_PASSWORD: ci-postgres-password
         run: |
           node scripts/dev-env.mjs
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait postgres server
+          # The worker too: attribution proposals are drained from the queue, so the activity
+          # tests have nothing to assert on without it, and it is part of the deployed stack.
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait postgres server worker
           docker compose -f docker-compose.yml -f docker-compose.dev.yml logs server > server.log
           # FRM-REQ-007: the dump's path is logged, and it is logged *before* the migration runs.
           grep -q 'pre-migration dump written' server.log
