@@ -14,8 +14,17 @@ import { record } from '../domain/audit.js';
  */
 
 const name = process.argv[2];
-if (name === undefined || name.trim().length === 0) {
-  process.stderr.write('usage: issue-token <name>   e.g. issue-token "matt\'s laptop"\n');
+const USAGE = 'usage: issue-token <name>   e.g. issue-token "matt\'s laptop"\n';
+
+// `--help` asking for help and getting a credential named `--help` is the wrong answer: the token
+// is shown once, so the mistake is only visible later as a stray row nobody can identify.
+if (name === undefined || name.trim().length === 0 || ['-h', '--help', 'help'].includes(name)) {
+  process.stderr.write(USAGE);
+  process.exit(name === undefined || name.trim().length === 0 ? 1 : 0);
+}
+
+if (name.startsWith('-')) {
+  process.stderr.write(`issue-token: "${name}" looks like a flag, not a name.\n${USAGE}`);
   process.exit(1);
 }
 
