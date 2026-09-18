@@ -2,6 +2,7 @@ export * from './enums.js';
 export * from './ids.js';
 export * from './entities/common.js';
 export * from './entities/spine.js';
+export * from './entities/record.js';
 export * from './entities/api.js';
 export * from './entities/writes.js';
 export * from './ears/index.js';

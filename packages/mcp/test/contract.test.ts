@@ -13,7 +13,9 @@ import {
 } from '@foreman/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { UriTemplate } from '@modelcontextprotocol/sdk/shared/uriTemplate.js';
 import { createClient, ForemanApiError } from '../src/client.js';
+import { listResources, parseUri, readResource, RESOURCE_TEMPLATE } from '../src/resources.js';
 import { createServer } from '../src/server.js';
 import {
   MAX_TOOLS,
@@ -308,5 +310,70 @@ describe('the gate in front of the write tools (T-2.9, FRM-REQ-090, FRM-REQ-091)
     const setStatus = WRITE_TOOLS.find((t) => t.name === 'foreman_set_status');
     const decision = await setStatus?.gate({ get } as never, { id: 'BND-T-0.3', status: 'in_progress' });
     expect(decision?.gated).toBe(false);
+  });
+});
+
+describe('documents as resources (T-4.9, FRM-REQ-087)', () => {
+  it('splits a URI into project, document and section', () => {
+    expect(parseUri('foreman://BND/architecture#deployment')).toEqual({
+      code: 'BND',
+      address: 'architecture',
+      section: 'deployment',
+    });
+  });
+
+  it('reads a whole document when there is no fragment', () => {
+    expect(parseUri('foreman://BND/architecture')).toEqual({
+      code: 'BND',
+      address: 'architecture',
+    });
+  });
+
+  it('upper-cases the project code, because that is what a code is', () => {
+    expect(parseUri('foreman://bnd/architecture')?.code).toBe('BND');
+  });
+
+  it('returns null rather than throwing on something that is not one', () => {
+    for (const uri of ['', 'https://example.com', 'foreman://', 'foreman://B/x', 'nonsense']) {
+      expect(parseUri(uri), uri).toBeNull();
+    }
+  });
+
+  it('the template matches both forms, and puts the pieces where they belong', () => {
+    // The reason the template is `{+rest}` and not `{address}{#section}`: the SDK's matcher splits
+    // the latter one character from the end — address `architecture#deploymen`, section `t`.
+    const template = new UriTemplate(RESOURCE_TEMPLATE);
+    expect(template.match('foreman://BND/architecture#deployment')).toEqual({
+      code: 'BND',
+      rest: 'architecture#deployment',
+    });
+    expect(template.match('foreman://BND/architecture')).toEqual({
+      code: 'BND',
+      rest: 'architecture',
+    });
+  });
+
+  it('asks the API for the section, not the document, when given a fragment', async () => {
+    const get = vi.fn().mockResolvedValue({ markdown: '## Deployment\n\nBehind a tunnel.' });
+    const content = await readResource({ get } as never, 'foreman://BND/architecture#deployment');
+
+    expect(get).toHaveBeenCalledWith('/api/projects/BND/documents/at/architecture/sections/deployment');
+    // The whole argument for addressing sections: three paragraphs, not two thousand lines.
+    expect(content.text).toContain('Behind a tunnel');
+    expect(content.mimeType).toBe('text/markdown');
+  });
+
+  it('asks for the whole document when given none', async () => {
+    const get = vi.fn().mockResolvedValue({ markdown: '# Architecture' });
+    await readResource({ get } as never, 'foreman://BND/architecture');
+    expect(get).toHaveBeenCalledWith('/api/projects/BND/documents/at/architecture');
+  });
+
+  it('lists everything addressable in one call', async () => {
+    const get = vi.fn().mockResolvedValue({ items: [{ uri: 'foreman://BND/architecture' }] });
+    const listed = await listResources({ get } as never);
+    // Once at connect time, not per project as a client discovers them.
+    expect(get).toHaveBeenCalledWith('/api/resources');
+    expect(listed).toHaveLength(1);
   });
 });

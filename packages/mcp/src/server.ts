@@ -1,6 +1,7 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ForemanClient } from './client.js';
 import { ForemanApiError } from './client.js';
+import { listResources, readResource, RESOURCE_TEMPLATE } from './resources.js';
 import { READ_TOOLS, WRITE_TOOLS } from './tools/index.js';
 
 /**
@@ -139,6 +140,51 @@ export function createServer({ client, name, version }: ServerOptions): McpServe
       },
     );
   }
+
+  /**
+   * Documents and sections, addressed by URI (T-4.9).
+   *
+   * One template for both: `foreman://BND/architecture` is the document, and
+   * `foreman://BND/architecture#deployment` is three paragraphs of it. Long content goes here and
+   * never through tool output — a tool result is spent context whether or not it was the part
+   * anybody needed.
+   */
+  server.registerResource(
+    'document',
+    new ResourceTemplate(RESOURCE_TEMPLATE, {
+      list: async () => ({
+        resources: (await listResources(client)).map((entry) => ({
+          uri: entry.uri,
+          name: entry.name,
+          description: entry.description,
+          mimeType: entry.mimeType,
+        })),
+      }),
+    }),
+    {
+      title: 'Project documents',
+      description:
+        'Architecture, data model, API contract, runbooks and phase plans — whole, or one ' +
+        'addressed section.',
+      mimeType: 'text/markdown',
+    },
+    async (uri) => {
+      try {
+        const content = await readResource(client, uri.href);
+        return { contents: [content] };
+      } catch (error) {
+        const message =
+          error instanceof ForemanApiError
+            ? `Foreman: ${error.message} (${String(error.status)})`
+            : error instanceof Error
+              ? error.message
+              : String(error);
+        // A resource read has no `isError`, so the message is the content — and a 404 here names
+        // the addresses that do exist, which is what makes the next call the right one.
+        return { contents: [{ uri: uri.href, mimeType: 'text/plain', text: message }] };
+      }
+    },
+  );
 
   return server;
 }

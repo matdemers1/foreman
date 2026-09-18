@@ -19,6 +19,7 @@ import { projectRoutes } from './routes/projects.js';
 import { briefRoutes } from './routes/brief.js';
 import { searchRoutes } from './routes/search.js';
 import { coverageRoutes } from './routes/coverage.js';
+import { recordRoutes } from './routes/record.js';
 import { linkRoutes } from './routes/links.js';
 import { tokenRoutes } from './routes/tokens.js';
 import { undoRoutes } from './routes/undo.js';
@@ -89,6 +90,7 @@ export function createApp({ config, db, oidc = null }: AppDeps): Express {
   mount(app, '/api/tokens', tokenRoutes(db));
   mount(app, '/api/links', linkRoutes(db));
   mount(app, '/api/projects', coverageRoutes(db));
+  mount(app, '/api/projects', recordRoutes(db));
 
   /** Liveness: the process is up. Deliberately touches nothing else. */
   app.get('/healthz', (_req, res) => {

@@ -4,6 +4,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import type { Db } from '../db.js';
 import { getByHumanId } from '../domain/entities.js';
 import { portfolio } from '../domain/portfolio.js';
+import { resourceCatalogue } from '../domain/resources.js';
 import { SEARCHABLE, search } from '../domain/search.js';
 import { handler, param, parseQuery } from './helpers.js';
 
@@ -26,6 +27,20 @@ export function searchRoutes(db: Db): Router {
   const router = Router();
   router.use(requireAuth);
   router.use(requireScope(db, 'read'));
+
+  /**
+   * Every document and section in every project, as a URI (T-4.9).
+   *
+   * Cross-project because that is how a client lists resources: once, at connect time, not per
+   * project as it discovers them.
+   */
+  router.get(
+    '/resources',
+    handler(async (_req, res) => {
+      const items = await resourceCatalogue(db);
+      res.json({ items, nextCursor: null, total: items.length });
+    }),
+  );
 
   router.get(
     '/search',
