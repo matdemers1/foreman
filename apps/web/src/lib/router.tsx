@@ -81,6 +81,7 @@ export interface Route {
     | 'adrs'
     | 'risks'
     | 'glossary'
+    | 'search'
     | 'task'
     | 'not-found';
   readonly code?: string;
@@ -116,6 +117,8 @@ export function routeFor(path: string): Route {
         : { screen: 'document', code, humanId: parts[3] };
     }
   }
+
+  if (parts[0] === 'search' && parts[1] === undefined) return { screen: 'search' };
 
   if (parts[0] === 'tasks' && parts[1] !== undefined) {
     return { screen: 'task', humanId: parts[1] };

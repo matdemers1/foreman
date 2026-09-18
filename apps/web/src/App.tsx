@@ -26,6 +26,7 @@ import { Documents } from './screens/Documents';
 import { Glossary } from './screens/Glossary';
 import { RequirementDetail } from './screens/RequirementDetail';
 import { RiskRegister } from './screens/RiskRegister';
+import { Search as SearchScreen } from './screens/Search';
 import { Requirements } from './screens/Requirements';
 import { RegisterView } from './screens/RegisterView';
 import { ScopeOfWorkView } from './screens/ScopeOfWorkView';
@@ -109,7 +110,12 @@ export function App() {
               current={path.startsWith('/projects')}
             />
             <SideNavItem href="/findings" icon={<ListChecks />} label="Findings" />
-            <SideNavItem href="/search" icon={<Search />} label="Search" />
+            <SideNavItem
+              href="/search"
+              icon={<Search />}
+              label="Search"
+              current={path === '/search'}
+            />
           </SideNav>
         }
         footer={
@@ -166,6 +172,8 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <RiskRegister code={route.code ?? ''} />;
     case 'glossary':
       return <Glossary code={route.code ?? ''} />;
+    case 'search':
+      return <SearchScreen key={search} search={search} />;
     case 'task':
       return <TaskDetail humanId={route.humanId ?? ''} />;
     case 'not-found':

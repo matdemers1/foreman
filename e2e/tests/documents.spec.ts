@@ -201,3 +201,43 @@ test.describe('addressed by URI (FRM-REQ-087)', () => {
     expect(uris).toContain('foreman://EXMP/architecture#deployment');
   });
 });
+
+test.describe('cross-project search (S-06, T-4.11, FRM-REQ-132)', () => {
+  test('finds ADRs, and says which project each is from', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/search?q=decision');
+
+    const first = page.getByRole('list', { name: /Results for/ }).getByRole('listitem').first();
+    await expect(first.getByRole('link', { name: /EXMP-ADR-/ })).toBeVisible();
+    // A cross-project result set that does not say which project each hit is from is a list you
+    // have to check one at a time.
+    // Exact: 'EXMP' is also a substring of every ADR's ID on the same row.
+    await expect(first.getByText('EXMP', { exact: true })).toBeVisible();
+  });
+
+  test('narrows to one kind', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/search?q=decision&type=risk');
+
+    // The same word, a different kind: no ADRs in the answer.
+    await expect(page.getByRole('link', { name: /EXMP-ADR-/ })).toHaveCount(0);
+  });
+
+  test('keeps the search in the URL, so a result set is a link', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/search');
+    await page.getByRole('textbox', { name: 'Find' }).fill('tunnel');
+    await page.getByRole('button', { name: 'Search' }).click();
+
+    await expect(page).toHaveURL(/\/search\?q=tunnel/);
+  });
+
+  test('resolves an exact human ID first', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/search?q=EXMP-ADR-001');
+
+    await expect(
+      page.getByRole('list', { name: /Results for/ }).getByRole('listitem').first(),
+    ).toContainText('EXMP-ADR-001');
+  });
+});

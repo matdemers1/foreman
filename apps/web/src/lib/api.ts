@@ -396,6 +396,14 @@ export interface TermRow {
   scope: 'project' | 'ecosystem';
 }
 
+export interface SearchHit {
+  type: string;
+  humanId: string | null;
+  projectCode: string | null;
+  title: string;
+  snippet: string | null;
+}
+
 interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -453,6 +461,12 @@ export const foreman = {
   risks: (code: string) => api.get<Page<RiskRow>>(`/api/projects/${code}/risks`),
   decisions: (code: string) => api.get<Page<DecisionRow>>(`/api/projects/${code}/decisions`),
   glossary: (code: string) => api.get<Page<TermRow>>(`/api/projects/${code}/glossary`),
+  search: (q: string, types: string[], project: string | null) => {
+    const query = new URLSearchParams({ q, limit: '50' });
+    if (types.length > 0) query.set('types', types.join(','));
+    if (project !== null) query.set('project', project);
+    return api.get<Page<SearchHit>>(`/api/search?${query.toString()}`);
+  },
   brief: (code: string) => api.get<Brief>(`/api/brief/${code}`),
   entity: (humanId: string) => api.get<EntityResult>(`/api/entities/${humanId}`),
 };
