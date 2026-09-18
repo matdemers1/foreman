@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Badge,
   Card,
@@ -8,12 +9,15 @@ import {
   Link,
   Page,
   PageHeader,
+  SegmentedControl,
   Skeleton,
   Table,
   type TableColumn,
 } from '@d3cloud/ui';
 import { foreman, type TaskRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { PhaseBoard } from './PhaseBoard';
+import { StatusControl } from './StatusControl';
 
 /**
  * S-11 — one phase, and its tasks.
@@ -23,17 +27,10 @@ import { useAsync } from '../lib/useAsync';
  * how that happens again.
  */
 
-const STATUS_TONE: Record<string, 'neutral' | 'attention' | 'danger'> = {
-  todo: 'neutral',
-  in_progress: 'attention',
-  blocked: 'danger',
-  done: 'neutral',
-  cancelled: 'neutral',
-};
-
 export function PhaseDetail({ code, phaseHumanId }: { code: string; phaseHumanId: string }) {
   const phases = useAsync(() => foreman.phases(code), [code]);
   const tasks = useAsync(() => foreman.tasks(code, phaseHumanId), [code, phaseHumanId]);
+  const [view, setView] = useState<'list' | 'board'>('list');
 
   const phase =
     phases.state.status === 'ready'
@@ -71,8 +68,9 @@ export function PhaseDetail({ code, phaseHumanId }: { code: string; phaseHumanId
       key: 'status',
       header: 'Status',
       sortable: true,
-      width: '8rem',
-      cell: (row) => <Badge tone={STATUS_TONE[row.status] ?? 'neutral'}>{row.status}</Badge>,
+      width: '11rem',
+      // A control, not a badge: status is changeable from every screen that shows it.
+      cell: (row) => <StatusControl task={row} code={code} onChanged={tasks.reload} />,
     },
     { key: 'size', header: 'Size', width: '5rem', cell: (row) => row.size ?? '—' },
     {
@@ -113,7 +111,19 @@ export function PhaseDetail({ code, phaseHumanId }: { code: string; phaseHumanId
         description={phase?.objective ?? undefined}
         actions={
           phase === undefined ? undefined : (
-            <Badge tone={phase.status === 'active' ? 'attention' : 'neutral'}>{phase.status}</Badge>
+            <>
+              <SegmentedControl
+                items={[
+                  { value: 'list', label: 'List' },
+                  { value: 'board', label: 'Board' },
+                ]}
+                value={view}
+                onValueChange={(next) => { setView(next === 'board' ? 'board' : 'list'); }}
+                size="sm"
+                aria-label="How to show the tasks"
+              />
+              <Badge tone={phase.status === 'active' ? 'attention' : 'neutral'}>{phase.status}</Badge>
+            </>
           )
         }
       />
@@ -133,6 +143,8 @@ export function PhaseDetail({ code, phaseHumanId }: { code: string; phaseHumanId
         <EmptyState kind="error" heading="The tasks did not load">
           {tasks.state.message}
         </EmptyState>
+      ) : view === 'board' ? (
+        <PhaseBoard tasks={tasks.state.value.items} code={code} onChanged={tasks.reload} />
       ) : (
         <Table
           caption={`Tasks in ${phaseHumanId}`}

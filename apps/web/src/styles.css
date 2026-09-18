@@ -7,3 +7,27 @@
   font-size: var(--text-13);
   line-height: var(--leading-13);
 }
+
+/* The board: one column per status. It scrolls sideways below `md` rather than stacking, because
+   stacked columns are a list with extra headings — and the list view already exists. */
+.fm-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(16rem, 1fr);
+  gap: var(--space-16);
+  overflow-x: auto;
+  align-items: start;
+}
+.fm-board__heading {
+  margin: 0 0 var(--space-8);
+  font-size: var(--text-13);
+  line-height: var(--leading-13);
+  font-weight: var(--weight-medium);
+  color: var(--color-fg-muted);
+}
+.fm-error {
+  margin-top: var(--space-4);
+  font-size: var(--text-13);
+  line-height: var(--leading-13);
+  color: var(--color-danger);
+}
