@@ -12,6 +12,7 @@ import {
 import type { Db } from '../db.js';
 import { record, type Actor } from './audit.js';
 import { Conflict, Invalid, NotFound } from './errors.js';
+import { exitGate, GateRefused } from './coverage.js';
 import { allocate, phaseHumanId, taskHumanId } from './humanId.js';
 
 /**
@@ -139,6 +140,13 @@ export async function createPhase(db: Db, actor: Actor, code: string, input: Pha
 export async function updatePhase(db: Db, actor: Actor, humanId: string, input: PhaseUpdate) {
   const before = await db.phase.findFirst({ where: { humanId, deletedAt: null } });
   if (before === null) throw new NotFound(humanId);
+
+  // Completing a phase runs its exit gate (FRM-REQ-037, FRM-REQ-056). A phase that closes over an
+  // uncovered Must is a phase whose "done" means nothing, and the refusal names every reason.
+  if (input.status === 'complete' && before.status !== 'complete') {
+    const gate = await exitGate(db, humanId);
+    if (!gate.passed) throw new GateRefused(gate);
+  }
 
   // The number is part of the human ID, and the ID is immutable (ADR-008). Renumbering a phase
   // would leave `BND-P-8.5` naming a phase that is no longer 8.5.

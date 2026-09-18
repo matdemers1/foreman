@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Actor } from '../domain/audit.js';
 import { Conflict, Invalid, NotFound } from '../domain/errors.js';
 import { ImmutableHumanIdError } from '../domain/humanId.js';
+import { GateRefused } from '../domain/coverage.js';
 import { StaleWrite } from './concurrency.js';
 
 /**
@@ -53,6 +54,12 @@ function respondToError(error: unknown, res: Response, next: NextFunction): void
     // lost to without a second request.
     res.setHeader('ETag', error.currentEtag);
     res.status(412).json({ error: error.message, current: error.current });
+    return;
+  }
+  if (error instanceof GateRefused) {
+    // 409 with every failure listed. "The exit gate failed" sends somebody looking; naming the
+    // three Musts with no task tells them what to do (FRM-REQ-056).
+    res.status(409).json({ error: error.message, gate: error.result });
     return;
   }
   if (error instanceof Conflict) {
