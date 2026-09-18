@@ -1,0 +1,129 @@
+name: CI
+
+# A gated pipeline, cheapest first: lint → unit → integration → e2e (FRM-REQ-008). Every job needs
+# the one before it, so a type error never spends three minutes waiting for a database, and a
+# broken migration is found before anything renders.
+#
+# Every action is pinned to a commit SHA, never a tag (FRM-REQ-009): a tag is a mutable pointer, and
+# an action that moves under you is a supply-chain compromise with your own credentials.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  unit:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      # The console has to build before anything downstream can serve it.
+      - run: pnpm --filter foreman-web build
+
+  integration:
+    needs: unit
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: foreman
+          POSTGRES_PASSWORD: foreman
+          POSTGRES_DB: foreman
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U foreman -d foreman"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      # The suite refuses outright to run against a database whose name does not end in _test,
+      # and creates and migrates this one itself.
+      DATABASE_URL: postgresql://foreman:foreman@127.0.0.1:5432/foreman_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Migration drift check — schema.prisma and migrations/ must agree
+        working-directory: apps/server
+        env:
+          SHADOW_DATABASE_URL: postgresql://foreman:foreman@127.0.0.1:5432/shadow
+        run: |
+          PGPASSWORD=foreman psql -h 127.0.0.1 -U foreman -d foreman -c 'CREATE DATABASE shadow;'
+          pnpm exec prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema prisma/schema.prisma \
+            --exit-code
+      - run: pnpm --filter foreman-server test:integration
+
+  # Compose is what actually runs on the host, so the images are built the way they will be built
+  # there — and the boot order that matters (dump, then migrate) is asserted against a real one.
+  compose:
+    needs: integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - name: No host ports anywhere in the base compose file (FRM-REQ-004)
+        run: |
+          if docker compose config | grep -q 'ports:'; then
+            echo 'the base compose file publishes a port; ingress is the tunnel only' >&2
+            exit 1
+          fi
+      - name: Build the images
+        run: |
+          docker compose build server worker
+      - name: Boot on an empty database, and prove the dump precedes the migration
+        env:
+          POSTGRES_PASSWORD: ci-postgres-password
+        run: |
+          node scripts/dev-env.mjs
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait postgres server
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml logs server > server.log
+          # FRM-REQ-007: the dump's path is logged, and it is logged *before* the migration runs.
+          grep -q 'pre-migration dump written' server.log
+          awk '/pre-migration dump written/ { dumped = NR }
+               /migrations applied/ { applied = NR }
+               END { if (!(dumped && applied && dumped < applied)) exit 1 }' server.log
+      - name: The seed exercises every entity, and runs twice
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+            exec -T server node dist/cli/seed-example.js
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+            exec -T server node dist/cli/seed-example.js
+      - name: Always show the logs when something failed
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml logs
+      - name: Stop
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
