@@ -1,0 +1,11 @@
+# Host-only overlay: adds the Cloudflare Tunnel. Never used in development.
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel.yml up -d
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN}
+    depends_on:
+      - server
