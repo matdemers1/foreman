@@ -108,7 +108,9 @@ describe.skipIf(url === undefined)('the importer', () => {
       expect(await db.requirement.count({ where: { humanId: { startsWith: 'BND-' } } })).toBe(
         afterFirst.requirements,
       );
-    });
+    }, 30_000); // Two full imports of the real corpus — the heaviest test here, and over the 5s
+    // default on a CI runner even though it is ~1.6s locally.
+
 
     it('imports the real register with its IDs intact', async () => {
       await runImport(db, { path: FIXTURES, dryRun: false });

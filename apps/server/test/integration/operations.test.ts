@@ -27,11 +27,34 @@ const url = process.env['DATABASE_URL'];
  * The drill itself is performed against the running container:
  * `docker compose exec server node dist/cli/run-job.js restore-drill`.
  */
-function hasPgTools(): boolean {
-  const result = spawnSync('pg_dump', ['--version'], { stdio: 'ignore' });
-  return result.error === undefined && result.status === 0;
+/**
+ * Present *and* the right major version — the two are not the same thing.
+ *
+ * `pg_dump` 18 against a PostgreSQL 16 server produces a dump that begins `SET transaction_timeout
+ * = 0;`, a setting that did not exist before 17. Restoring it with `ON_ERROR_STOP=1` fails on the
+ * fourth line, so a mismatched client yields dumps that cannot be restored — the precise failure
+ * ADR-007 exists to prevent. Both images pin `postgresql-client-${POSTGRES_MAJOR}` and assert the
+ * version at build time, so this can only bite a developer whose host tools have moved ahead.
+ * Skipping with a reason beats failing with a psql error that names none of this.
+ */
+function pgToolsMatchServer(): boolean {
+  const dump = spawnSync('pg_dump', ['--version'], { encoding: 'utf8' });
+  if (dump.error !== undefined || dump.status !== 0) return false;
+
+  const client = / (\d+)\./.exec(dump.stdout)?.[1];
+  const server = spawnSync('psql', [url ?? '', '-tAc', 'show server_version'], { encoding: 'utf8' });
+  if (server.status !== 0) return false;
+
+  const major = /^(\d+)\./.exec(server.stdout.trim())?.[1];
+  if (client !== undefined && major !== undefined && client !== major) {
+    console.warn(
+      `operations: skipping the dump and drill tests — pg_dump is ${client}, the server is ${major}.`,
+    );
+    return false;
+  }
+  return client !== undefined && client === major;
 }
-const PG = hasPgTools();
+const PG = pgToolsMatchServer();
 
 describe.skipIf(url === undefined)('operations', () => {
   let db: Db;
@@ -125,8 +148,18 @@ describe.skipIf(url === undefined)('operations', () => {
   });
 
   describe('health (T-7.4, FRM-REQ-142)', () => {
-    it.skipIf(!PG)('reports all six signals', async () => {
-      const report = await health(db, { backupDir });
+    it('reports all six signals', async () => {
+      // Built here rather than inherited from the dump tests above. Those only run where pg_dump
+      // exists, and the drill test between them deletes every restore-drill job — so reading their
+      // residue made this pass on a laptop without Postgres tools and fail in CI, which is the
+      // wrong way round for a test of the health endpoint.
+      const dir = await mkdtemp(join(tmpdir(), 'foreman-health-'));
+      await writeFile(join(dir, 'foreman-2026-09-18T03-00-00.sql.gz'), 'not really a dump');
+      await db.job.create({
+        data: { kind: 'restore-drill', status: 'succeeded', payload: {} },
+      });
+
+      const report = await health(db, { backupDir: dir });
 
       expect(report.queue).toHaveProperty('queued');
       expect(report).toHaveProperty('stageFailures');
@@ -134,6 +167,8 @@ describe.skipIf(url === undefined)('operations', () => {
       expect(report).toHaveProperty('lastReconcile');
       expect(report.lastBackup).not.toBeNull();
       expect(report.lastRestoreDrill).not.toBeNull();
+
+      await rm(dir, { recursive: true, force: true });
     });
 
     it('says a never-drilled backup is a problem, in words', async () => {
