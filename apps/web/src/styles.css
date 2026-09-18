@@ -39,3 +39,79 @@
   flex-wrap: wrap;
   gap: var(--space-16);
 }
+
+/* Rendered markdown. The library styles components, not prose, so the handful of element rules a
+   document needs live here — and only the ones a document actually uses. */
+.fm-markdown > :first-child {
+  margin-top: 0;
+}
+.fm-markdown > :last-child {
+  margin-bottom: 0;
+}
+.fm-markdown h2,
+.fm-markdown h3 {
+  margin: var(--space-24) 0 var(--space-8);
+  font-size: var(--text-16);
+  line-height: var(--leading-16);
+  font-weight: var(--weight-medium);
+}
+.fm-markdown p,
+.fm-markdown ul,
+.fm-markdown ol {
+  margin: 0 0 var(--space-12);
+}
+.fm-markdown li {
+  margin-bottom: var(--space-4);
+}
+.fm-markdown code {
+  font-family: var(--font-mono);
+  font-size: var(--text-13);
+}
+.fm-markdown pre {
+  padding: var(--space-12);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  overflow-x: auto;
+}
+.fm-markdown blockquote {
+  margin: 0 0 var(--space-12);
+  padding-left: var(--space-12);
+  border-left: var(--border-width) solid var(--color-border);
+  color: var(--color-fg-muted);
+}
+.fm-markdown table {
+  border-collapse: collapse;
+  margin-bottom: var(--space-12);
+}
+.fm-markdown th,
+.fm-markdown td {
+  padding: var(--space-4) var(--space-8);
+  border: var(--border-width) solid var(--color-border);
+  text-align: left;
+}
+/* A diagram that would not parse shows its source and the parser's complaint. Blank space where a
+   diagram should be is the failure that gets shipped. */
+.fm-mermaid-error {
+  color: var(--color-danger);
+  white-space: pre-wrap;
+}
+
+/* A diff, and the two colours it needs. Added and removed also carry a leading + or -, so the
+   distinction survives being read by someone who cannot tell the two hues apart. */
+.fm-diff {
+  margin: var(--space-8) 0 0;
+  padding: var(--space-12);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  font-family: var(--font-mono);
+  font-size: var(--text-13);
+  line-height: var(--leading-13);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+.fm-diff__added {
+  color: var(--color-success);
+}
+.fm-diff__removed {
+  color: var(--color-danger);
+}

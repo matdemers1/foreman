@@ -245,10 +245,51 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
     ],
   });
 
-  // Documents: several kinds, with addressable sections and a revision.
-  for (const [index, kind] of (
-    ['architecture', 'data_model', 'ux_flows', 'phase_plan', 'research'] as const
-  ).entries()) {
+  // Documents: several kinds, with addressable sections, a Mermaid diagram and a real revision.
+  const SECTIONS: Record<string, { key: string; heading: string; bodyMd: string }[]> = {
+    architecture: [
+      {
+        key: 'summary',
+        heading: 'Summary',
+        bodyMd: `What this document is for, citing ${CODE}-REQ-001 — which makes this section a backlink on that requirement.`,
+      },
+      {
+        key: 'deployment',
+        heading: 'Deployment',
+        bodyMd: [
+          'The section an MCP resource URI resolves to, on its own.',
+          '',
+          '```mermaid',
+          'graph TB',
+          '  tunnel[Cloudflare Tunnel] --> server[Foreman server]',
+          '  server --> db[(PostgreSQL 16)]',
+          '  server --> worker[Job worker]',
+          '  worker --> db',
+          '```',
+          '',
+          'No host ports: the tunnel is the only way in.',
+        ].join('\n'),
+      },
+    ],
+  };
+
+  const DEFAULT_SECTIONS = [
+    { key: 'summary', heading: 'Summary', bodyMd: `What this document is for, citing ${CODE}-REQ-001.` },
+    {
+      key: 'deployment',
+      heading: 'Deployment',
+      bodyMd: 'The section an MCP resource URI resolves to, on its own.',
+    },
+  ];
+
+  for (const kind of [
+    'architecture',
+    'data_model',
+    'ux_flows',
+    'phase_plan',
+    'research',
+  ] as const) {
+    const sections = SECTIONS[kind] ?? DEFAULT_SECTIONS;
     const document = await db.document.create({
       data: {
         projectId: project.id,
@@ -257,36 +298,27 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
         ...(kind === 'phase_plan' ? { phaseId: p1.id } : {}),
         sourcePath: `D3 Cloud Vault/Example Project/${kind}.md`,
         sections: {
-          create: [
-            {
-              key: 'summary',
-              heading: 'Summary',
-              bodyMd: `What this document is for, citing ${CODE}-REQ-001.`,
-              sortOrder: 0,
-            },
-            {
-              key: 'deployment',
-              heading: 'Deployment',
-              bodyMd: 'The section an MCP resource URI resolves to, on its own.',
-              sortOrder: 1,
-            },
-          ],
+          create: sections.map((section, order) => ({ ...section, sortOrder: order })),
         },
       },
     });
 
-    if (index === 0) {
-      await db.documentRevision.create({
-        data: {
-          documentId: document.id,
-          revisionNo: 1,
-          snapshot: { title: document.title, sections: ['summary', 'deployment'] },
-          actor: 'seed',
-          actorKind: 'importer',
-          note: 'As imported.',
+    // The snapshot is the document as it stood — the shape a diff reads. An ad-hoc one makes the
+    // history unreadable from that revision backwards.
+    await db.documentRevision.create({
+      data: {
+        documentId: document.id,
+        revisionNo: 1,
+        snapshot: {
+          title: document.title,
+          kind: document.kind,
+          sections: sections.map((section, order) => ({ ...section, sortOrder: order })),
         },
-      });
-    }
+        actor: 'seed',
+        actorKind: 'importer',
+        note: 'As imported.',
+      },
+    });
   }
 
   // Audits and findings: every kind, every severity, every status.

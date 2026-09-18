@@ -37,6 +37,7 @@ import {
   updateAdr,
   updateDecision,
   updateRisk,
+  termOccurrences,
   updateTerm,
 } from '../domain/record.js';
 import { findProject } from '../domain/projects.js';
@@ -202,6 +203,8 @@ export function recordRoutes(db: Db): Router {
         ...section,
         document: { id: document.id, title: document.title, kind: document.kind },
         markdown: renderSection(section),
+        // The glossary terms this section uses, so a reader need not go and look them up.
+        terms: await termOccurrences(db, param(req, 'code'), section.bodyMd),
       });
     }),
   );

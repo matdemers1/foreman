@@ -1,0 +1,114 @@
+import {
+  Alert,
+  Badge,
+  EmptyState,
+  Link,
+  Page,
+  PageHeader,
+  Skeleton,
+  Table,
+  type TableColumn,
+} from '@d3cloud/ui';
+import { foreman, type RiskRow } from '../lib/api';
+import { useAsync } from '../lib/useAsync';
+
+/**
+ * The Risk Register, generated (T-4.12, FRM-REQ-073, ADR-006).
+ *
+ * The column that earns the screen is **Tripwire**: a risk without a named condition is a worry,
+ * and a worry is something you re-read and feel bad about rather than something that ever fires.
+ */
+
+const LEVEL_TONE: Record<string, 'danger' | 'attention' | 'neutral'> = {
+  high: 'danger',
+  medium: 'attention',
+  low: 'neutral',
+};
+
+export function RiskRegister({ code }: { code: string }) {
+  const { state } = useAsync(() => foreman.risks(code), [code]);
+
+  const columns: TableColumn<RiskRow>[] = [
+    { key: 'humanId', header: 'ID', width: '7rem', cell: (row) => row.humanId },
+    { key: 'title', header: 'Risk', cell: (row) => row.title },
+    {
+      key: 'likelihood',
+      header: 'Likelihood',
+      width: '7rem',
+      cell: (row) => <Badge tone={LEVEL_TONE[row.likelihood] ?? 'neutral'}>{row.likelihood}</Badge>,
+    },
+    {
+      key: 'impact',
+      header: 'Impact',
+      width: '6rem',
+      cell: (row) => <Badge tone={LEVEL_TONE[row.impact] ?? 'neutral'}>{row.impact}</Badge>,
+    },
+    {
+      key: 'tripwire',
+      header: 'Tripwire',
+      cell: (row) =>
+        row.tripwire === null || row.tripwire.trim() === '' ? (
+          <span className="fm-muted">none named — this is a worry, not a risk</span>
+        ) : (
+          row.tripwire
+        ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: '7rem',
+      cell: (row) =>
+        row.status === 'fired' ? (
+          <Badge tone="danger">
+            fired{row.firedAt === null ? '' : ` ${row.firedAt.slice(0, 10)}`}
+          </Badge>
+        ) : (
+          <Badge tone="neutral">{row.status}</Badge>
+        ),
+    },
+  ];
+
+  const fired =
+    state.status === 'ready' ? state.value.items.filter((r) => r.status === 'fired') : [];
+
+  return (
+    <Page>
+      <PageHeader
+        title="Risk register"
+        description={`Generated for ${code}. Each risk with the condition that forces a re-plan.`}
+        back={<Link href={`/projects/${code}`}>{code}</Link>}
+      />
+
+      {fired.length === 0 ? null : (
+        <Alert
+          tone="danger"
+          title={`${String(fired.length)} tripwire${fired.length === 1 ? '' : 's'} has fired`}
+        >
+          {fired.map((r) => `${r.humanId} — ${r.title}`).join('; ')}
+        </Alert>
+      )}
+
+      {state.status === 'loading' ? (
+        <Skeleton lines={8} />
+      ) : state.status === 'error' ? (
+        <EmptyState kind="error" heading="The risks did not load">
+          {state.message}
+        </EmptyState>
+      ) : (
+        <Table
+          caption={`Risk register for ${code}`}
+          captionHidden
+          density="compact"
+          columns={columns}
+          rows={state.value.items}
+          rowKey={(row) => row.humanId}
+          empty={
+            <EmptyState kind="empty" size="inline" heading="No risks recorded">
+              A project with no recorded risks has either none or no register.
+            </EmptyState>
+          }
+        />
+      )}
+    </Page>
+  );
+}

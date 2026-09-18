@@ -76,6 +76,11 @@ export interface Route {
     | 'requirement'
     | 'scope-of-work'
     | 'register'
+    | 'documents'
+    | 'document'
+    | 'adrs'
+    | 'risks'
+    | 'glossary'
     | 'task'
     | 'not-found';
   readonly code?: string;
@@ -102,6 +107,14 @@ export function routeFor(path: string): Route {
       return { screen: 'scope-of-work', code };
     }
     if (parts[2] === 'register' && parts[3] === undefined) return { screen: 'register', code };
+    if (parts[2] === 'risks' && parts[3] === undefined) return { screen: 'risks', code };
+    if (parts[2] === 'glossary' && parts[3] === undefined) return { screen: 'glossary', code };
+    if (parts[2] === 'adrs' && parts[3] === undefined) return { screen: 'adrs', code };
+    if (parts[2] === 'documents') {
+      return parts[3] === undefined
+        ? { screen: 'documents', code }
+        : { screen: 'document', code, humanId: parts[3] };
+    }
   }
 
   if (parts[0] === 'tasks' && parts[1] !== undefined) {

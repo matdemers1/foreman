@@ -380,9 +380,29 @@ async function revision(db: Db, documentId: string, revisionNo: number) {
     where: { documentId_revisionNo: { documentId, revisionNo } },
   });
   if (row === null) throw new NotFound(`revision ${String(revisionNo)} of document ${documentId}`);
-  return row.snapshot as unknown as {
-    title: string;
-    sections: { key: string; heading: string; bodyMd: string }[];
+
+  // A snapshot is JSON written by an earlier version of this code, or by the importer. Read
+  // defensively: a diff that throws on a malformed old revision makes the history unreadable from
+  // that point backwards, which is the opposite of what keeping revisions is for.
+  const snapshot = row.snapshot as unknown;
+  const sections =
+    typeof snapshot === 'object' && snapshot !== null && Array.isArray((snapshot as { sections?: unknown }).sections)
+      ? ((snapshot as { sections: unknown[] }).sections
+          .filter((s): s is Record<string, unknown> => typeof s === 'object' && s !== null)
+          .map((s) => ({
+            key: typeof s['key'] === 'string' ? s['key'] : '',
+            heading: typeof s['heading'] === 'string' ? s['heading'] : '',
+            bodyMd: typeof s['bodyMd'] === 'string' ? s['bodyMd'] : '',
+          }))
+          .filter((s) => s.key !== ''))
+      : [];
+
+  return {
+    title:
+      typeof snapshot === 'object' && snapshot !== null && typeof (snapshot as { title?: unknown }).title === 'string'
+        ? (snapshot as { title: string }).title
+        : '',
+    sections,
   };
 }
 

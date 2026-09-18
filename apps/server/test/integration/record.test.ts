@@ -500,6 +500,71 @@ describe.skipIf(url === undefined)('the record', () => {
     });
   });
 
+  describe('term occurrences (T-4.8, FRM-REQ-072)', () => {
+    it('resolves a term used in a section to its definition', async () => {
+      await post(`/projects/${CODE}/terms`, {
+        term: 'tripwire',
+        definition: 'The named condition that forces a re-plan.',
+      });
+      await makeDocument([
+        { heading: 'Deployment', bodyMd: 'Each risk carries a tripwire that says when to re-plan.' },
+      ]);
+
+      const section = await get<{ terms: { term: string; definition: string; count: number }[] }>(
+        `/projects/${CODE}/documents/at/architecture/sections/deployment`,
+      );
+      expect(section.terms).toHaveLength(1);
+      expect(section.terms[0]?.definition).toContain('forces a re-plan');
+    });
+
+    it('matches an alias, and reports the term once', async () => {
+      await post(`/projects/${CODE}/terms`, {
+        term: 'human ID',
+        definition: 'A project-prefixed identifier.',
+        aliases: ['humanId', 'human id'],
+      });
+      await makeDocument([
+        { heading: 'Deployment', bodyMd: 'Every humanId is immutable. A humanId embeds its code.' },
+      ]);
+
+      const section = await get<{ terms: { term: string; matched: string; count: number }[] }>(
+        `/projects/${CODE}/documents/at/architecture/sections/deployment`,
+      );
+      // One entry for the term, not one per alias: the reader wants the definition once.
+      expect(section.terms).toHaveLength(1);
+      expect(section.terms[0]?.term).toBe('human ID');
+      expect(section.terms[0]?.matched).toBe('humanId');
+      expect(section.terms[0]?.count).toBe(2);
+    });
+
+    it('does not resolve a term inside a code span', async () => {
+      await post(`/projects/${CODE}/terms`, { term: 'term', definition: 'A glossary entry.' });
+      await makeDocument([
+        { heading: 'Deployment', bodyMd: 'The `term` column holds it.' },
+      ]);
+
+      const section = await get<{ terms: unknown[] }>(
+        `/projects/${CODE}/documents/at/architecture/sections/deployment`,
+      );
+      // In backticks it is an identifier, not the glossary entry.
+      expect(section.terms).toHaveLength(0);
+    });
+
+    it('leaves the stored markdown exactly as written', async () => {
+      await post(`/projects/${CODE}/terms`, { term: 'tripwire', definition: 'A named condition.' });
+      const body = 'Each risk carries a tripwire.';
+      await makeDocument([{ heading: 'Deployment', bodyMd: body }]);
+
+      const section = await get<{ bodyMd: string }>(
+        `/projects/${CODE}/documents/at/architecture/sections/deployment`,
+      );
+      // Occurrences are a list beside the prose, never links injected into it: rewriting would
+      // make the stored text and the rendered text differ, and the next edit is made against
+      // whichever one the author was looking at.
+      expect(section.bodyMd).toBe(body);
+    });
+  });
+
   describe('decisions, risks and the glossary (T-4.6)', () => {
     it('stores a decision with its rationale', async () => {
       const res = await post(`/projects/${CODE}/decisions`, {

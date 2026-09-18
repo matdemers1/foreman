@@ -100,6 +100,10 @@ export function ProjectOverview({ code }: { code: string }) {
         <Link href={`/projects/${code}/requirements`}>Requirements</Link>
         <Link href={`/projects/${code}/scope-of-work`}>Scope of work</Link>
         <Link href={`/projects/${code}/register`}>Register</Link>
+        <Link href={`/projects/${code}/documents`}>Documents</Link>
+        <Link href={`/projects/${code}/adrs`}>Decisions</Link>
+        <Link href={`/projects/${code}/risks`}>Risks</Link>
+        <Link href={`/projects/${code}/glossary`}>Glossary</Link>
       </nav>
 
       <Grid minItemWidth="md">

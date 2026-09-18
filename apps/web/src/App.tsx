@@ -20,7 +20,12 @@ import { PhaseDetail } from './screens/PhaseDetail';
 import { Phases } from './screens/Phases';
 import { Portfolio } from './screens/Portfolio';
 import { ProjectOverview } from './screens/ProjectOverview';
+import { Adrs } from './screens/Adrs';
+import { DocumentEditor } from './screens/DocumentEditor';
+import { Documents } from './screens/Documents';
+import { Glossary } from './screens/Glossary';
 import { RequirementDetail } from './screens/RequirementDetail';
+import { RiskRegister } from './screens/RiskRegister';
 import { Requirements } from './screens/Requirements';
 import { RegisterView } from './screens/RegisterView';
 import { ScopeOfWorkView } from './screens/ScopeOfWorkView';
@@ -151,6 +156,16 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <ScopeOfWorkView code={route.code ?? ''} />;
     case 'register':
       return <RegisterView code={route.code ?? ''} />;
+    case 'documents':
+      return <Documents code={route.code ?? ''} />;
+    case 'document':
+      return <DocumentEditor code={route.code ?? ''} id={route.humanId ?? ''} />;
+    case 'adrs':
+      return <Adrs code={route.code ?? ''} />;
+    case 'risks':
+      return <RiskRegister code={route.code ?? ''} />;
+    case 'glossary':
+      return <Glossary code={route.code ?? ''} />;
     case 'task':
       return <TaskDetail humanId={route.humanId ?? ''} />;
     case 'not-found':

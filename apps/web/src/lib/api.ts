@@ -16,6 +16,31 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * A read that keeps the version with the body.
+ *
+ * `If-Match` is how a concurrent edit becomes visible instead of silently winning (FRM-REQ-146),
+ * and the version is only in the response header — so any screen that intends to write back has to
+ * take it at read time or it has nothing to send.
+ *
+ * Deliberately not generic: the one caller knows what it is reading, and a type parameter used
+ * only in the return position is an unchecked cast wearing a signature.
+ */
+async function requestWithEtag(path: string): Promise<{ body: unknown; etag: string | null }> {
+  const res = await fetch(path, { credentials: 'same-origin' });
+  const text = await res.text();
+  const body: unknown = text.length > 0 ? JSON.parse(text) : undefined;
+
+  if (!res.ok) {
+    const message =
+      typeof body === 'object' && body !== null && 'error' in body
+        ? String(body.error)
+        : `request failed with ${String(res.status)}`;
+    throw new ApiError(res.status, message, body);
+  }
+  return { body, etag: res.headers.get('etag') };
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   // Headers may legally be an array of pairs, which does not spread into an object — it spreads
   // into indices, and the header silently disappears.
@@ -49,6 +74,13 @@ export const api = {
   get: <T>(path: string) => request<T>(path),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+  getWithEtag: (path: string) => requestWithEtag(path),
+  put: <T>(path: string, body: unknown, etag?: string | null) =>
+    request<T>(path, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      ...(etag === undefined || etag === null ? {} : { headers: { 'if-match': etag } }),
+    }),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, {
       method: 'POST',
@@ -266,6 +298,104 @@ export interface GateResult {
   failures: { kind: string; humanId: string; detail: string }[];
 }
 
+export interface DocumentSection {
+  id: string;
+  key: string;
+  heading: string;
+  bodyMd: string;
+  sortOrder: number;
+  updatedAt: string;
+}
+
+export interface DocumentDetail {
+  id: string;
+  kind: string;
+  title: string;
+  sourcePath: string | null;
+  phase: { humanId: string; name: string } | null;
+  sections: DocumentSection[];
+  updatedAt: string;
+}
+
+export interface DocumentRow {
+  id: string;
+  kind: string;
+  title: string;
+  phase: { humanId: string; name: string } | null;
+  sections: { key: string; heading: string; sortOrder: number }[];
+  updatedAt: string;
+}
+
+export interface Revision {
+  revisionNo: number;
+  actor: string;
+  actorKind: string;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface DiffResult {
+  from: number;
+  to: number;
+  sections: {
+    key: string;
+    heading: string;
+    status: 'added' | 'removed' | 'changed' | 'unchanged';
+    lines: { kind: 'added' | 'removed' | 'same'; text: string }[];
+  }[];
+}
+
+export interface AdrRow {
+  id: string;
+  humanId: string;
+  number: number;
+  title: string;
+  status: string;
+  decisionAbstract: string | null;
+  contextMd: string | null;
+  decisionMd: string | null;
+  consequencesMd: string | null;
+  rejectedMd: string | null;
+  decidedOn: string | null;
+  relations: { kind: string; relatedAdr: { humanId: string; title: string } }[];
+}
+
+export interface AdrGraph {
+  nodes: { humanId: string; title: string; status: string }[];
+  edges: { from: string; to: string; kind: string }[];
+  cycle: string[] | null;
+}
+
+export interface RiskRow {
+  id: string;
+  humanId: string;
+  title: string;
+  likelihood: string;
+  impact: string;
+  mitigation: string | null;
+  tripwire: string | null;
+  status: string;
+  firedAt: string | null;
+  phase: { humanId: string; name: string } | null;
+}
+
+export interface DecisionRow {
+  id: string;
+  humanId: string;
+  statement: string;
+  value: string;
+  rationale: string | null;
+  lockedAt: string | null;
+}
+
+export interface TermRow {
+  id: string;
+  term: string;
+  definition: string;
+  aliases: string[];
+  scope: 'project' | 'ecosystem';
+}
+
 interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -294,6 +424,35 @@ export const foreman = {
   scopeOfWork: (code: string) => api.get<ScopeOfWork>(`/api/projects/${code}/scope-of-work`),
   gate: (code: string, phaseHumanId: string) =>
     api.get<GateResult>(`/api/projects/${code}/phases/${phaseHumanId}/gate`),
+  documents: (code: string) => api.get<Page<DocumentRow>>(`/api/projects/${code}/documents`),
+  /** Read with the version, because this screen writes back to it. */
+  document: async (code: string, id: string) => {
+    const { body, etag } = await api.getWithEtag(`/api/projects/${code}/documents/${id}`);
+    return { body: body as DocumentDetail, etag };
+  },
+  saveSection: (
+    code: string,
+    id: string,
+    key: string,
+    body: { bodyMd: string; heading?: string; note?: string },
+    etag: string | null,
+  ) =>
+    api.put<DocumentSection>(
+      `/api/projects/${code}/documents/${id}/sections/${key}`,
+      body,
+      etag,
+    ),
+  revisions: (code: string, id: string) =>
+    api.get<Page<Revision>>(`/api/projects/${code}/documents/${id}/revisions`),
+  diff: (code: string, id: string, from: number, to: number) =>
+    api.get<DiffResult>(
+      `/api/projects/${code}/documents/${id}/diff?from=${String(from)}&to=${String(to)}`,
+    ),
+  adrs: (code: string) => api.get<Page<AdrRow>>(`/api/projects/${code}/adrs`),
+  adrGraph: (code: string) => api.get<AdrGraph>(`/api/projects/${code}/adrs-graph`),
+  risks: (code: string) => api.get<Page<RiskRow>>(`/api/projects/${code}/risks`),
+  decisions: (code: string) => api.get<Page<DecisionRow>>(`/api/projects/${code}/decisions`),
+  glossary: (code: string) => api.get<Page<TermRow>>(`/api/projects/${code}/glossary`),
   brief: (code: string) => api.get<Brief>(`/api/brief/${code}`),
   entity: (humanId: string) => api.get<EntityResult>(`/api/entities/${humanId}`),
 };

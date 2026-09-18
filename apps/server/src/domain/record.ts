@@ -443,3 +443,55 @@ export async function glossaryFor(db: Db, code: string) {
 
   return [...byName.values()].sort((a, b) => a.term.localeCompare(b.term));
 }
+
+/**
+ * Where a glossary term appears in a body of prose (T-4.8, FRM-REQ-072).
+ *
+ * A term is matched on a word boundary, case-insensitively, and by its aliases as well — "human ID"
+ * and "humanId" are the same word to a reader and should be the same word here. Code spans and
+ * fences are skipped: `term` in backticks is an identifier, not the glossary entry.
+ *
+ * Returned as a list rather than as rewritten markdown. Rewriting prose to inject links means the
+ * stored text and the rendered text differ, and the next edit is made against whichever one the
+ * author happened to be looking at.
+ */
+export interface TermOccurrence {
+  readonly term: string;
+  readonly definition: string;
+  readonly scope: 'project' | 'ecosystem';
+  readonly matched: string;
+  readonly count: number;
+}
+
+export async function termOccurrences(
+  db: Db,
+  code: string,
+  markdown: string,
+): Promise<TermOccurrence[]> {
+  const glossary = await glossaryFor(db, code);
+  const prose = markdown
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/~~~[\s\S]*?~~~/g, ' ')
+    .replace(/`[^`\n]*`/g, ' ');
+
+  const found: TermOccurrence[] = [];
+  for (const entry of glossary) {
+    for (const candidate of [entry.term, ...entry.aliases]) {
+      const matches = prose.match(
+        new RegExp(`\\b${candidate.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'),
+      );
+      if (matches !== null && matches.length > 0) {
+        found.push({
+          term: entry.term,
+          definition: entry.definition,
+          scope: entry.scope,
+          matched: candidate,
+          count: matches.length,
+        });
+        // One occurrence record per term, not per alias: the reader wants the definition once.
+        break;
+      }
+    }
+  }
+  return found.sort((a, b) => a.term.localeCompare(b.term));
+}
