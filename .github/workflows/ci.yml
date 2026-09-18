@@ -87,7 +87,8 @@ jobs:
       - run: pnpm --filter foreman-server test:integration
 
   # Compose is what actually runs on the host, so the images are built the way they will be built
-  # there — and the boot order that matters (dump, then migrate) is asserted against a real one.
+  # there — the boot order that matters (dump, then migrate) is asserted against a real one, and
+  # the e2e suite drives the stack rather than a dev server.
   compose:
     needs: integration
     runs-on: ubuntu-latest
@@ -118,9 +119,32 @@ jobs:
       - name: The seed exercises every entity, and runs twice
         run: |
           docker compose -f docker-compose.yml -f docker-compose.dev.yml \
-            exec -T server node dist/cli/seed-example.js
+            exec -T -e OPERATOR_PASSWORD=ci-operator-password server \
+            node dist/cli/seed-example.js
           docker compose -f docker-compose.yml -f docker-compose.dev.yml \
             exec -T server node dist/cli/seed-example.js
+      # e2e last, against the stack that is already running: the exit demo is a property of the
+      # deployed thing, not of a bundle a dev server happens to serve.
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter e2e exec playwright install --with-deps chromium
+      - name: e2e
+        env:
+          FOREMAN_URL: http://127.0.0.1:3200
+          E2E_EMAIL: dev@localhost
+          E2E_PASSWORD: ci-operator-password
+        run: pnpm --filter e2e test
+      - name: Keep the report when e2e failed
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: e2e-report
+          path: e2e/playwright-report
+          retention-days: 7
       - name: Always show the logs when something failed
         if: failure()
         run: docker compose -f docker-compose.yml -f docker-compose.dev.yml logs
