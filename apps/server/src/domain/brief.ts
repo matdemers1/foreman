@@ -1,4 +1,5 @@
 import type { Db } from '../db.js';
+import { driftFor } from './drift.js';
 import { NotFound } from './errors.js';
 
 /**
@@ -72,6 +73,14 @@ export interface Brief {
     readonly unconfirmedAttributions: number;
     /** Risks whose tripwire has fired. */
     readonly firedRisks: number;
+    /**
+     * Everything the drift engine finds, as one number (FRM-REQ-128).
+     *
+     * Read from the same engine the drift screen and the portfolio badge use, so the three can
+     * never disagree — and two of Foreman's own numbers disagreeing is the fastest way for it to
+     * stop being believed.
+     */
+    readonly total: number;
   };
   readonly recentCommits: readonly {
     readonly sha: string;
@@ -216,6 +225,7 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
       uncoveredRequirements: uncovered,
       unconfirmedAttributions: unconfirmed,
       firedRisks,
+      total: (await driftFor(db, project.code)).total,
     },
     recentCommits: commits.map((commit) => ({
       sha: commit.sha.slice(0, 7),

@@ -149,7 +149,7 @@ export interface PortfolioRow {
   openCriticals: number;
   /** `unknown` is a third state, and renders grey rather than green (S-04). */
   ci: { conclusion: string | null; unknown: boolean };
-  drift: { uncoveredRequirements: number; unconfirmedAttributions: number };
+  drift: { uncoveredRequirements: number; unconfirmedAttributions: number; total: number };
   lastActivityAt: string | null;
 }
 
@@ -231,6 +231,7 @@ export interface Brief {
     uncoveredRequirements: number;
     unconfirmedAttributions: number;
     firedRisks: number;
+    total: number;
   };
   recentCommits: { sha: string; message: string; at: string }[];
 }
@@ -551,6 +552,45 @@ export interface RegressionFlag {
   changedBy: { sha: string; message: string; at: string }[];
 }
 
+export interface DriftItem {
+  category: 'coverage-hole' | 'stale-task' | 'fired-tripwire' | 'failed-exit-gate' | 'orphan-adr';
+  humanId: string;
+  title: string;
+  detail: string;
+}
+
+export interface Drift {
+  project: string;
+  total: number;
+  counts: Record<string, number>;
+  items: DriftItem[];
+}
+
+export interface TechRow {
+  name: string;
+  category: string;
+  version: string | null;
+  role: string | null;
+  projects: { code: string; version: string | null }[];
+}
+
+export interface HealthReport {
+  queue: {
+    queued: number;
+    running: number;
+    failed: number;
+    oldestQueuedAt: string | null;
+    stalled: boolean;
+  };
+  stageFailures: { jobKind: string; stage: string; error: string; at: string }[];
+  lastIngest: string | null;
+  lastReconcile: string | null;
+  lastBackup: { at: string; path: string; bytes: number } | null;
+  lastRestoreDrill: string | null;
+  ok: boolean;
+  problems: string[];
+}
+
 interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -641,6 +681,9 @@ export const foreman = {
   recurrences: (humanId: string) =>
     api.get<RecurrenceResult>(`/api/findings/${humanId}/recurrences`),
   regressionWatch: () => api.get<Page<RegressionFlag>>('/api/regression-watch'),
+  drift: (code: string) => api.get<Drift>(`/api/projects/${code}/drift`),
+  tech: () => api.get<{ items: TechRow[]; disagreements: TechRow[] }>('/api/tech'),
+  healthReport: () => api.get<HealthReport>('/api/health-report'),
   brief: (code: string) => api.get<Brief>(`/api/brief/${code}`),
   entity: (humanId: string) => api.get<EntityResult>(`/api/entities/${humanId}`),
 };

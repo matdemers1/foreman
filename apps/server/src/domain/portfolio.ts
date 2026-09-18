@@ -1,4 +1,5 @@
 import type { Db } from '../db.js';
+import { driftFor } from './drift.js';
 
 /**
  * The portfolio — one row per project, answering "where is everything" at a glance
@@ -21,6 +22,8 @@ export interface PortfolioRow {
   readonly drift: {
     readonly uncoveredRequirements: number;
     readonly unconfirmedAttributions: number;
+    /** The badge (FRM-REQ-127). The same engine the drift screen reads, so they cannot disagree. */
+    readonly total: number;
   };
   readonly lastActivityAt: string | null;
 }
@@ -97,7 +100,11 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
           // Grey, not green: never ingested is not the same as passing.
           unknown: check === null,
         },
-        drift: { uncoveredRequirements: uncovered, unconfirmedAttributions: unconfirmed },
+        drift: {
+          uncoveredRequirements: uncovered,
+          unconfirmedAttributions: unconfirmed,
+          total: (await driftFor(db, project.code)).total,
+        },
         lastActivityAt: lastCommit?.committedAt.toISOString() ?? null,
       };
     }),

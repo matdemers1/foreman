@@ -3,7 +3,14 @@ import { hostname } from 'node:os';
 import { ConfigError, loadConfig } from 'foreman-server/config';
 import { createDb } from 'foreman-server/db';
 import { logger } from 'foreman-server/logger';
-import { buildRegistry, drainOne, scheduleReconciles } from 'foreman-server/jobs';
+import {
+  alertOnStall,
+  buildRegistry,
+  createMailer,
+  drainOne,
+  scheduleMaintenance,
+  scheduleReconciles,
+} from 'foreman-server/jobs';
 
 /**
  * The worker: claim a job, run its stages, repeat. It runs no migrations and serves no requests —
@@ -27,7 +34,8 @@ const config = (() => {
 })();
 
 const db = createDb(config.DATABASE_URL);
-const registry = buildRegistry({ config });
+const mailer = createMailer(config);
+const registry = buildRegistry({ config, mailer });
 const workerId = `${hostname()}:${String(process.pid)}`;
 const log = logger.child({ workerId });
 
@@ -77,11 +85,13 @@ async function scheduleIfDue(): Promise<void> {
   lastScheduled = Date.now();
   try {
     await scheduleReconciles(db, registry, log);
+    await scheduleMaintenance(db, registry, log);
+    await alertOnStall(db, mailer);
   } catch (error) {
     // A scheduling failure must not stop the drain loop: the jobs already queued still matter.
     log.warn(
       { err: error instanceof Error ? error.message : String(error) },
-      'could not schedule reconciles',
+      'could not schedule the day\u2019s work',
     );
   }
 }

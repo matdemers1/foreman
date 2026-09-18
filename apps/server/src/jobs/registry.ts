@@ -1,5 +1,7 @@
 import { createGitHubClient, isConfigured, type GitHubClient } from '../adapters/github.js';
+import { createMailer, type Mailer } from '../adapters/mail.js';
 import type { Config } from '../config.js';
+import { backupJob, restoreDrillJob } from './backup.js';
 import { backfillJob, ingestWebhookJob, reconcileJob } from './ingest.js';
 import { JobRegistry } from './types.js';
 
@@ -14,6 +16,7 @@ export interface RegistryDeps {
   readonly config?: Config;
   /** Swapped in tests. */
   readonly github?: GitHubClient | null;
+  readonly mailer?: Mailer | undefined;
 }
 
 export function buildRegistry(deps: RegistryDeps = {}): JobRegistry {
@@ -41,6 +44,12 @@ export function buildRegistry(deps: RegistryDeps = {}): JobRegistry {
   registry.register(ingestWebhookJob());
   registry.register(backfillJob({ github }));
   registry.register(reconcileJob({ github }));
+
+  if (deps.config !== undefined) {
+    const mailer = deps.mailer ?? createMailer(deps.config);
+    registry.register(backupJob({ config: deps.config, mailer }));
+    registry.register(restoreDrillJob({ config: deps.config, mailer }));
+  }
 
   return registry;
 }

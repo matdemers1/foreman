@@ -88,14 +88,15 @@ const COLUMNS: TableColumn<PortfolioRow>[] = [
     header: 'Drift',
     numeric: true,
     width: '5rem',
-    sortable: (a, b) =>
-      a.drift.uncoveredRequirements +
-      a.drift.unconfirmedAttributions -
-      (b.drift.uncoveredRequirements + b.drift.unconfirmedAttributions),
-    cell: (row) => {
-      const total = row.drift.uncoveredRequirements + row.drift.unconfirmedAttributions;
-      return total === 0 ? '—' : total;
-    },
+    // The badge reads the drift engine's own total (FRM-REQ-127), not a sum of two of its parts.
+    // A badge that adds up a subset is a badge that disagrees with the screen it links to.
+    sortable: (a, b) => a.drift.total - b.drift.total,
+    cell: (row) =>
+      row.drift.total === 0 ? (
+        '—'
+      ) : (
+        <Link href={`/projects/${row.code}/drift`}>{row.drift.total}</Link>
+      ),
   },
   {
     key: 'lastActivityAt',

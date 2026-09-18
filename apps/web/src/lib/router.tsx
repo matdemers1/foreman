@@ -85,6 +85,8 @@ export interface Route {
     | 'activity'
     | 'findings'
     | 'finding'
+    | 'drift'
+    | 'health'
     | 'search'
     | 'task'
     | 'not-found';
@@ -117,6 +119,7 @@ export function routeFor(path: string): Route {
     if (parts[2] === 'adrs' && parts[3] === undefined) return { screen: 'adrs', code };
     if (parts[2] === 'audits' && parts[3] === undefined) return { screen: 'audits', code };
     if (parts[2] === 'activity' && parts[3] === undefined) return { screen: 'activity', code };
+    if (parts[2] === 'drift' && parts[3] === undefined) return { screen: 'drift', code };
     if (parts[2] === 'documents') {
       return parts[3] === undefined
         ? { screen: 'documents', code }
@@ -125,6 +128,10 @@ export function routeFor(path: string): Route {
   }
 
   if (parts[0] === 'search' && parts[1] === undefined) return { screen: 'search' };
+  // `/system`, not `/health`: the server owns `/health` as its deploy probe and answers it with
+  // JSON before the SPA ever sees the request. Two meanings of one path is a screen that renders
+  // as a blob of JSON, which is how this was found.
+  if (parts[0] === 'system' && parts[1] === undefined) return { screen: 'health' };
 
   // Findings are reached without a project: the inbox is cross-project by design, and a finding's
   // human ID already carries its project (ADR-008).

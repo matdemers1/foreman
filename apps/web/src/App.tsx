@@ -12,7 +12,13 @@ import {
   ThemeProvider,
   ThemeSwitch,
 } from '@d3cloud/ui';
-import { FolderKanban, Home as HomeIcon, ListChecks, Search } from 'lucide-react';
+import {
+  Activity as ActivityIcon,
+  FolderKanban,
+  Home as HomeIcon,
+  ListChecks,
+  Search,
+} from 'lucide-react';
 import { fetchSession, logout, type SessionState } from './lib/api';
 import { routeFor, useLocation } from './lib/router';
 import { Login } from './screens/Login';
@@ -25,9 +31,11 @@ import { Adrs } from './screens/Adrs';
 import { AuditIndex } from './screens/AuditIndex';
 import { DocumentEditor } from './screens/DocumentEditor';
 import { Documents } from './screens/Documents';
+import { DriftView } from './screens/DriftView';
 import { FindingDetail } from './screens/FindingDetail';
 import { Findings } from './screens/Findings';
 import { Glossary } from './screens/Glossary';
+import { Health } from './screens/Health';
 import { RequirementDetail } from './screens/RequirementDetail';
 import { RiskRegister } from './screens/RiskRegister';
 import { Search as SearchScreen } from './screens/Search';
@@ -125,6 +133,12 @@ export function App() {
               label="Search"
               current={path === '/search'}
             />
+            <SideNavItem
+              href="/system"
+              icon={<ActivityIcon />}
+              label="Health"
+              current={path === '/system'}
+            />
           </SideNav>
         }
         footer={
@@ -189,6 +203,10 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <Findings key={search} search={search} />;
     case 'finding':
       return <FindingDetail humanId={route.humanId ?? ''} />;
+    case 'drift':
+      return <DriftView code={route.code ?? ''} />;
+    case 'health':
+      return <Health />;
     case 'search':
       return <SearchScreen key={search} search={search} />;
     case 'task':

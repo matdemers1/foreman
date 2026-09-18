@@ -21,6 +21,7 @@ import { searchRoutes } from './routes/search.js';
 import { coverageRoutes } from './routes/coverage.js';
 import { recordRoutes } from './routes/record.js';
 import { findingRoutes, projectFindingRoutes } from './routes/findings.js';
+import { operationsRoutes } from './routes/operations.js';
 import { realityRoutes } from './routes/reality.js';
 import { webhookRoutes } from './routes/webhooks.js';
 import { buildRegistry, type JobRegistry } from './jobs/index.js';
@@ -104,6 +105,7 @@ export function createApp({ config, db, oidc = null, registry }: AppDeps): Expre
   mount(app, '/api/projects', realityRoutes(db, jobs));
   mount(app, '/api/projects', projectFindingRoutes(db));
   mount(app, '/api', findingRoutes(db));
+  mount(app, '/api', operationsRoutes(db, config));
 
   /** Liveness: the process is up. Deliberately touches nothing else. */
   app.get('/healthz', (_req, res) => {
