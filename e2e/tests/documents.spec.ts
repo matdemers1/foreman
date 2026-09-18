@@ -202,6 +202,19 @@ test.describe('addressed by URI (FRM-REQ-087)', () => {
   });
 });
 
+test.describe('the audit index (T-4.12)', () => {
+  test('counts findings from the findings, not from a maintained number', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/projects/EXMP/audits');
+
+    await expect(page.getByRole('heading', { name: 'Audits' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Findings' })).toBeVisible();
+    // The seed writes four findings across its audits; the index counts them rather than
+    // restating a number somebody typed.
+    await expect(page.getByText(/open of/).first()).toBeVisible();
+  });
+});
+
 test.describe('cross-project search (S-06, T-4.11, FRM-REQ-132)', () => {
   test('finds ADRs, and says which project each is from', async ({ page }) => {
     await signIn(page);

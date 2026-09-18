@@ -21,6 +21,7 @@ import { Phases } from './screens/Phases';
 import { Portfolio } from './screens/Portfolio';
 import { ProjectOverview } from './screens/ProjectOverview';
 import { Adrs } from './screens/Adrs';
+import { AuditIndex } from './screens/AuditIndex';
 import { DocumentEditor } from './screens/DocumentEditor';
 import { Documents } from './screens/Documents';
 import { Glossary } from './screens/Glossary';
@@ -172,6 +173,8 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <RiskRegister code={route.code ?? ''} />;
     case 'glossary':
       return <Glossary code={route.code ?? ''} />;
+    case 'audits':
+      return <AuditIndex code={route.code ?? ''} />;
     case 'search':
       return <SearchScreen key={search} search={search} />;
     case 'task':

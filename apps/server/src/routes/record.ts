@@ -401,6 +401,46 @@ export function recordRoutes(db: Db): Router {
     }),
   );
 
+  // ─── Audit index (T-4.12) ────────────────────────────────────────────────
+
+  /**
+   * The Audit Index, generated (FRM-REQ-073).
+   *
+   * The vault kept this as a hand-maintained `_Audit Index.md` that every audit skill appended to.
+   * Here it is a count over the findings each audit produced — which cannot disagree with them.
+   */
+  router.get(
+    '/:code/audits',
+    handler(async (req, res) => {
+      const project = await findProject(db, param(req, 'code'));
+      const audits = await db.audit.findMany({
+        where: { projectId: project.id, deletedAt: null },
+        orderBy: [{ runDate: 'desc' }, { humanId: 'desc' }],
+        include: {
+          findings: {
+            where: { deletedAt: null },
+            select: { severity: true, status: true },
+          },
+        },
+      });
+
+      res.json({
+        items: audits.map(({ findings, ...audit }) => ({
+          ...audit,
+          findings: {
+            total: findings.length,
+            open: findings.filter((f) => f.status === 'open').length,
+            // Criticals and highs counted apart: they are what an index is read for.
+            critical: findings.filter((f) => f.severity === 'critical').length,
+            high: findings.filter((f) => f.severity === 'high').length,
+          },
+        })),
+        nextCursor: null,
+        total: audits.length,
+      });
+    }),
+  );
+
   // ─── Glossary ────────────────────────────────────────────────────────────
 
   router.get(

@@ -404,6 +404,19 @@ export interface SearchHit {
   snippet: string | null;
 }
 
+export interface AuditRow {
+  id: string;
+  humanId: string;
+  kind: string;
+  scope: string | null;
+  runDate: string;
+  verdict: string | null;
+  rounds: number;
+  status: string;
+  vaultPath: string | null;
+  findings: { total: number; open: number; critical: number; high: number };
+}
+
 interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -461,6 +474,7 @@ export const foreman = {
   risks: (code: string) => api.get<Page<RiskRow>>(`/api/projects/${code}/risks`),
   decisions: (code: string) => api.get<Page<DecisionRow>>(`/api/projects/${code}/decisions`),
   glossary: (code: string) => api.get<Page<TermRow>>(`/api/projects/${code}/glossary`),
+  audits: (code: string) => api.get<Page<AuditRow>>(`/api/projects/${code}/audits`),
   search: (q: string, types: string[], project: string | null) => {
     const query = new URLSearchParams({ q, limit: '50' });
     if (types.length > 0) query.set('types', types.join(','));
