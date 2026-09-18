@@ -1,5 +1,10 @@
 {
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "types": ["node"] },
+  "compilerOptions": {
+    // The DOM lib because the suite contains browser-context code: `page.evaluate` bodies run in
+    // the page, not in Node, and without this they do not typecheck at all.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
   "include": ["tests", "*.config.ts"]
 }

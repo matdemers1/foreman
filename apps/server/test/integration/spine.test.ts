@@ -478,4 +478,70 @@ describe.skipIf(url === undefined)('the spine', () => {
       expect(res.status).toBe(412);
     });
   });
+
+  describe('editing a phase (T-2.10)', () => {
+    it('updates the fields a phase can change', async () => {
+      await makeProject();
+      await post('/projects/SPN/phases', { number: 3, name: 'Original' });
+
+      const res = await patch('/projects/SPN/phases/SPN-P-3', {
+        name: 'Renamed',
+        objective: 'A clearer objective.',
+        size: 'L',
+      });
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as { name: string; objective: string; size: string };
+      expect(body.name).toBe('Renamed');
+      expect(body.size).toBe('L');
+    });
+
+    it('refuses to renumber, because the number is inside the human ID', async () => {
+      await makeProject();
+      await post('/projects/SPN/phases', { number: 3, name: 'Three' });
+
+      const res = await patch('/projects/SPN/phases/SPN-P-3', { number: 4 });
+      expect(res.status).toBe(409);
+      expect(((await res.json()) as { error: string }).error).toContain('renumbered');
+
+      // And the phase is untouched.
+      const phase = await db.phase.findFirstOrThrow({ where: { humanId: 'SPN-P-3' } });
+      expect(Number(phase.number)).toBe(3);
+    });
+
+    it('accepts the number it already has, so a full-form save is not a conflict', async () => {
+      await makeProject();
+      await post('/projects/SPN/phases', { number: 3, name: 'Three' });
+      // A form that round-trips every field would otherwise be refused for changing nothing.
+      const res = await patch('/projects/SPN/phases/SPN-P-3', { number: 3, name: 'Still three' });
+      expect(res.status).toBe(200);
+    });
+
+    it('stamps the dates a phase starting and finishing produce', async () => {
+      await makeProject();
+      await post('/projects/SPN/phases', { number: 3, name: 'Three' });
+
+      await patch('/projects/SPN/phases/SPN-P-3', { status: 'active' });
+      const started = await db.phase.findFirstOrThrow({ where: { humanId: 'SPN-P-3' } });
+      expect(started.startedAt).not.toBeNull();
+
+      await patch('/projects/SPN/phases/SPN-P-3', { status: 'complete' });
+      const done = await db.phase.findFirstOrThrow({ where: { humanId: 'SPN-P-3' } });
+      expect(done.completedAt).not.toBeNull();
+      expect(done.startedAt?.getTime()).toBe(started.startedAt?.getTime());
+    });
+
+    it('audits the change with what it replaced', async () => {
+      await makeProject();
+      await post('/projects/SPN/phases', { number: 3, name: 'Before' });
+      await patch('/projects/SPN/phases/SPN-P-3', { name: 'After' });
+
+      const event = await db.auditEvent.findFirstOrThrow({
+        where: { entityHumanId: 'SPN-P-3', action: 'update' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect((event.before as { name: string }).name).toBe('Before');
+      expect((event.after as { name: string }).name).toBe('After');
+    });
+  });
 });

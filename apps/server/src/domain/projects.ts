@@ -1,6 +1,7 @@
 import {
   lintEars,
   type PhaseCreate,
+  type PhaseUpdate,
   type ProjectCreate,
   type ProjectUpdate,
   type RequirementCreate,
@@ -129,6 +130,47 @@ export async function createPhase(db: Db, actor: Actor, code: string, input: Pha
       entityType: 'phase',
       entityId: phase.id,
       entityHumanId: phase.humanId,
+      after: phase,
+    });
+    return phase;
+  });
+}
+
+export async function updatePhase(db: Db, actor: Actor, humanId: string, input: PhaseUpdate) {
+  const before = await db.phase.findFirst({ where: { humanId, deletedAt: null } });
+  if (before === null) throw new NotFound(humanId);
+
+  // The number is part of the human ID, and the ID is immutable (ADR-008). Renumbering a phase
+  // would leave `BND-P-8.5` naming a phase that is no longer 8.5.
+  // `before.number` is a Prisma Decimal; the input is a plain number.
+  if (input.number !== undefined && input.number !== Number(before.number)) {
+    throw new Conflict(
+      `${humanId} cannot be renumbered: its human ID embeds the number, and every citation of it would then point at something else`,
+    );
+  }
+
+  return db.$transaction(async (tx) => {
+    const phase = await tx.phase.update({
+      where: { id: before.id },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.objective !== undefined ? { objective: input.objective } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.exitDemo !== undefined ? { exitDemo: input.exitDemo } : {}),
+        ...(input.size !== undefined ? { size: input.size } : {}),
+        ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+        // A phase that starts or finishes is a date somebody will ask about later.
+        ...(input.status === 'active' && before.startedAt === null ? { startedAt: new Date() } : {}),
+        ...(input.status === 'complete' ? { completedAt: new Date() } : {}),
+      },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'update',
+      entityType: 'phase',
+      entityId: phase.id,
+      entityHumanId: phase.humanId,
+      before,
       after: phase,
     });
     return phase;

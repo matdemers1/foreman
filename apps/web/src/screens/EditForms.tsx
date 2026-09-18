@@ -1,0 +1,212 @@
+import { useState, type SyntheticEvent } from 'react';
+import {
+  Alert,
+  Button,
+  FormActions,
+  FormField,
+  Input,
+  Modal,
+  Select,
+  Stack,
+  Textarea,
+} from '@d3cloud/ui';
+import { api, ApiError } from '../lib/api';
+
+/**
+ * Editing, from the console (T-2.10, FRM-REQ-031 … FRM-REQ-048).
+ *
+ * **Every control carries an accessible name.** `FormField` supplies one through context, so the
+ * control needs no `id` and cannot drift from its label; anything outside a `FormField` — the
+ * status select in a table cell — passes `aria-label` explicitly.
+ *
+ * What a form *omits* is as deliberate as what it offers. A project's code and a phase's number are
+ * not fields here, because both are embedded in a human ID and a human ID is immutable: renumbering
+ * would leave every citation pointing at something else (ADR-008).
+ */
+
+interface Field {
+  readonly name: string;
+  readonly label: string;
+  readonly kind: 'text' | 'textarea' | 'select';
+  readonly options?: { value: string; label: string }[];
+  readonly help?: string;
+  readonly optional?: boolean;
+}
+
+export interface EditFormProps {
+  /** Names the action: "Edit BND-T-0.3", never "Edit". */
+  title: string;
+  description?: string;
+  path: string;
+  fields: readonly Field[];
+  initial: Record<string, string>;
+  trigger: React.ReactNode;
+  onSaved: () => void;
+}
+
+export function EditForm({
+  title,
+  description,
+  path,
+  fields,
+  initial,
+  trigger,
+  onSaved,
+}: EditFormProps) {
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  const set = (name: string, value: string) => {
+    setValues((current) => ({ ...current, [name]: value }));
+  };
+
+  const submit = (event: SyntheticEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setFieldErrors({});
+
+    // Only what changed. Sending the whole form would overwrite a field somebody else edited
+    // between this screen loading and this button being pressed.
+    const changed: Record<string, string> = {};
+    for (const field of fields) {
+      const next = values[field.name] ?? '';
+      if (next !== (initial[field.name] ?? '')) changed[field.name] = next;
+    }
+
+    if (Object.keys(changed).length === 0) {
+      setBusy(false);
+      setOpen(false);
+      return;
+    }
+
+    void api
+      .patch(path, changed)
+      .then(() => {
+        setOpen(false);
+        onSaved();
+      })
+      .catch((caught: unknown) => {
+        if (caught instanceof ApiError) {
+          const body = caught.body as { fields?: { path: string; message: string }[] } | undefined;
+          if (body?.fields !== undefined) {
+            // Per-field, where the person can act on it, rather than one message at the top.
+            setFieldErrors(
+              Object.fromEntries(body.fields.map((f) => [f.path, f.message])),
+            );
+          }
+          setError(caught.message);
+        } else {
+          setError('That did not save.');
+        }
+      })
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          // Reopened after a failure, it starts from what is stored rather than from the attempt.
+          setValues(initial);
+          setError(null);
+          setFieldErrors({});
+        }
+      }}
+      trigger={trigger}
+      title={title}
+      {...(description === undefined ? {} : { description })}
+    >
+      <form onSubmit={submit}>
+        <Stack gap="16">
+          {error === null ? null : (
+            <Alert tone="danger" title="That did not save" dynamic>
+              {error}
+            </Alert>
+          )}
+
+          {fields.map((field) => (
+            <FormField
+              key={field.name}
+              label={field.label}
+              {...(field.help === undefined ? {} : { help: field.help })}
+              {...(field.optional === true ? { optional: true } : {})}
+              {...(fieldErrors[field.name] === undefined
+                ? {}
+                : { error: fieldErrors[field.name] })}
+            >
+              {field.kind === 'select' ? (
+                <Select
+                  options={field.options ?? []}
+                  value={values[field.name] ?? ''}
+                  onValueChange={(next) => { set(field.name, next); }}
+                />
+              ) : field.kind === 'textarea' ? (
+                <Textarea
+                  name={field.name}
+                  value={values[field.name] ?? ''}
+                  rows={3}
+                  onChange={(e) => { set(field.name, e.target.value); }}
+                />
+              ) : (
+                <Input
+                  name={field.name}
+                  value={values[field.name] ?? ''}
+                  onChange={(e) => { set(field.name, e.target.value); }}
+                />
+              )}
+            </FormField>
+          ))}
+
+          <FormActions>
+            <Button type="button" onClick={() => { setOpen(false); }}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={busy}>
+              {busy ? 'Saving…' : 'Save'}
+            </Button>
+          </FormActions>
+        </Stack>
+      </form>
+    </Modal>
+  );
+}
+
+export const LIFECYCLES = [
+  { value: 'planned', label: 'Planned' },
+  { value: 'scaffolded', label: 'Scaffolded' },
+  { value: 'building', label: 'Building' },
+  { value: 'deployed', label: 'Deployed' },
+  { value: 'parked', label: 'Parked' },
+  { value: 'scrapped', label: 'Scrapped' },
+];
+
+export const PHASE_STATUSES = [
+  { value: 'planned', label: 'Planned' },
+  { value: 'active', label: 'Active' },
+  { value: 'complete', label: 'Complete' },
+  { value: 'parked', label: 'Parked' },
+];
+
+export const SIZES = [
+  { value: 'XS', label: 'XS' },
+  { value: 'S', label: 'S' },
+  { value: 'M', label: 'M' },
+  { value: 'L', label: 'L' },
+  { value: 'XL', label: 'XL' },
+];
+
+/** MoSCoW. `W` is gated on the way in, because it leaves every coverage count. */
+export const PRIORITIES = [
+  { value: 'M', label: 'Must' },
+  { value: 'S', label: 'Should' },
+  { value: 'C', label: 'Could' },
+  { value: 'W', label: "Won't" },
+];

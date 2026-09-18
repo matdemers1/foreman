@@ -1,6 +1,7 @@
 import {
   PageQuery,
   PhaseCreate,
+  PhaseUpdate,
   ProjectCreate,
   ProjectUpdate,
   RequirementCreate,
@@ -19,6 +20,7 @@ import {
   createTask,
   findProject,
   listPhases,
+  updatePhase,
   updateProject,
   updateRequirement,
   updateTask,
@@ -135,6 +137,23 @@ export function projectRoutes(db: Db): Router {
       const body = parseBody(PhaseCreate, req, res);
       if (body === null) return;
       res.status(201).json(await createPhase(db, actorOf(req), param(req, 'code'), body));
+    }),
+  );
+
+  router.patch(
+    '/:code/phases/:humanId',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(PhaseUpdate, req, res);
+      if (body === null) return;
+
+      const humanId = param(req, 'humanId');
+      const current = await db.phase.findFirst({ where: { humanId, deletedAt: null } });
+      if (current !== null) assertFresh(req, current);
+
+      const updated = await updatePhase(db, actorOf(req), humanId, body);
+      setEtag(res, updated);
+      res.json(updated);
     }),
   );
 

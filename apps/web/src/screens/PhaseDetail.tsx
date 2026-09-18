@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Badge,
+  Button,
   Card,
   CardTitle,
   DescriptionItem,
@@ -16,6 +17,7 @@ import {
 } from '@d3cloud/ui';
 import { foreman, type TaskRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { EditForm, PHASE_STATUSES, SIZES } from './EditForms';
 import { PhaseBoard } from './PhaseBoard';
 import { StatusControl } from './StatusControl';
 
@@ -123,6 +125,34 @@ export function PhaseDetail({ code, phaseHumanId }: { code: string; phaseHumanId
                 aria-label="How to show the tasks"
               />
               <Badge tone={phase.status === 'active' ? 'attention' : 'neutral'}>{phase.status}</Badge>
+              <EditForm
+                title={`Edit ${phase.humanId}`}
+                // No number field: it is embedded in the human ID, and the ID is immutable.
+                description="A phase cannot be renumbered — its ID embeds the number."
+                path={`/api/projects/${code}/phases/${phase.humanId}`}
+                trigger={<Button>Edit</Button>}
+                onSaved={phases.reload}
+                initial={{
+                  name: phase.name,
+                  status: phase.status,
+                  size: phase.size ?? '',
+                  objective: phase.objective ?? '',
+                  exitDemo: phase.exitDemo ?? '',
+                }}
+                fields={[
+                  { name: 'name', label: 'Name', kind: 'text' },
+                  { name: 'status', label: 'Status', kind: 'select', options: PHASE_STATUSES },
+                  { name: 'size', label: 'Size', kind: 'select', options: SIZES, optional: true },
+                  { name: 'objective', label: 'Objective', kind: 'textarea', optional: true },
+                  {
+                    name: 'exitDemo',
+                    label: 'Exit demo',
+                    kind: 'textarea',
+                    optional: true,
+                    help: 'What you would show to call this phase done.',
+                  },
+                ]}
+              />
             </>
           )
         }

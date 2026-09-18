@@ -1,5 +1,6 @@
 import {
   Badge,
+  Button,
   Card,
   CardTitle,
   Cluster,
@@ -15,6 +16,7 @@ import {
 } from '@d3cloud/ui';
 import { foreman, type Brief } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { EditForm, LIFECYCLES } from './EditForms';
 
 /**
  * S-09 — a project's overview: pitch, lifecycle, how far the phase in flight has got, CI, and what
@@ -35,7 +37,7 @@ function Ci({ ci }: { ci: Brief['ci'] }) {
 }
 
 export function ProjectOverview({ code }: { code: string }) {
-  const { state } = useAsync(() => foreman.brief(code), [code]);
+  const { state, reload } = useAsync(() => foreman.brief(code), [code]);
 
   if (state.status === 'loading') {
     return (
@@ -67,9 +69,29 @@ export function ProjectOverview({ code }: { code: string }) {
         title={brief.project.name}
         description={brief.project.pitch ?? undefined}
         actions={
-          <Badge tone={brief.project.lifecycle === 'building' ? 'attention' : 'neutral'}>
-            {brief.project.lifecycle}
-          </Badge>
+          <>
+            <Badge tone={brief.project.lifecycle === 'building' ? 'attention' : 'neutral'}>
+              {brief.project.lifecycle}
+            </Badge>
+            <EditForm
+              title={`Edit ${brief.project.name}`}
+              // The code is absent on purpose: it is immutable, and every human ID embeds it.
+              description="A project's code cannot change — every ID in it embeds the code."
+              path={`/api/projects/${code}`}
+              trigger={<Button>Edit</Button>}
+              onSaved={reload}
+              initial={{
+                name: brief.project.name,
+                lifecycle: brief.project.lifecycle,
+                pitch: brief.project.pitch ?? '',
+              }}
+              fields={[
+                { name: 'name', label: 'Name', kind: 'text' },
+                { name: 'lifecycle', label: 'Lifecycle', kind: 'select', options: LIFECYCLES },
+                { name: 'pitch', label: 'Pitch', kind: 'textarea', optional: true },
+              ]}
+            />
+          </>
         }
       />
 

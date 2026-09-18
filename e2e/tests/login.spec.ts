@@ -131,3 +131,93 @@ test.describe('the API', () => {
     expect((await request.get('/readyz')).ok()).toBe(true);
   });
 });
+
+test.describe('editing (T-2.10)', () => {
+  const signIn = async (page: import('@playwright/test').Page): Promise<void> => {
+    await page.goto('/');
+    await page.getByRole('textbox', { name: 'Email' }).fill(EMAIL);
+    await page.getByRole('textbox', { name: 'Password' }).fill(PASSWORD);
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.getByRole('navigation').waitFor();
+  };
+
+  test('every control in an edit form has an accessible name (FRM-REQ-048)', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/tasks/EXMP-T-1.1');
+    await page.getByRole('button', { name: 'Edit' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    // Every focusable control inside the dialog, checked by name rather than by inspection: a
+    // label that is merely *near* a control is not a name, and only the tree can tell them apart.
+    const unnamed = await dialog
+      .locator('input, textarea, select, button, [role="combobox"]')
+      .evaluateAll((nodes) =>
+        nodes
+          .filter((node) => {
+            const el = node as HTMLElement;
+            if (el.getAttribute('aria-hidden') === 'true') return false;
+            if (el.hasAttribute('disabled')) return false;
+            // Every way a control can get a name, in the order the accessibility tree prefers.
+            const candidates = [
+              el.getAttribute('aria-label'),
+              el.getAttribute('aria-labelledby'),
+              el.id === '' ? '' : document.querySelector(`label[for="${el.id}"]`)?.textContent,
+              el.closest('label')?.textContent,
+              el.textContent,
+            ];
+            return !candidates.some((name) => typeof name === 'string' && name.trim() !== '');
+          })
+          .map((node) => (node as HTMLElement).outerHTML.slice(0, 80)),
+      );
+
+    expect(unnamed, 'a control with no accessible name is a control a screen reader cannot announce').toEqual([]);
+  });
+
+  test('saves a change, and the page shows it', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/tasks/EXMP-T-1.1');
+    await page.getByRole('button', { name: 'Edit' }).click();
+
+    const title = page.getByRole('textbox', { name: 'Title' });
+    const original = await title.inputValue();
+    const edited = `${original} (edited)`;
+
+    await title.fill(edited);
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    await expect(page.getByRole('heading', { name: edited })).toBeVisible();
+
+    // Put it back, so the suite is re-runnable.
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('textbox', { name: 'Title' }).fill(original);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('heading', { name: original })).toBeVisible();
+  });
+
+  test('a cancelled edit changes nothing', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/tasks/EXMP-T-1.1');
+    const heading = await page.getByRole('heading', { level: 1 }).textContent();
+
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('textbox', { name: 'Title' }).fill('Discarded');
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(page.getByRole('heading', { name: heading ?? '' })).toBeVisible();
+  });
+
+  test('offers no field for a project code, because it cannot change', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/projects/EXMP');
+    await page.getByRole('button', { name: 'Edit' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    // ADR-008: the code is embedded in every human ID in the project. Not offering the field is
+    // how "immutable" is expressed to a person.
+    await expect(dialog.getByRole('textbox', { name: /code/i })).toHaveCount(0);
+    await expect(dialog.getByRole('textbox', { name: 'Name' })).toBeVisible();
+  });
+});

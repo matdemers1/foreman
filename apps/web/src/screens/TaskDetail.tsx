@@ -1,6 +1,7 @@
 import {
   Alert,
   Badge,
+  Button,
   Card,
   CardTitle,
   DescriptionItem,
@@ -14,6 +15,7 @@ import {
 } from '@d3cloud/ui';
 import { foreman } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { EditForm, SIZES } from './EditForms';
 
 /**
  * S-12 — one task: what it is for, what it declares, what it satisfies, and what cites it.
@@ -35,7 +37,7 @@ interface TaskEntity {
 }
 
 export function TaskDetail({ humanId }: { humanId: string }) {
-  const { state } = useAsync(() => foreman.entity(humanId), [humanId]);
+  const { state, reload } = useAsync(() => foreman.entity(humanId), [humanId]);
 
   if (state.status === 'loading') {
     return (
@@ -66,7 +68,48 @@ export function TaskDetail({ humanId }: { humanId: string }) {
       <PageHeader
         title={task.title}
         description={humanId}
-        actions={<Badge tone={task.status === 'blocked' ? 'danger' : 'neutral'}>{task.status}</Badge>}
+        actions={
+          <>
+            <Badge tone={task.status === 'blocked' ? 'danger' : 'neutral'}>{task.status}</Badge>
+            <EditForm
+              title={`Edit ${humanId}`}
+              path={`/api/projects/${projectCode}/tasks/${humanId}`}
+              trigger={<Button>Edit</Button>}
+              onSaved={reload}
+              initial={{
+                title: task.title,
+                size: task.size ?? '',
+                doneWhen: task.doneWhen ?? '',
+                ...(task.status === 'blocked'
+                  ? { blockedReason: task.blockedReason ?? '' }
+                  : {}),
+              }}
+              fields={[
+                { name: 'title', label: 'Title', kind: 'text' },
+                { name: 'size', label: 'Size', kind: 'select', options: SIZES, optional: true },
+                {
+                  name: 'doneWhen',
+                  label: 'Done when',
+                  kind: 'textarea',
+                  optional: true,
+                  help: 'What would show this task is finished.',
+                },
+                // Offered only while the task is blocked: a reason with nothing to explain is
+                // a field nobody knows how to fill in.
+                ...(task.status === 'blocked'
+                  ? [
+                      {
+                        name: 'blockedReason',
+                        label: 'What is blocking it',
+                        kind: 'textarea' as const,
+                        help: 'Required while the task is blocked.',
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </>
+        }
       />
 
       {task.status === 'blocked' ? (
