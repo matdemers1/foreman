@@ -5,7 +5,7 @@ import { createApp } from '../../src/app.js';
 import { setPassword } from '../../src/auth/native.js';
 import { loadConfig, type Config } from '../../src/config.js';
 import { createDb, type Db } from '../../src/db.js';
-import { buildRegistry, drainOne, enqueue } from '../../src/jobs/index.js';
+import { buildRegistry, drainOne, enqueue, scheduleReconciles } from '../../src/jobs/index.js';
 import { logger } from '../../src/logger.js';
 
 /**
@@ -612,6 +612,30 @@ describe.skipIf(url === undefined)('backfill and reconcile', () => {
     expect(outcome?.status).toBe('failed');
     const commit = await db.commit.findFirstOrThrow({ where: { repoId, sha: '7'.repeat(40) } });
     expect(commit.orphanedAt).toBeNull();
+  });
+
+  describe('scheduling (T-5.5)', () => {
+    it('queues one reconcile per repository per day, however often it is asked', async () => {
+      await db.repo.update({ where: { id: repoId }, data: { backfilledAt: new Date() } });
+      const day = new Date('2026-09-18T03:00:00Z');
+
+      const first = await scheduleReconciles(db, registry(), logger, day);
+      const second = await scheduleReconciles(db, registry(), logger, day);
+      // Asking is free: the idempotency key carries the date, so a worker polling every minute
+      // enqueues one job rather than 1,440.
+      expect(first.enqueued).toHaveLength(1);
+      expect(second.enqueued).toHaveLength(0);
+
+      const tomorrow = new Date('2026-09-19T03:00:00Z');
+      expect((await scheduleReconciles(db, registry(), logger, tomorrow)).enqueued).toHaveLength(1);
+    });
+
+    it('skips a repository whose history has never been read', async () => {
+      // Reconciling a repo that was never backfilled would report its entire history as healed
+      // gaps, which is a number that means nothing and an alert that cries wolf.
+      await db.repo.update({ where: { id: repoId }, data: { backfilledAt: null } });
+      expect((await scheduleReconciles(db, registry(), logger)).enqueued).toHaveLength(0);
+    });
   });
 
   it('un-orphans a commit that comes back', async () => {
