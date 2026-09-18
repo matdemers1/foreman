@@ -130,7 +130,9 @@ export function oidcRoutes({ db, config, client }: OidcRouteDeps): Router {
         const session = await db.session.findUnique({ where: { id: sessionId } });
         await sessions.revoke(db, sessionId);
         if (session?.method === 'oidc' && client !== null) {
-          redirectTo = client.endSessionUrl('', config.BASE_URL);
+          // RP-initiated logout is best-effort: the local session has already ended, and a
+          // provider that will not build a URL must not turn signing out into a failure.
+          redirectTo = await client.endSessionUrl('', config.BASE_URL);
         }
         await record(db, {
           actor: req.auth?.actor ?? 'unknown',

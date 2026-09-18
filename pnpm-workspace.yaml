@@ -39,3 +39,17 @@ ignoredBuiltDependencies:
 # hold for every other version, this package included.
 trustPolicyExclude:
   - prisma@7.10.0
+
+# One exact version is excused from the release-age wait, with the reasoning written down.
+#
+# The seven-day rule exists because most malicious releases are found and pulled inside that window
+# — which is a statement about *somebody else's* package being taken over. `@d3cloudio/auth-client`
+# is first-party: published from the d3-auth repository by the operator, minutes before this line
+# was added, and its contents were read before it was depended on (ADR-010).
+#
+# It is pinned to the exact version rather than the package name on purpose. The risk the rule
+# still covers here is an npm account compromise, and a compromised 0.1.2 would be a *new* release:
+# it would meet the seven-day wall like anything else. Excusing the name would let it straight
+# through.
+minimumReleaseAgeExclude:
+  - '@d3cloudio/auth-client@0.1.1'
