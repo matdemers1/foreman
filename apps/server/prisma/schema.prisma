@@ -734,6 +734,10 @@ model Commit {
   committedAt DateTime @map("committed_at") @db.Timestamptz(6)
   additions   Int?
   deletions   Int?
+  /// Set when a force push removed this SHA from the remote. **Marked, never deleted**
+  /// (FRM-REQ-105): an attribution, a fix-commit reference or a release note may already cite it,
+  /// and deleting the row would turn a rewritten history into a wrong one.
+  orphanedAt  DateTime? @map("orphaned_at") @db.Timestamptz(6)
 
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
@@ -743,6 +747,7 @@ model Commit {
 
   @@unique([repoId, sha])
   @@index([repoId, committedAt])
+  @@index([repoId, orphanedAt])
   @@map("commit")
 }
 

@@ -20,6 +20,9 @@ import { briefRoutes } from './routes/brief.js';
 import { searchRoutes } from './routes/search.js';
 import { coverageRoutes } from './routes/coverage.js';
 import { recordRoutes } from './routes/record.js';
+import { realityRoutes } from './routes/reality.js';
+import { webhookRoutes } from './routes/webhooks.js';
+import { buildRegistry, type JobRegistry } from './jobs/index.js';
 import { linkRoutes } from './routes/links.js';
 import { tokenRoutes } from './routes/tokens.js';
 import { undoRoutes } from './routes/undo.js';
@@ -67,18 +70,23 @@ export interface AppDeps {
    * login button instead of two, and nothing else changes (FRM-REQ-017).
    */
   readonly oidc?: OidcClient | null;
+  /** Shared with the worker in production; built here when absent. Swapped in tests. */
+  readonly registry?: JobRegistry;
 }
 
 /**
  * The Express app. Routes arrive in Phase 1; what exists here from Phase 0 is what the Compose
  * healthchecks and the tunnel need.
  */
-export function createApp({ config, db, oidc = null }: AppDeps): Express {
+export function createApp({ config, db, oidc = null, registry }: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
   // Behind the Cloudflare Tunnel, so `req.ip` must come from the proxy or every login shares one
   // throttle bucket. One hop, not `true`: trusting every hop lets a client spoof its own address.
   app.set('trust proxy', 1);
+  // Before `express.json`, and with its own raw parser: the HMAC is over the exact bytes GitHub
+  // sent, and a re-serialised object is not those bytes.
+  app.use('/webhooks', webhookRoutes({ db, config, registry: registry ?? buildRegistry({ config }) }));
   app.use(express.json({ limit: '2mb' }));
   app.use(attachAuth({ db, config }));
   mount(app, '/auth', authRoutes({ db, config, oidcAvailable: oidc !== null }));
@@ -91,6 +99,7 @@ export function createApp({ config, db, oidc = null }: AppDeps): Express {
   mount(app, '/api/links', linkRoutes(db));
   mount(app, '/api/projects', coverageRoutes(db));
   mount(app, '/api/projects', recordRoutes(db));
+  mount(app, '/api/projects', realityRoutes(db));
 
   /** Liveness: the process is up. Deliberately touches nothing else. */
   app.get('/healthz', (_req, res) => {

@@ -1,12 +1,30 @@
+import { createGitHubClient, isConfigured, type GitHubClient } from '../adapters/github.js';
+import type { Config } from '../config.js';
+import { backfillJob, ingestWebhookJob, reconcileJob } from './ingest.js';
 import { JobRegistry } from './types.js';
 
 /**
- * Every job kind Foreman knows. Phase 0 registers only what it can prove: a queue with no jobs is
- * untestable, so `example` exists to exercise multi-stage replay, and the later phases add ingest,
- * attribution, scans, reconcile and backup beside it.
+ * Every job kind Foreman knows.
+ *
+ * The GitHub client is built once and shared, because it holds the installation token: one client
+ * per process refreshes one token, where a client per job would mint a new one every time and turn
+ * a rate limit into a mystery.
  */
-export function buildRegistry(): JobRegistry {
+export interface RegistryDeps {
+  readonly config?: Config;
+  /** Swapped in tests. */
+  readonly github?: GitHubClient | null;
+}
+
+export function buildRegistry(deps: RegistryDeps = {}): JobRegistry {
   const registry = new JobRegistry();
+
+  const github =
+    deps.github !== undefined
+      ? deps.github
+      : deps.config !== undefined && isConfigured(deps.config)
+        ? createGitHubClient({ config: deps.config })
+        : null;
 
   registry.register({
     kind: 'example',
@@ -19,6 +37,10 @@ export function buildRegistry(): JobRegistry {
       { name: 'third', run: () => Promise.resolve({ step: 3 }) },
     ],
   });
+
+  registry.register(ingestWebhookJob());
+  registry.register(backfillJob({ github }));
+  registry.register(reconcileJob({ github }));
 
   return registry;
 }

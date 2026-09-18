@@ -27,7 +27,7 @@ const config = (() => {
 })();
 
 const db = createDb(config.DATABASE_URL);
-const registry = buildRegistry();
+const registry = buildRegistry({ config });
 const workerId = `${hostname()}:${String(process.pid)}`;
 const log = logger.child({ workerId });
 

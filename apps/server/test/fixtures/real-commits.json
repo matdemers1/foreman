@@ -1,0 +1,1497 @@
+[
+  {
+    "repo": "bindery",
+    "sha": "449cec75607c",
+    "subject": "e2e: the import filter is a radiogroup now"
+  },
+  {
+    "repo": "bindery",
+    "sha": "e1931ab3564b",
+    "subject": "web: reset mocks between tests under vitest 4"
+  },
+  {
+    "repo": "bindery",
+    "sha": "afc860d7e952",
+    "subject": "docs: recapture screenshots after adopting @d3cloud/ui"
+  },
+  {
+    "repo": "bindery",
+    "sha": "c01c672625f1",
+    "subject": "restore drill: wait for Postgres over TCP, not the socket"
+  },
+  {
+    "repo": "bindery",
+    "sha": "57458adee69f",
+    "subject": "web: install @d3cloud/ui from its release, not a sibling checkout"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0302cea5b695",
+    "subject": "web: adopt @d3cloud/ui"
+  },
+  {
+    "repo": "bindery",
+    "sha": "017d8651a566",
+    "subject": "docs: repair a sentence my last edit orphaned"
+  },
+  {
+    "repo": "bindery",
+    "sha": "846afe5a8fa5",
+    "subject": "ci: npm audit must not fail closed on an unreachable registry"
+  },
+  {
+    "repo": "bindery",
+    "sha": "aaad906fe2ed",
+    "subject": "design audit: recapture screenshots, after the commit this time"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0c0d68b0f99d",
+    "subject": "design audit: D-01 \u2014 give the shell a responsive layer"
+  },
+  {
+    "repo": "bindery",
+    "sha": "02674f1d752e",
+    "subject": "design audit: D-06 and D-07 \u2014 recovery states, and marks you can see"
+  },
+  {
+    "repo": "bindery",
+    "sha": "4b9bde750b7a",
+    "subject": "design audit: recapture screenshots after D-02 through D-05"
+  },
+  {
+    "repo": "bindery",
+    "sha": "797e744d0f0c",
+    "subject": "design audit: D-03 \u2014 find-next inside the bundle"
+  },
+  {
+    "repo": "bindery",
+    "sha": "d9b05c8da32a",
+    "subject": "design audit: the foundation three \u2014 D-05, D-02, D-04"
+  },
+  {
+    "repo": "bindery",
+    "sha": "6f237dbc30a5",
+    "subject": "docs: the Zima's compose is its own file, and pulling images does not update it"
+  },
+  {
+    "repo": "bindery",
+    "sha": "949b74d16228",
+    "subject": "review-panel: the e2e drain gate demanded a state the architecture forbids"
+  },
+  {
+    "repo": "bindery",
+    "sha": "1d05c43bda13",
+    "subject": "review-panel: recapture documentation screenshots after round 10"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0c704ad37609",
+    "subject": "review-panel round 10: fix the regression round 9 introduced, and close four partials"
+  },
+  {
+    "repo": "bindery",
+    "sha": "224ebf4bf51c",
+    "subject": "review-panel round 9: close the last four, found by verifying the remaining 17"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0d03299674e9",
+    "subject": "review-panel: recapture documentation screenshots after round 8"
+  },
+  {
+    "repo": "bindery",
+    "sha": "7b97f515d7d2",
+    "subject": "review-panel round 8: close what the second verification pass found"
+  },
+  {
+    "repo": "bindery",
+    "sha": "acddbe953137",
+    "subject": "review-panel round 7: close the findings verification found still open"
+  },
+  {
+    "repo": "bindery",
+    "sha": "90ad0c10ed00",
+    "subject": "review-panel: recapture documentation screenshots after round 6"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0033fc7acf3e",
+    "subject": "review-panel round 6: correctness, performance, architecture and the blocked findings"
+  },
+  {
+    "repo": "bindery",
+    "sha": "5a6dad27936c",
+    "subject": "review-panel round 5: fix CR-037..CR-040, CR-042, and 36 Medium findings"
+  },
+  {
+    "repo": "bindery",
+    "sha": "646d73c05120",
+    "subject": "review-panel: recapture documentation screenshots for rounds 3 and 4"
+  },
+  {
+    "repo": "bindery",
+    "sha": "b10258d200b9",
+    "subject": "review-panel round 4: fix CR-010, CR-013, CR-021, CR-025..CR-031, CR-041"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0446f263c2cd",
+    "subject": "review-panel round 3: fix CR-008, CR-009, CR-011, CR-012, CR-015..CR-020, CR-022..CR-024, CR-032, CR-033"
+  },
+  {
+    "repo": "bindery",
+    "sha": "142237a27abd",
+    "subject": "review-panel round 2: fix CR-004, CR-005, CR-006, CR-014, CR-034, CR-035, CR-036"
+  },
+  {
+    "repo": "bindery",
+    "sha": "c0175a65e783",
+    "subject": "review-panel round 1: fix CR-001, CR-002, CR-003, CR-007"
+  },
+  {
+    "repo": "bindery",
+    "sha": "af2550f7b77a",
+    "subject": "Note that the unlock session cannot be read from a docker exec"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0812361aa3f0",
+    "subject": "Recapture import after the vault-binding fix"
+  },
+  {
+    "repo": "bindery",
+    "sha": "6daccc6b0a44",
+    "subject": "An import can be bound to the vault at any point, not only when scanned"
+  },
+  {
+    "repo": "bindery",
+    "sha": "17f9e4c4a116",
+    "subject": "Recapture photos with a thumbnail the pipeline actually rendered"
+  },
+  {
+    "repo": "bindery",
+    "sha": "3dad941a1e16",
+    "subject": "Recapture import, photos and vault for Phase 18"
+  },
+  {
+    "repo": "bindery",
+    "sha": "f51c62fc17d6",
+    "subject": "Photos opens on whichever tab has something in it"
+  },
+  {
+    "repo": "bindery",
+    "sha": "f4ac422da5c2",
+    "subject": "Phase 18 screens: Photos \u00b7 Videos, the vault's third tab, and the import rewrite"
+  },
+  {
+    "repo": "bindery",
+    "sha": "dd993bc637bd",
+    "subject": "Phase 18 backend: chunked vault objects, media metadata, video, vault-bound imports"
+  },
+  {
+    "repo": "bindery",
+    "sha": "c78d1aad8953",
+    "subject": "Recapture the vault, and stop the capture-before-commit trap recurring"
+  },
+  {
+    "repo": "bindery",
+    "sha": "c790049f4896",
+    "subject": "Photos and documents are different things, and the vault now says so"
+  },
+  {
+    "repo": "bindery",
+    "sha": "f0debd4bf3ff",
+    "subject": "Vaulted documents belong in the vault, not in everything else"
+  },
+  {
+    "repo": "bindery",
+    "sha": "cd7ca8a77d22",
+    "subject": "Recapture Trust after the sealed-originals line"
+  },
+  {
+    "repo": "bindery",
+    "sha": "7cabe4500cab",
+    "subject": "A vaulted original is sealed, not missing \u2014 and that was stopping backups"
+  },
+  {
+    "repo": "bindery",
+    "sha": "d14e95d0a35d",
+    "subject": "Reset the review fixture every run, and recapture the screenshot"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0ed092830685",
+    "subject": "The screens for correcting a document, and the badge that says who decided"
+  },
+  {
+    "repo": "bindery",
+    "sha": "beb293934e92",
+    "subject": "PATCH /documents/{id} \u2014 the route undo has been waiting for since Phase 3"
+  },
+  {
+    "repo": "bindery",
+    "sha": "7455044df0da",
+    "subject": "A correction has to outlive the next classification run"
+  },
+  {
+    "repo": "bindery",
+    "sha": "041bc4571d3e",
+    "subject": "Acknowledging a dead letter has to tell the badge"
+  },
+  {
+    "repo": "bindery",
+    "sha": "319e6cbb38af",
+    "subject": "The export must name what it could not include"
+  },
+  {
+    "repo": "bindery",
+    "sha": "e3959d51a985",
+    "subject": "Recapture the vault screenshot against the code it now shows"
+  },
+  {
+    "repo": "bindery",
+    "sha": "da5ff68acbe5",
+    "subject": "Cover the vault in the browser, and stop the capture lying about empty screens"
+  },
+  {
+    "repo": "bindery",
+    "sha": "b7ea2bf49dc7",
+    "subject": "The private vault: the screens, and the copies that outlive the host"
+  },
+  {
+    "repo": "bindery",
+    "sha": "8b7d3041c274",
+    "subject": "Prove the vault move, and fix what proving it found"
+  },
+  {
+    "repo": "bindery",
+    "sha": "17d87554f703",
+    "subject": "The vault boundary, before anything can create a vaulted row (T-16.1 to T-16.4, T-16.11)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "3f38c262fc9f",
+    "subject": "The worker died between `up -d` and `alembic upgrade head`"
+  },
+  {
+    "repo": "bindery",
+    "sha": "4ea7d073aa7c",
+    "subject": "Wait for the corpus to be processed before driving a browser"
+  },
+  {
+    "repo": "bindery",
+    "sha": "72bc8270be34",
+    "subject": "Recapture search and add after the effect refactor"
+  },
+  {
+    "repo": "bindery",
+    "sha": "6743e7c6587e",
+    "subject": "Stop resetting state in effects, and cover what that changed"
+  },
+  {
+    "repo": "bindery",
+    "sha": "a17e952e41be",
+    "subject": "Fix env lines my own edit stripped into the shell"
+  },
+  {
+    "repo": "bindery",
+    "sha": "a54f9b36a350",
+    "subject": "One .env in CI, not two files that agreed by coincidence"
+  },
+  {
+    "repo": "bindery",
+    "sha": "acdb64a0a5df",
+    "subject": "Recapture the screenshots, and describe the pipeline that now exists"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0dcc0ab08c91",
+    "subject": "Actions does not support YAML merge keys"
+  },
+  {
+    "repo": "bindery",
+    "sha": "a843eb1a14c8",
+    "subject": "Gate the build on four tiers instead of one"
+  },
+  {
+    "repo": "bindery",
+    "sha": "f3093c59bbdd",
+    "subject": "The health panel counted the whole archive for everyone"
+  },
+  {
+    "repo": "bindery",
+    "sha": "6107bbf51c43",
+    "subject": "Recapture the screenshots for the reorganised sidebar"
+  },
+  {
+    "repo": "bindery",
+    "sha": "77583612c24e",
+    "subject": "A warning that is always on is not a warning (T-14.1 \u2013 T-14.7)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "9d9a1406fefe",
+    "subject": "Two things production found that no test could (T-13.9, T-13.10)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "dbb5ca5fd0a9",
+    "subject": "Write down how this gets turned on, before turning it on"
+  },
+  {
+    "repo": "bindery",
+    "sha": "fcd745a66a4b",
+    "subject": "The drill must run where the archive is, not where the checkout is"
+  },
+  {
+    "repo": "bindery",
+    "sha": "b2cdc3cfaea0",
+    "subject": "Restore from S3 alone and find the document (T-13.10)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "b07d80227cfe",
+    "subject": "The worker could not run pg_dump, and only a real run said so"
+  },
+  {
+    "repo": "bindery",
+    "sha": "7be4d2fa4e8b",
+    "subject": "Fix the lint T-13.9 shipped with"
+  },
+  {
+    "repo": "bindery",
+    "sha": "1df26f4c7aa3",
+    "subject": "Guard the rule that could delete the archive (T-13.9)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "df0af4e92508",
+    "subject": "A backup that stopped in March, noticed in November (T-13.8)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "eda8a8292d1c",
+    "subject": "Recapture the Trust screenshot for the offsite panel"
+  },
+  {
+    "repo": "bindery",
+    "sha": "141fe482eda3",
+    "subject": "An age, not a tick, and a failure with its reason (T-13.7)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "861b813bc74e",
+    "subject": "Run on a cadence, and never look green for the wrong reason (T-13.6)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "9ffe6980c7e3",
+    "subject": "The dump goes last, or the bucket holds a dangling reference (T-13.5)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "f380f65eb73d",
+    "subject": "Ship each blob once, and do not believe the ledger (T-13.4)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "786470d97fba",
+    "subject": "Prove a backup would survive, not that AWS answers the phone (T-13.3)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "52cc281e0c25",
+    "subject": "Recapture the documentation screenshots for the offsite panel"
+  },
+  {
+    "repo": "bindery",
+    "sha": "c7ba98b37b0d",
+    "subject": "AWS credentials belong in the application, not the compose file (T-13.2)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "ec5e9f71b562",
+    "subject": "Copy 3 of 3-2-1 was described, not built (T-13.1)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "849537faeca2",
+    "subject": "Make the golden corpus a correction rather than a transcription (T-9.5)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "12531bec80ed",
+    "subject": "A removed tag link still occupies its primary key (T-9.3)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "e3bdeb6b2d25",
+    "subject": "Delete the Batch API rather than leave it looking finished (T-9.9, T-9.10)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "156303f719df",
+    "subject": "A replay should reset the job, not add a second one"
+  },
+  {
+    "repo": "bindery",
+    "sha": "65c9af01326f",
+    "subject": "`max_tokens` is not a ceiling on thinking. Effort is."
+  },
+  {
+    "repo": "bindery",
+    "sha": "0b0294560931",
+    "subject": "Never just \"structured output was empty\""
+  },
+  {
+    "repo": "bindery",
+    "sha": "3ba3150597ef",
+    "subject": "A refusal is not an empty response (T-9.8)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "06c222d8a785",
+    "subject": "Staleness is a commit hash, not a timestamp"
+  },
+  {
+    "repo": "bindery",
+    "sha": "20b73e0b2bb7",
+    "subject": "Guides that cannot quietly rot (T-11.1 \u2013 T-11.4, T-11.8, T-11.9)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "aa73c671b92c",
+    "subject": "Version comes from the build, and the worker says its own (T-11.5 \u2013 T-11.7)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "ca157d430fc1",
+    "subject": "An unscoped log line is not a public one (T-10.14)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "ce7ad693be8f",
+    "subject": "The screens for accounts, administration and joining (T-10.16 \u2013 T-10.18)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "bbf227833b8e",
+    "subject": "Deduplication was global, and that is a cross-tenant leak (T-10.13, T-10.15)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "276c161ee2c9",
+    "subject": "Retire recovery codes rather than deleting them"
+  },
+  {
+    "repo": "bindery",
+    "sha": "3099a171e1a0",
+    "subject": "Accounts: invitations, reset codes, TOTP, suspension (T-10.8 \u2013 T-10.12)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "b57b74655fb9",
+    "subject": "Record the Access cutover in the runbook and the invariants"
+  },
+  {
+    "repo": "bindery",
+    "sha": "a6e879e12bbd",
+    "subject": "Harden the front door before the outer gate comes off (T-10.1 \u2013 T-10.6)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "c2a564b79587",
+    "subject": "Guards learned from over-merging a real archive (T-9.3)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "09d25a55bdcb",
+    "subject": "Thinking was on by default, and it made the answer worse"
+  },
+  {
+    "repo": "bindery",
+    "sha": "45ae83d63291",
+    "subject": "Ask about a long taxonomy in chunks (T-9.3)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0aff921f990d",
+    "subject": "\"Could not be read\" was true and sent me to the wrong place"
+  },
+  {
+    "repo": "bindery",
+    "sha": "d446c46551b0",
+    "subject": "A lease sized to the stage, not to the slowest stage (T-9.6)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "1441cae9dc69",
+    "subject": "Unify document types and tags, not only folders (T-9.2)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "27a3004bcda6",
+    "subject": "Offer the taxonomy the archive actually uses (T-9.1)"
+  },
+  {
+    "repo": "bindery",
+    "sha": "6c2b21878ed0",
+    "subject": "Ask whether anything looked at the photograph"
+  },
+  {
+    "repo": "bindery",
+    "sha": "292dadbd771e",
+    "subject": "Shrink the large originals instead of giving up on them"
+  },
+  {
+    "repo": "bindery",
+    "sha": "2e51cbdf7cbf",
+    "subject": "Do not offer \"unreadable\" to a request that is showing you the picture"
+  },
+  {
+    "repo": "bindery",
+    "sha": "6f3b3f36a8a8",
+    "subject": "Send the photograph, not a render of a PDF wrapper around it"
+  },
+  {
+    "repo": "bindery",
+    "sha": "8cc06554c375",
+    "subject": "An unavailable provider is not a failed job"
+  },
+  {
+    "repo": "bindery",
+    "sha": "a575cd456540",
+    "subject": "A failed run must not set the vocabulary for its own retry"
+  },
+  {
+    "repo": "bindery",
+    "sha": "426e89739485",
+    "subject": "Send the page, not a postage stamp"
+  },
+  {
+    "repo": "bindery",
+    "sha": "bdd954824564",
+    "subject": "Correct the deploy runbook: the stack is not where CasaOS puts things"
+  },
+  {
+    "repo": "bindery",
+    "sha": "ab1080842f23",
+    "subject": "Ask what was readable, not whether the column is null"
+  },
+  {
+    "repo": "bindery",
+    "sha": "c75007ef9a83",
+    "subject": "Look at the pictures, and ask which folders are the same unit"
+  },
+  {
+    "repo": "bindery",
+    "sha": "2638531593c5",
+    "subject": "Keep the end of long errors, and stop retrying what cannot succeed"
+  },
+  {
+    "repo": "bindery",
+    "sha": "55167edaad08",
+    "subject": "Chain OCR remedies, and stop --force-ocr colliding with --skip-text"
+  },
+  {
+    "repo": "bindery",
+    "sha": "699a4d63b3d5",
+    "subject": "Handle the four failure modes the alpha-channel bug was hiding"
+  },
+  {
+    "repo": "bindery",
+    "sha": "9cf0e797378d",
+    "subject": "Fix every failure from the 500-file import, and the review pile"
+  },
+  {
+    "repo": "bindery",
+    "sha": "4ecc27240f57",
+    "subject": "Stop OCR-ing documents that already have perfect text"
+  },
+  {
+    "repo": "bindery",
+    "sha": "888010d1572a",
+    "subject": "Audit every file type in the real archive and support the ones that belong"
+  },
+  {
+    "repo": "bindery",
+    "sha": "866267906bc8",
+    "subject": "Import everything in one click; stop advertising a mode that does not exist"
+  },
+  {
+    "repo": "bindery",
+    "sha": "ec1ac9d21629",
+    "subject": "Support office documents: Word, Excel, PowerPoint, CSV, text"
+  },
+  {
+    "repo": "bindery",
+    "sha": "a09b03ba8ee0",
+    "subject": "Rebuild the pipeline page; fix the two documents it was hiding"
+  },
+  {
+    "repo": "bindery",
+    "sha": "e768de060982",
+    "subject": "Replace polling with pushed updates over a WebSocket"
+  },
+  {
+    "repo": "bindery",
+    "sha": "3cd25c0cf1e1",
+    "subject": "Stop the add page hammering the progress endpoint 60 times a second"
+  },
+  {
+    "repo": "bindery",
+    "sha": "b79545b49e61",
+    "subject": "Fix the file picker on the add page staging nothing"
+  },
+  {
+    "repo": "bindery",
+    "sha": "dfe62f0f8f72",
+    "subject": "Add-files page, a visual pipeline, and diagnostics that outlive the container"
+  },
+  {
+    "repo": "bindery",
+    "sha": "0f97a25cd3af",
+    "subject": "Redesign: sidebar navigation, Ask as the front door, a logo, icons throughout"
+  },
+  {
+    "repo": "bindery",
+    "sha": "dfa27cf3d164",
+    "subject": "Make replays actually replay; add a model picker"
+  },
+  {
+    "repo": "bindery",
+    "sha": "21ca0b0ca805",
+    "subject": "Force OCR when a page yields nothing; show the extracted text; add rescan"
+  },
+  {
+    "repo": "bindery",
+    "sha": "c9edfd1d324b",
+    "subject": "Fix page padding, job visibility, and add a UI path to re-run AI review"
+  },
+  {
+    "repo": "bindery",
+    "sha": "66c2a55aeb89",
+    "subject": "Mount scripts/ into the test containers"
+  },
+  {
+    "repo": "bindery",
+    "sha": "71698f84f8fe",
+    "subject": "Restore drill: coalesce NULL titles, which made a real hit read as a miss"
+  },
+  {
+    "repo": "bindery",
+    "sha": "96ad194794a0",
+    "subject": "Pin pg_dump to 16; a v1.16 archive is unrestorable by pg16"
+  },
+  {
+    "repo": "bindery",
+    "sha": "e45ebfe1e38e",
+    "subject": "Parse the database URL with make_url; urlsplit breaks on a password containing /"
+  },
+  {
+    "repo": "bindery",
+    "sha": "88b9e658fff4",
+    "subject": "Fix pg_dump connection handling; backups failed on the real host"
+  },
+  {
+    "repo": "bindery",
+    "sha": "253e0bd44749",
+    "subject": "Phase 8 (2/2): tokens, camera, first run, states, a11y, perf"
+  },
+  {
+    "repo": "bindery",
+    "sha": "06edf2f4e748",
+    "subject": "Phase 8 (1/2): health panel, notifications, Q&A with citations"
+  },
+  {
+    "repo": "bindery",
+    "sha": "4fe6808ef63f",
+    "subject": "Phase 7: household, libraries and the leak suite"
+  },
+  {
+    "repo": "bindery",
+    "sha": "a40d2feceaa9",
+    "subject": "Phase 6: trust, export and resilience"
+  },
+  {
+    "repo": "bindery",
+    "sha": "913a5baba1f9",
+    "subject": "Phase 5 UI: one Organise screen for correspondents, things, and taxonomy"
+  },
+  {
+    "repo": "bindery",
+    "sha": "949467dfdb17",
+    "subject": "Phase 5 backend: aliases, merge, assets, shelves, taxonomy health"
+  },
+  {
+    "repo": "bindery",
+    "sha": "bd7699d4db3b",
+    "subject": "Phase 4 UI: staged import, and bulk edit where you browse"
+  },
+  {
+    "repo": "bindery",
+    "sha": "227f15bf2d9a",
+    "subject": "Phase 4 backend: backlog import, batch classification, bulk edit"
+  },
+  {
+    "repo": "bindery",
+    "sha": "bbf4de97a415",
+    "subject": "Settings and archive browser \u2014 two screens the Scope of Work never scheduled"
+  },
+  {
+    "repo": "bindery",
+    "sha": "996aed6bc896",
+    "subject": "Docs: T-0.5 is closed and the stack is live"
+  },
+  {
+    "repo": "bindery",
+    "sha": "99b702e343e8",
+    "subject": "Deployment: it's live, and ZimaOS taught us three things"
+  },
+  {
+    "repo": "bindery",
+    "sha": "d6e86ff97f68",
+    "subject": "Deployment: ZimaOS custom-app manifest and runbook"
+  },
+  {
+    "repo": "bindery",
+    "sha": "e8ca57cc6e84",
+    "subject": "CI: name the web image's final stage `runtime`"
+  },
+  {
+    "repo": "bindery",
+    "sha": "52add7928aa7",
+    "subject": "CI: run the suite before publishing, and tag images so the host can pull a stable ref"
+  },
+  {
+    "repo": "bindery",
+    "sha": "344d52b10a9c",
+    "subject": "Phase 3 UI, boundary confirmation, and a CLAUDE.md restore"
+  },
+  {
+    "repo": "bindery",
+    "sha": "29aa30d6ace0",
+    "subject": "Phase 3 backend: classification, provenance, the gate, rules, undo"
+  },
+  {
+    "repo": "bindery",
+    "sha": "3a36a83f1402",
+    "subject": "Phase 2: bundles as documents, and a deterministic known-form registry"
+  },
+  {
+    "repo": "bindery",
+    "sha": "24c72b466b50",
+    "subject": "Phase 1 UI: search, viewer with highlight overlay, palette, pipeline"
+  },
+  {
+    "repo": "bindery",
+    "sha": "d8c5775cbe24",
+    "subject": "Phase 1 backend: queue, pipeline, page-level search"
+  },
+  {
+    "repo": "bindery",
+    "sha": "ebd4edfae448",
+    "subject": "Phase 0 \u2014 foundation: stack, baseline schema, auth, upload"
+  },
+  {
+    "repo": "bindery",
+    "sha": "7d04ec9b0b23",
+    "subject": "Scaffold Bindery \u2014 self-hosted document archive"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "e2b289f0d3b2",
+    "subject": "Package the SDK for npm as @d3cloudio/auth-client 0.1.0"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "0979dd3e0147",
+    "subject": "Every token exchange was broken, and 28 tests said otherwise"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "e7bad608dc3d",
+    "subject": "Bindery is a preset, so its address is answered once rather than typed three times"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "59c0643738ba",
+    "subject": "The Python SDK says it is typed, and the seed names Bindery as it registers"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "357a270e7dfb",
+    "subject": "Python client: a sign-in an app can bind to its own browser"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "df1d52e9dbc2",
+    "subject": "Python client: a renewed session keeps its subject, and keys that rotate still verify"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "5878b4fe0bba",
+    "subject": "v0.1.0: Apache-2.0, a README for people who did not write it, SECURITY.md"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "4703e9aee314",
+    "subject": "Sign-out pages drawn like the rest of D3 Auth, and answers that say what they do"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "603404f85c70",
+    "subject": "Presets: Immich's whole settings screen before Register; the owner is granted what they register"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "2edcc2fcf968",
+    "subject": "Consumer contract: point apps at the connection sheet and presets"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "2eea35b5d553",
+    "subject": "Console: add an app from a preset, and connect any app from its page"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "04359c0d3288",
+    "subject": "App presets: migration 0007, routes, audit detail and the state file"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "4dac2505163f",
+    "subject": "App presets: registry, Immich preset and the connection sheet builder"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "36073ab857bc",
+    "subject": "Lockfile: integrity for the @d3cloud/ui 1.1.0 tarball"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "8c94cf05093f",
+    "subject": "Console on @d3cloud/ui 1.1.0"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "c7ba19a8eb15",
+    "subject": "Runbook: the one Free-plan rate limit rule that is actually applied"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "08299bfd5e8b",
+    "subject": "Mail relay deployed: KV namespace, ALERT_TO as a secret, sender restricted"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "3cc5343a671e",
+    "subject": "e2e F7: match the key-generated alert by its full text"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "10cda1d19db2",
+    "subject": "Console on the published @d3cloud/ui 1.1.0-rc.2"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "6a4d02b496dc",
+    "subject": "A per-response style nonce for the console's runtime styles"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "81978774a47c",
+    "subject": "e2e: follow the rebuilt console"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "3710c99150a9",
+    "subject": "Console rebuilt on the Page Patterns (@d3cloud/ui 1.1)"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "df2014443134",
+    "subject": "No-JavaScript sign-in pages drawn in the design system's classes"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "0f6648338d66",
+    "subject": "Theme boot script in the console shell, allowed by hash in the CSP"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "b9e5ae40995d",
+    "subject": "Console on @d3cloud/ui 1.1.0-rc.1, from a vendored tarball"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "ed1177ae2d26",
+    "subject": "Server image: Postgres 16 client tools, so restores work"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "79c9263bc2a8",
+    "subject": "Console signs in through its own built-in client (ADR-005)"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "501159b0fda2",
+    "subject": "T-6.5: sealed second admin, backups tile, operations runbooks"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "d75e18089ad9",
+    "subject": "T-6.4: a probe that notices when D3 Auth cannot say so itself"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "a9f4e0e899f4",
+    "subject": "T-6.3: alert rules that read the audit trail"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "57a5c7736a1e",
+    "subject": "T-6.1, T-6.2: a nightly bundle, and a drill that restores it"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "be62689c3547",
+    "subject": "Supply chain: judge only recent releases, and excuse one exact Prisma version"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "1d2f819b4f0e",
+    "subject": "Close the last ZAP findings, and fail the nightly scan only on High"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "0bc4ab635ce4",
+    "subject": "Let the conformance server read the bridge CA on Linux"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "4021155e30cd",
+    "subject": "Runbook wording"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "77ba5483d9b0",
+    "subject": "Runbook: signing everybody out at once"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "b8fc4c52a729",
+    "subject": "T-5.5 finding: a sign-in finished by the wrong browser"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "0e9171d6cc4b",
+    "subject": "T-5.5 findings: sign-out on every page, and an offer after factor changes"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "d8952d38aae7",
+    "subject": "T-5.5 finding: a borrowed session could plant its own passkey"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "2b69acc00a51",
+    "subject": "T-5.5 findings: a breached-password corpus, and sessions that end"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "2cb65690f809",
+    "subject": "T-5.4: the nightly authenticated ZAP scan"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "59c21b5a7b49",
+    "subject": "Mount the conformance CA as a directory, so Linux sees it"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "052f4772be79",
+    "subject": "T-5.3: Semgrep at zero, and the supply chain it pointed at"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "e3069f577780",
+    "subject": "T-5.2: the logout plans, and sign-outs that never reached the app"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "abc29f357814",
+    "subject": "Run the adversarial suite as its own CI gate"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "82eb8aec955a",
+    "subject": "Keep the SDK lint-clean"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "f69d11979124",
+    "subject": "T-5.1: lying to the app, and a signature nobody was checking"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "0ce6a97d3b9e",
+    "subject": "T-5.1: getting past the sign-in without what it asks for"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "21eb753d25a9",
+    "subject": "Keep the adversarial suite lint-clean"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "0dabbe139111",
+    "subject": "T-5.1: bending the protocol, and tokens that outlived their access"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "25b4ac5863d6",
+    "subject": "T-5.1: the first two attack classes, and what they found"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "55a48cfd16a9",
+    "subject": "T-4.8: F7 end to end, the console flows, and audit coverage that bites"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "b049256e9383",
+    "subject": "T-4.7: a console home that is wrong when the instance is wrong"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "7abe6146f4a3",
+    "subject": "T-4.6: export and import, with the file honest about what it is not"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "691c3d6b7ed6",
+    "subject": "T-4.5: settings, with the secrets sealed and the test send honest"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "359a0830fbe6",
+    "subject": "T-4.2: reading the audit trail"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "0f416a93a764",
+    "subject": "T-4.4: proving it is still you, before the owner-only buttons"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "a215bcb3afdb",
+    "subject": "Publish the key set in the order the provider used to"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "19a145d5cfb7",
+    "subject": "T-4.3: rotating the signing keys, with the waits enforced"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "092714d5fc14",
+    "subject": "T-4.1: groups, and the union that makes them useful"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "17b42cd4d6cb",
+    "subject": "Let the conformance fixture skip the continue-as interstitial"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "e2775d8fdb5a",
+    "subject": "T-3.9: the Python SDK"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "beea8f4eccf5",
+    "subject": "T-3.10, T-3.11, T-3.13: the example, the contract, and the flows that prove them"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "453d30f50977",
+    "subject": "T-3.8: the TypeScript SDK"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "9edb4fb66bbe",
+    "subject": "T-3.6, T-3.7: the console screens, and the launcher"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "cfeaf806bad5",
+    "subject": "T-3.5: telling apps when somebody is signed out"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "fb3410111788",
+    "subject": "T-3.4: continue as, once per app"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "b8311a68b5df",
+    "subject": "T-3.3: the roles claim, scoped to the app that asked"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "876e869b2399",
+    "subject": "T-3.2: grants, and deny by default"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "21737b0c9d58",
+    "subject": "T-3.1: apps registered from a manifest, live"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "78aceeab775b",
+    "subject": "Serve the sign-in and break-glass pages without a console build"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "c4699dff8e68",
+    "subject": "Hash the session id before it becomes a challenge key"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "43508a2830b5",
+    "subject": "T-2.10: the flows people actually walk, at both sizes"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "0457ac2c331d",
+    "subject": "T-2.9: break-glass, for when the only factor is gone"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "f9c63a36beea",
+    "subject": "T-2.8: suspend, let back in, and reset an account"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "e0f655314e95",
+    "subject": "T-2.7: the account area \u2014 profile, password, sessions and devices"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "d3da15b60323",
+    "subject": "T-2.6: trusted devices, and the rule that admins can prove it is them"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "603c1bf8ef7e",
+    "subject": "T-2.5: passkeys, enrolled and signed in with"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "062eff59acce",
+    "subject": "T-2.4: TOTP with single-use codes"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "e18a5053fb5b",
+    "subject": "T-2.3: invites end to end"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "e5b8cd8b27df",
+    "subject": "T-2.1, T-2.2: mail adapter with three drivers, and the relay Worker"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "86fb0937db98",
+    "subject": "Express example deployed at demo.d3cloud.io against the live instance"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "4884531ef9e5",
+    "subject": "Package the Express example so it can run beside a deployed D3 Auth"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "1ab4a8f3e25e",
+    "subject": "D3 Auth runs its own cloudflared, like Bindery"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "4053a7f2e88e",
+    "subject": "Drop a flaky wall-clock timing test for a deterministic one"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "ef71cc2dc219",
+    "subject": "Record sessions inside the request, not in a fire-and-forget listener"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "44139cd379a7",
+    "subject": "Assert where logout lands, not what renders there"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "b782fcb00022",
+    "subject": "Keep Playwright out of the unit job"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "44f81d2c2223",
+    "subject": "T-1.13: first-run setup \u2014 claim a fresh instance from the browser (REQ-141)"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "74221a26a6f9",
+    "subject": "T-1.11 (part): publish images from CI and write the deploy runbook"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "f4bd57ad563c",
+    "subject": "T-1.12: Express example app and the F1 Playwright flows"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "8abfd170add5",
+    "subject": "T-1.10: migrations run at boot behind an automatic dump"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "625fe61b6fb8",
+    "subject": "T-1.5, T-1.6, T-1.7, T-1.8, T-1.9: the real sign-in, sessions, logout, headers and audit"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "e8e8f9f6961f",
+    "subject": "T-1.4: sign-in throttling"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "972cdd7c4879",
+    "subject": "T-1.2, T-1.3: password verification with a decoy, and the password policy"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "52e6bf8c11bf",
+    "subject": "T-1.1: login state machine"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "f02b36092be6",
+    "subject": "T-0.9: OpenID Conformance Suite harness, Basic and Config plans in CI"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "6c90ebbc1fcb",
+    "subject": "T-0.11: console shell on @d3cloud/ui, served by the server"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "7470af7c578a",
+    "subject": "T-0.10: structured logging with a secret scrubber, real readiness, no-egress test"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "f482b8de4467",
+    "subject": "T-0.7, T-0.8: provider configuration and throwaway dev login"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "350705d3a9ac",
+    "subject": "T-0.6: Prisma adapter for oidc-provider"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "ebe1ff8067b0",
+    "subject": "T-0.5: signing keys generated at first boot, sealed under the KEK"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "c3628a81b7cd",
+    "subject": "T-0.4: fail-fast config and KEK envelope crypto"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "03bfb592e647",
+    "subject": "T-0.3: Prisma schema and migration 0001 for every Data Model entity"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "83326458412a",
+    "subject": "T-0.2: Docker Compose stack and hardened multi-stage server image"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "d76ce3056651",
+    "subject": "T-0.1: pnpm monorepo with strict TypeScript, ESLint, Vitest and CI"
+  },
+  {
+    "repo": "d3-auth",
+    "sha": "7ddfd5673380",
+    "subject": "Scaffold d3-auth: layout, CLAUDE.md, compose, env example, seed example"
+  },
+  {
+    "repo": "foreman",
+    "sha": "f960e0a2c1d8",
+    "subject": "The generated Audit Index (T-4.12)"
+  },
+  {
+    "repo": "foreman",
+    "sha": "6147135836c4",
+    "subject": "Cross-project search (T-4.11, S-06)"
+  },
+  {
+    "repo": "foreman",
+    "sha": "a96cb350ec85",
+    "subject": "The document editor, Mermaid, and the generated registers (T-4.8, T-4.10, T-4.12)"
+  },
+  {
+    "repo": "foreman",
+    "sha": "0c21182e4d5a",
+    "subject": "The record: documents by section, revisions, ADRs, citations (T-4.1 \u2026 T-4.9, T-4.11)"
+  },
+  {
+    "repo": "foreman",
+    "sha": "655bf5a29179",
+    "subject": "Pin the coercion bug next to its fix, and close out Phase 3"
+  },
+  {
+    "repo": "foreman",
+    "sha": "0ae79e903557",
+    "subject": "The register, its detail, and the two views that replace documents (T-3.1, T-3.8, T-3.9)"
+  },
+  {
+    "repo": "foreman",
+    "sha": "7911d46929fb",
+    "subject": "foreman_coverage MCP tool (T-3.7)"
+  },
+  {
+    "repo": "foreman",
+    "sha": "6894f06c70e5",
+    "subject": "Coverage, the traceability matrix and the exit gate (T-3.4, T-3.5, T-3.6)"
+  },
+  {
+    "repo": "foreman",
+    "sha": "d9da14c661c7",
+    "subject": "T-3.2: the EARS parser, tuned against 591 real requirements"
+  },
+  {
+    "repo": "foreman",
+    "sha": "b7439814fdb3",
+    "subject": "T-2.10: edit forms, and what they deliberately do not offer"
+  },
+  {
+    "repo": "foreman",
+    "sha": "ffed03d3283d",
+    "subject": "T-0.8: the second login path, and two bugs that only a click could find"
+  },
+  {
+    "repo": "foreman",
+    "sha": "7bc3b117b576",
+    "subject": "T-1.12: a board, and status changed by control rather than by dragging"
+  },
+  {
+    "repo": "foreman",
+    "sha": "61d6164fc75c",
+    "subject": "T-1.11: the five screens, on the Table that unblocked them"
+  },
+  {
+    "repo": "foreman",
+    "sha": "ed5066b0666d",
+    "subject": "ADR-010 resolved: the OIDC path is on the published SDK"
+  },
+  {
+    "repo": "foreman",
+    "sha": "602211a62f6c",
+    "subject": "Console: @d3cloud/ui v1.2.0, which unblocks the Phase 1 screens"
+  },
+  {
+    "repo": "foreman",
+    "sha": "c4b0b3c19068",
+    "subject": "T-2.5, T-2.7: If-Match, TOTP enrolment, and a flaky test made honest"
+  },
+  {
+    "repo": "foreman",
+    "sha": "0c81e04c6868",
+    "subject": "T-2.8, T-2.9: writing from Claude, and the gate that only asks when it matters"
+  },
+  {
+    "repo": "foreman",
+    "sha": "798e22b7893c",
+    "subject": "T-2.6: scoped tokens, and a denial that leaves a trace"
+  },
+  {
+    "repo": "foreman",
+    "sha": "f859603d6632",
+    "subject": "T-2.1 \u2026 T-2.4, T-2.11: nothing is unrecoverable, and every route is checked"
+  },
+  {
+    "repo": "foreman",
+    "sha": "0ed9d8f4ccf9",
+    "subject": "issue-token, and the shim proved against a running Foreman"
+  },
+  {
+    "repo": "foreman",
+    "sha": "eeded0601f78",
+    "subject": "T-1.9, T-1.10: the MCP shim, and the contract tests that keep it a peer"
+  },
+  {
+    "repo": "foreman",
+    "sha": "81bc7f028257",
+    "subject": "T-1.7, T-1.8: the brief, the portfolio, and typed search"
+  },
+  {
+    "repo": "foreman",
+    "sha": "31dae80d7033",
+    "subject": "Lint: the spine test spread a Headers init that may be an array"
+  },
+  {
+    "repo": "foreman",
+    "sha": "288b797fd0f5",
+    "subject": "T-1.1 \u2026 T-1.6: the spine, and the invariants stated as types where possible"
+  },
+  {
+    "repo": "foreman",
+    "sha": "fb31e7833ce3",
+    "subject": "T-0.12: e2e against the stack, not against a dev server"
+  },
+  {
+    "repo": "foreman",
+    "sha": "5b28901a97a2",
+    "subject": "T-0.10, T-0.11, T-0.12: a console you can sign into, a seed, and the gate"
+  },
+  {
+    "repo": "foreman",
+    "sha": "7a6883c05ffd",
+    "subject": "T-0.7: the second login path, and the test that blackholes it"
+  },
+  {
+    "repo": "foreman",
+    "sha": "ee6a6f1d667c",
+    "subject": "T-0.6: the login path that has to work when D3 Auth does not"
+  },
+  {
+    "repo": "foreman",
+    "sha": "99d37cbec7fb",
+    "subject": "T-0.2, T-0.4, T-0.5: it boots, it refuses, and a failed stage replays alone"
+  },
+  {
+    "repo": "foreman",
+    "sha": "f49c066fc2a6",
+    "subject": "T-0.3: the whole schema, with the three traps sprung deliberately"
+  },
+  {
+    "repo": "foreman",
+    "sha": "95017d512155",
+    "subject": "T-0.1, T-0.13: a real monorepo, and the assertion that keeps Claude a user"
+  },
+  {
+    "repo": "foreman",
+    "sha": "562c22fada1a",
+    "subject": "Scaffold: the shape of Foreman before any of it exists"
+  }
+]
