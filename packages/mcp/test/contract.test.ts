@@ -1,6 +1,7 @@
 import {
   BriefInput,
   CACHE,
+  CoverageInput,
   gateForDelete,
   gateForLink,
   gateForPriority,
@@ -79,6 +80,7 @@ describe('schemas are generated from packages/shared (FRM-REQ-081)', () => {
     foreman_portfolio: PortfolioInput,
     foreman_search: SearchInput,
     foreman_get: GetInput,
+    foreman_coverage: CoverageInput,
   };
 
   it.each(READ_TOOLS.map((tool) => [tool.name, tool] as const))(
@@ -139,6 +141,21 @@ describe('the tools call the API they claim to', () => {
       project: 'BND',
       limit: 5,
     });
+  });
+
+  it('foreman_coverage asks the project for its holes', async () => {
+    const get = vi.fn().mockResolvedValue({ uncoveredMusts: [] });
+    const tool = READ_TOOLS.find((t) => t.name === 'foreman_coverage');
+    await tool?.run(clientWith(get), { project: 'BND' });
+    expect(get).toHaveBeenCalledWith('/api/projects/BND/coverage');
+  });
+
+  it('foreman_coverage asks the gate when it is given a phase', async () => {
+    const get = vi.fn().mockResolvedValue({ passed: false, failures: [] });
+    const tool = READ_TOOLS.find((t) => t.name === 'foreman_coverage');
+    await tool?.run(clientWith(get), { project: 'BND', phase: 'BND-P-3' });
+    // Asking is not completing: the gate is a question here, never a state change.
+    expect(get).toHaveBeenCalledWith('/api/projects/BND/phases/BND-P-3/gate');
   });
 
   it('refuses input that does not match the shared schema', async () => {

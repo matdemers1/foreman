@@ -58,6 +58,18 @@ export const GetInput = z.object({
 export type GetInput = z.infer<typeof GetInput>;
 
 /**
+ * `foreman_coverage` / `GET /api/projects/:code/coverage`.
+ *
+ * With a phase, the answer is that phase's exit gate — what stands in the way of calling it
+ * complete — rather than the project-wide holes.
+ */
+export const CoverageInput = z.object({
+  project: ProjectCode.describe('The project code, e.g. BND'),
+  phase: HumanId.optional().describe('A phase ID, e.g. BND-P-3: answer its exit gate instead'),
+});
+export type CoverageInput = z.infer<typeof CoverageInput>;
+
+/**
  * Cache metadata on a listing. The client is told how long an answer stays good for and what it is
  * scoped to, so it need not re-ask for a portfolio that has not changed.
  */
@@ -73,4 +85,5 @@ export const CACHE = {
   portfolio: { ttlMs: 60_000, cacheScope: 'global' },
   search: { ttlMs: 15_000, cacheScope: 'global' },
   get: { ttlMs: 30_000, cacheScope: 'project' },
+  coverage: { ttlMs: 30_000, cacheScope: 'project' },
 } as const satisfies Record<string, CacheMeta>;

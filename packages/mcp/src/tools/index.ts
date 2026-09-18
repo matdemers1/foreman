@@ -1,4 +1,11 @@
-import { BriefInput, CACHE, GetInput, PortfolioInput, SearchInput } from '@foreman/shared';
+import {
+  BriefInput,
+  CACHE,
+  CoverageInput,
+  GetInput,
+  PortfolioInput,
+  SearchInput,
+} from '@foreman/shared';
 import { z } from 'zod';
 import type { ForemanClient } from '../client.js';
 import { WRITE_TOOLS } from './writes.js';
@@ -78,6 +85,21 @@ export const READ_TOOLS: readonly ToolDefinition[] = [
     run: async (client, input) => {
       const args = GetInput.parse(input);
       return client.get(`/api/entities/${args.id}`, { backlinks: args.backlinks });
+    },
+  },
+  {
+    name: 'foreman_coverage',
+    title: 'Coverage',
+    description:
+      'Uncovered Musts, tasks citing no requirement, requirements with no acceptance test, EARS ' +
+      'warnings. With a phase, answers its exit gate instead: what stands in the way of completing it.',
+    inputSchema: CoverageInput,
+    cache: CACHE.coverage,
+    run: async (client, input) => {
+      const args = CoverageInput.parse(input);
+      return args.phase === undefined
+        ? client.get(`/api/projects/${args.project}/coverage`)
+        : client.get(`/api/projects/${args.project}/phases/${args.phase}/gate`);
     },
   },
 ];
