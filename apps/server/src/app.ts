@@ -13,6 +13,8 @@ import type { Db } from './db.js';
 import { schemaRevision } from './boot.js';
 import { logger } from './logger.js';
 import { attachAuth } from './auth/middleware.js';
+import { mcpRoutes } from './routes/mcp.js';
+import { createVerifier, protectedResourceMetadata, type Verifier } from './auth/resource-server.js';
 import { authRoutes } from './routes/auth.js';
 import { oidcRoutes } from './routes/oidc.js';
 import { projectRoutes } from './routes/projects.js';
@@ -74,13 +76,15 @@ export interface AppDeps {
   readonly oidc?: OidcClient | null;
   /** Shared with the worker in production; built here when absent. Swapped in tests. */
   readonly registry?: JobRegistry;
+  /** Injected by tests; built from config otherwise (ADR-013). */
+  readonly verifier?: Verifier | null;
 }
 
 /**
  * The Express app. Routes arrive in Phase 1; what exists here from Phase 0 is what the Compose
  * healthchecks and the tunnel need.
  */
-export function createApp({ config, db, oidc = null, registry }: AppDeps): Express {
+export function createApp({ config, db, oidc = null, registry, verifier: given }: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
   // Behind the Cloudflare Tunnel, so `req.ip` must come from the proxy or every login shares one
@@ -91,7 +95,10 @@ export function createApp({ config, db, oidc = null, registry }: AppDeps): Expre
   const jobs = registry ?? buildRegistry({ config });
   app.use('/webhooks', webhookRoutes({ db, config, registry: jobs }));
   app.use(express.json({ limit: '2mb' }));
-  app.use(attachAuth({ db, config }));
+  // Foreman as an OAuth 2.1 resource server (ADR-013). Null when D3 Auth is unconfigured, which
+  // simply means no remote MCP — the stdio shim and its scoped tokens are unaffected.
+  const verifier = given === undefined ? createVerifier(config) : given;
+  app.use(attachAuth({ db, config, verifier }));
   mount(app, '/auth', authRoutes({ db, config, oidcAvailable: oidc !== null }));
   mount(app, '/auth/oidc', oidcRoutes({ db, config, client: oidc }));
   mount(app, '/api/projects', projectRoutes(db));
@@ -144,8 +151,32 @@ export function createApp({ config, db, oidc = null, registry }: AppDeps): Expre
     });
   });
 
+  /**
+   * RFC 9728 protected-resource metadata (ADR-013), served at both paths the spec tells clients to
+   * try: the root, and the one suffixed with the MCP endpoint's path.
+   *
+   * Registered **before** the SPA fallback on purpose. The catch-all answered every unmatched path
+   * with the console's `index.html` and a 200, so a client probing discovery got a webpage rather
+   * than a 404 — which is worse than nothing, because it looks like a successful response.
+   */
+  for (const path of [
+    '/.well-known/oauth-protected-resource',
+    '/.well-known/oauth-protected-resource/mcp',
+  ]) {
+    app.get(path, (_req, res) => {
+      res.json(protectedResourceMetadata(config));
+    });
+  }
+
+  // Anything else under /.well-known is a 404 in JSON, never the console: a client probing for a
+  // document Foreman does not serve must be told so, not handed HTML to fail on.
+  app.use('/.well-known', apiNotFound);
+
   // An API path that matches nothing is a 404 in JSON, not Express's default HTML page: a client
   // parsing a response should never have to guess which it got.
+  // Mounted before the not-found guards and the SPA: `/mcp` is neither an API path nor a screen.
+  if (verifier !== null) mount(app, '/mcp', mcpRoutes({ config }));
+
   app.use('/api', apiNotFound);
   app.use('/auth', apiNotFound);
   app.use('/webhooks', apiNotFound);
@@ -156,7 +187,7 @@ export function createApp({ config, db, oidc = null, registry }: AppDeps): Expre
   if (consoleDist !== undefined && existsSync(consoleDist)) {
     app.use(express.static(consoleDist, { index: false, maxAge: '1h' }));
     // SPA fallback, but never for the API: a mistyped endpoint must 404, not return HTML.
-    app.get(/^(?!\/(?:api|auth|webhooks|healthz|readyz|health)\b).*/, (_req, res) => {
+    app.get(/^(?!\/(?:api|auth|webhooks|healthz|readyz|health|mcp|\.well-known)\b).*/, (_req, res) => {
       res.sendFile(join(consoleDist, 'index.html'));
     });
   }

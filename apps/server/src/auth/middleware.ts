@@ -3,6 +3,7 @@ import type { Config } from '../config.js';
 import type { Db } from '../db.js';
 import type { ActorKind } from '../generated/prisma/enums.js';
 import { safeEqual } from './passwords.js';
+import type { Verifier } from './resource-server.js';
 import { hashToken } from './sessions.js';
 import * as sessions from './sessions.js';
 
@@ -29,6 +30,8 @@ declare module 'express-serve-static-core' {
 export interface AuthMiddlewareDeps {
   readonly db: Db;
   readonly config: Config;
+  /** Present only when D3 Auth is configured; absent Foremans offer no remote MCP (ADR-013). */
+  readonly verifier?: Verifier | null;
 }
 
 /** True when cookies must carry the `Secure` attribute — that is, everywhere but local HTTP. */
@@ -40,7 +43,7 @@ export function isSecureOrigin(config: Config): boolean {
  * Attach an auth context when one is presented. Never rejects: route guards decide what an
  * unauthenticated request means, so a public endpoint stays public.
  */
-export function attachAuth({ db, config }: AuthMiddlewareDeps) {
+export function attachAuth({ db, config, verifier }: AuthMiddlewareDeps) {
   const secure = isSecureOrigin(config);
 
   return (req: Request, _res: Response, next: NextFunction): void => {
@@ -48,6 +51,19 @@ export function attachAuth({ db, config }: AuthMiddlewareDeps) {
       const header = req.headers.authorization;
       if (header !== undefined && header.startsWith('Bearer ')) {
         const presented = header.slice('Bearer '.length).trim();
+
+        // A D3 Auth access token for the remote MCP endpoint (ADR-013). Told apart by shape, not by
+        // trying both: Foreman's own tokens are `frm_`-prefixed, and a JWT has three dot-separated
+        // segments, so neither lookup ever sees the other's credential.
+        if (verifier !== null && verifier !== undefined && !presented.startsWith('frm_') && presented.split('.').length === 3) {
+          const resolved = await resourceAuth(db, verifier, presented);
+          // Assigned only when there is one: `exactOptionalPropertyTypes` treats an explicit
+          // `undefined` as different from absent, and downstream guards test for absence.
+          if (resolved !== null) req.auth = resolved;
+          next();
+          return;
+        }
+
         const token = await db.apiToken.findUnique({ where: { tokenHash: hashToken(presented) } });
         if (
           token !== null &&
@@ -91,6 +107,46 @@ export function attachAuth({ db, config }: AuthMiddlewareDeps) {
       }
       next();
     })().catch(next);
+  };
+}
+
+/**
+ * A verified D3 Auth token resolved to the Foreman account it is linked to.
+ *
+ * **Linked, never matched.** The identity must already exist for `(iss, sub)` — the same rule the
+ * console's callback follows (ADR-004). A token arriving with a familiar email provisions nothing
+ * and adopts nothing; if no identity is linked, this is not an identity Foreman knows, and the
+ * request simply carries no auth.
+ */
+async function resourceAuth(
+  db: Db,
+  verifier: Verifier,
+  presented: string,
+): Promise<AuthContext | null> {
+  let token;
+  try {
+    token = await verifier.verify(presented);
+  } catch {
+    // Wrong audience, wrong issuer, expired or forged — all the same answer, and none of them
+    // worth telling the caller apart.
+    return null;
+  }
+
+  const identity = await db.identity.findUnique({
+    where: { iss_sub: { iss: token.iss, sub: token.sub } },
+    select: { userId: true, user: { select: { email: true, status: true } } },
+  });
+  if (identity === null || identity.user.status !== 'active') return null;
+
+  return {
+    userId: identity.userId,
+    actor: identity.user.email,
+    // `mcp`, not `user`: the audit trail should say a tool did this, even though a person
+    // authorized it. The console is the only surface that counts as the person acting directly.
+    actorKind: 'mcp',
+    // Deliberately not `admin`, and never `*`: a remote token must not mint other tokens or manage
+    // accounts, whoever is holding it. The console remains the only place that can.
+    scopes: ['read', 'write'],
   };
 }
 
