@@ -106,7 +106,10 @@ export function oidcRoutes({ db, config, client }: OidcRouteDeps): Router {
         if (error instanceof OidcError) {
           // Audited, because a mismatched issuer or state is worth seeing in the trail.
           logger.warn({ err: error.message }, 'D3 Auth sign-in refused');
-          res.status(400).json({ error: 'that sign-in could not be completed' });
+          // Back to the login screen with the reason, not a page of JSON: this arrives in a
+          // browser, after a redirect the person did not type, and "that sign-in could not be
+          // completed" told them nothing about what to do next.
+          res.redirect(`/?signin_error=${encodeURIComponent(error.message)}`);
           return;
         }
         throw error;
@@ -116,7 +119,10 @@ export function oidcRoutes({ db, config, client }: OidcRouteDeps): Router {
         { err: error instanceof Error ? error.message : String(error) },
         'D3 Auth callback failed',
       );
-      res.status(502).json({ error: 'the sign-in provider did not answer' });
+      // 500, and no claim about whose fault it was. This returned 502 "the sign-in provider did
+      // not answer" for *any* failure, so a unique-constraint violation in Foreman's own database
+      // rendered as a Cloudflare bad-gateway page and read as a tunnel or provider outage.
+      res.status(500).json({ error: 'the sign-in could not be completed' });
     });
   });
 

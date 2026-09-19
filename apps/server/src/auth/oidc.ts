@@ -205,6 +205,21 @@ export async function resolveIdentity(
     return { userId: completed.linkToUserId, created: false };
   }
 
+  // An account already holds this email, and no identity links to it. Adopting it here — "same
+  // address, must be the same person" — is exactly the email-matching this design forbids, and it
+  // is an account takeover for anyone who can make D3 Auth assert an address. So: refuse, and say
+  // how to do it deliberately. Signing in with the password and linking from there proves control
+  // of both sides, which arriving with a matching claim does not.
+  if (completed.email !== undefined) {
+    const taken = await db.user.findUnique({ where: { email: completed.email } });
+    if (taken !== null) {
+      throw new OidcError(
+        `an account already exists for ${completed.email}. Sign in with your password, then link ` +
+          'D3 Auth from there — Foreman never joins the two by email alone.',
+      );
+    }
+  }
+
   // Just-in-time provisioning: a successful sign-in is already proof that D3 Auth meant them to be
   // here, because deny-by-default means it refuses everybody else.
   const user = await db.user.create({

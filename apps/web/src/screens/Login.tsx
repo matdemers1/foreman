@@ -32,7 +32,14 @@ export function Login({ oidcAvailable, onSignedIn }: LoginProps) {
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [needsTotp, setNeedsTotp] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // A refused D3 Auth sign-in comes back as a redirect carrying its reason, because the person is
+  // in a browser and never asked for JSON. Read once, then cleared from the URL so a reload or a
+  // shared link does not keep re-announcing a failure that already happened.
+  const [error, setError] = useState<string | null>(() => {
+    const reason = new URLSearchParams(window.location.search).get('signin_error');
+    if (reason !== null) window.history.replaceState(null, '', window.location.pathname);
+    return reason;
+  });
   const [busy, setBusy] = useState(false);
 
   const submit = (event: SyntheticEvent) => {
