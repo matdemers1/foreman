@@ -7,6 +7,7 @@ import {
   MenuItem,
   MenuSeparator,
   SideNav,
+  SideNavGroup,
   SideNavItem,
   Spinner,
   ThemeProvider,
@@ -19,7 +20,8 @@ import {
   ListChecks,
   Search,
 } from 'lucide-react';
-import { fetchSession, logout, type SessionState } from './lib/api';
+import { fetchSession, foreman, logout, type SessionState } from './lib/api';
+import { useAsync } from './lib/useAsync';
 import { routeFor, useLocation } from './lib/router';
 import { Login } from './screens/Login';
 import { PhaseDetail } from './screens/PhaseDetail';
@@ -115,12 +117,7 @@ export function App() {
           <SideNav>
             {/* Phase 0 wires the shell; each destination arrives with the screen behind it. */}
             <SideNavItem href="/" icon={<HomeIcon />} label="Portfolio" current={path === '/'} />
-            <SideNavItem
-              href="/projects"
-              icon={<FolderKanban />}
-              label="Projects"
-              current={path.startsWith('/projects')}
-            />
+            <ProjectNav path={path} />
             <SideNavItem
               href="/findings"
               icon={<ListChecks />}
@@ -159,6 +156,39 @@ export function App() {
         <Screen path={path} search={search} />
       </AppShell>
     </ThemeProvider>
+  );
+}
+
+/**
+ * The projects themselves, not a link to a list of them.
+ *
+ * This was a static "Projects" item pointing at `/projects`, which no route has ever matched —
+ * the router only ever handled `/projects/:code`, so it rendered the not-found screen. There is no
+ * projects-list screen to point at either: the portfolio at `/` is that list (S-04). The design
+ * has always said the sidebar lists projects, so it does.
+ *
+ * A failure here is silent on purpose: the sidebar losing its project list should not take the
+ * screen down with it, and the portfolio still answers "where is everything".
+ */
+function ProjectNav({ path }: { path: string }) {
+  const { state } = useAsync(() => foreman.portfolio(), []);
+
+  // Nothing while loading or on failure: a nav that flashes a skeleton on every screen change is
+  // noisier than one that simply appears, and the portfolio still answers "where is everything".
+  if (state.status !== 'ready' || state.value.items.length === 0) return null;
+
+  return (
+    <SideNavGroup title="Projects">
+      {state.value.items.map((project) => (
+        <SideNavItem
+          key={project.code}
+          href={`/projects/${project.code}`}
+          icon={<FolderKanban />}
+          label={project.name}
+          current={path.startsWith(`/projects/${project.code}`)}
+        />
+      ))}
+    </SideNavGroup>
   );
 }
 

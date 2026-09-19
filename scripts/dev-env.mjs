@@ -25,6 +25,10 @@ PEPPER=${secret()}
 COOKIE_KEYS=${secret()}
 OPERATOR_EMAIL=dev@localhost
 OPERATOR_DISPLAY_NAME=Developer
+# Local only, and fixed on purpose: the seed otherwise generates a random password and prints it
+# once, which the e2e suite cannot know — so \`pnpm e2e\` could not sign in on a fresh stack. CI
+# sets its own.
+OPERATOR_PASSWORD=foreman-dev-password-9174
 BACKUP_DIR=./backups
 # Local only. The e2e suite signs its own deliveries with this to exercise the ingest path.
 GITHUB_WEBHOOK_SECRET=dev-webhook-secret
