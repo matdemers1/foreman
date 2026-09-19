@@ -1,4 +1,4 @@
-import { useState, type SyntheticEvent } from 'react';
+import { type SyntheticEvent, useEffect, useState } from 'react';
 import {
   Alert,
   AuthLayout,
@@ -35,12 +35,22 @@ export function Login({ oidcAvailable, onSignedIn }: LoginProps) {
   // A refused D3 Auth sign-in comes back as a redirect carrying its reason, because the person is
   // in a browser and never asked for JSON. Read once, then cleared from the URL so a reload or a
   // shared link does not keep re-announcing a failure that already happened.
-  const [error, setError] = useState<string | null>(() => {
-    const reason = new URLSearchParams(window.location.search).get('signin_error');
-    if (reason !== null) window.history.replaceState(null, '', window.location.pathname);
-    return reason;
-  });
+  const [error, setError] = useState<string | null>(null);
+  // Set when the refusal was "an account already holds this address". The remedy is to sign in
+  // with the password and *then* link, so the sign-in below finishes by starting the link rather
+  // than dropping the person on the portfolio with nothing pointing at the thing they came to do.
+  const [linkAfterSignIn, setLinkAfterSignIn] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get('signin_error');
+    if (reason === null) return;
+    setError(reason);
+    setLinkAfterSignIn(params.get('link_after_signin') === '1');
+    // Cleared from the URL so a reload does not re-announce a failure that already happened.
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
 
   const submit = (event: SyntheticEvent) => {
     event.preventDefault();
@@ -51,6 +61,11 @@ export function Login({ oidcAvailable, onSignedIn }: LoginProps) {
       .then((result) => {
         if (result.status === 'totp_required') {
           setNeedsTotp(true);
+          return;
+        }
+        if (linkAfterSignIn) {
+          // A real navigation: the server owns this route and answers with a redirect to D3 Auth.
+          window.location.assign('/auth/oidc/start?link=1');
           return;
         }
         onSignedIn();

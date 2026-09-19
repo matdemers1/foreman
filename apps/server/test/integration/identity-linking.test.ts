@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { OidcError, resolveIdentity, type CompletedSignIn } from '../../src/auth/oidc.js';
+import {
+  IdentityCollision,
+  OidcError,
+  resolveIdentity,
+  type CompletedSignIn,
+} from '../../src/auth/oidc.js';
 import { createDb, type Db } from '../../src/db.js';
 
 /**
@@ -69,6 +74,9 @@ describe.skipIf(url === undefined)('identity linking', () => {
   it('refuses when an account already holds the address, instead of failing on the constraint', async () => {
     await db.user.create({ data: { email: EMAIL, displayName: 'Already here', status: 'active' } });
 
+    // The distinct type matters: the route offers to finish the linking only for this case, and
+    // must not invite a retry after a bad state or a mismatched issuer.
+    await expect(resolveIdentity(db, signIn())).rejects.toBeInstanceOf(IdentityCollision);
     await expect(resolveIdentity(db, signIn())).rejects.toBeInstanceOf(OidcError);
   });
 

@@ -52,6 +52,13 @@ export interface CompletedSignIn {
 export class OidcError extends Error {}
 
 /**
+ * The one refusal a person can act on: an account already holds the address, so the identity must
+ * be attached deliberately rather than matched to it. Separate from `OidcError` because only this
+ * case should offer to finish the linking — a bad state or a mismatched issuer must not.
+ */
+export class IdentityCollision extends OidcError {}
+
+/**
  * Discover the provider and build a client, or return `null` when it is not configured or not
  * reachable. Never throws: a provider that is down is a Foreman that offers one login button
  * instead of two, not a Foreman that will not start.
@@ -213,9 +220,9 @@ export async function resolveIdentity(
   if (completed.email !== undefined) {
     const taken = await db.user.findUnique({ where: { email: completed.email } });
     if (taken !== null) {
-      throw new OidcError(
-        `an account already exists for ${completed.email}. Sign in with your password, then link ` +
-          'D3 Auth from there — Foreman never joins the two by email alone.',
+      throw new IdentityCollision(
+        `An account already exists for ${completed.email}. Sign in with your password below and ` +
+          'the link will finish automatically — Foreman never joins the two by email alone.',
       );
     }
   }

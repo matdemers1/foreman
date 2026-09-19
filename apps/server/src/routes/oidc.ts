@@ -6,6 +6,7 @@ import { logger } from '../logger.js';
 import { isSecureOrigin } from '../auth/middleware.js';
 import {
   issueSessionFor,
+  IdentityCollision,
   OidcError,
   resolveIdentity,
   TX_COOKIE,
@@ -109,7 +110,11 @@ export function oidcRoutes({ db, config, client }: OidcRouteDeps): Router {
           // Back to the login screen with the reason, not a page of JSON: this arrives in a
           // browser, after a redirect the person did not type, and "that sign-in could not be
           // completed" told them nothing about what to do next.
-          res.redirect(`/?signin_error=${encodeURIComponent(error.message)}`);
+          const query = new URLSearchParams({ signin_error: error.message });
+          // Only a collision can be finished by signing in: a bad state or a mismatched issuer
+          // must not invite anyone to try again with a password.
+          if (error instanceof IdentityCollision) query.set('link_after_signin', '1');
+          res.redirect(`/?${query.toString()}`);
           return;
         }
         throw error;
