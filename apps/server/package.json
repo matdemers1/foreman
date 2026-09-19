@@ -46,6 +46,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@d3cloud/foreman-mcp": "workspace:*",
     "@d3cloudio/auth-client": "0.1.1",
     "@foreman/shared": "workspace:*",
     "@prisma/adapter-pg": "7.10.0",
@@ -60,7 +61,6 @@
     "zod": "^4.6.2"
   },
   "devDependencies": {
-    "@d3cloud/foreman-mcp": "workspace:*",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@types/express": "^5.0.6",
     "@types/express-serve-static-core": "^5.1.3",

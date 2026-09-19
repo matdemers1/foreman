@@ -8,27 +8,28 @@
     "foreman-mcp": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./dist/index.js"
     },
     "./server": {
-      "types": "./dist/server.d.ts",
+      "types": "./src/server.ts",
       "default": "./dist/server.js"
     },
     "./client": {
-      "types": "./dist/client.d.ts",
+      "types": "./src/client.ts",
       "default": "./dist/client.js"
     },
     "./resources": {
-      "types": "./dist/resources.d.ts",
+      "types": "./src/resources.ts",
       "default": "./dist/resources.js"
     },
     "./tools": {
-      "types": "./dist/tools/index.d.ts",
+      "types": "./src/tools/index.ts",
       "default": "./dist/tools/index.js"
     }
   },

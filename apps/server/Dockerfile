@@ -17,6 +17,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
     pnpm install --offline --frozen-lockfile --filter foreman-server... --filter foreman-web...
 # `packages/shared` first: the server and the console both import their entity types from it.
 RUN pnpm --filter @foreman/shared build \
+    && pnpm --filter @d3cloud/foreman-mcp build \
     && pnpm --filter foreman-server build \
     && pnpm --filter foreman-web build
 # The release-age policy gates *resolving* new versions, which happens at `pnpm install` on a

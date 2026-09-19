@@ -3,23 +3,30 @@ import { defineConfig } from 'vitest/config';
 
 // Named projects, because CI gates in layers: lint → unit → integration → e2e (FRM-REQ-008).
 // The integration project is the only one that needs a database.
+const alias = {
+  // These packages resolve to `dist` at runtime, which is right for the image and wrong for a test
+  // run: nobody should have to build a sibling package to run a test.
+  //
+  // Declared per project, not once at the top level: in `projects` mode a project does not inherit
+  // the root `resolve`, so a top-level alias silently does nothing — which is easy to miss while
+  // the sibling's `dist` happens to be lying around from an earlier build.
+  '@foreman/shared': resolve(import.meta.dirname, '../../packages/shared/src/index.ts'),
+  '@d3cloud/foreman-mcp/server': resolve(import.meta.dirname, '../../packages/mcp/src/server.ts'),
+  '@d3cloud/foreman-mcp/client': resolve(import.meta.dirname, '../../packages/mcp/src/client.ts'),
+};
+
 export default defineConfig({
-  resolve: {
-    alias: {
-      // The package resolves to `dist` at runtime, which is right for the image and wrong for a
-      // test run: nobody should have to build a sibling package to run a unit test.
-      '@foreman/shared': resolve(import.meta.dirname, '../../packages/shared/src/index.ts'),
-    },
-  },
   test: {
     projects: [
       {
+        resolve: { alias },
         test: {
           name: 'unit',
           include: ['test/unit/**/*.test.ts'],
         },
       },
       {
+        resolve: { alias },
         test: {
           name: 'integration',
           include: ['test/integration/**/*.test.ts'],
