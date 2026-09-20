@@ -153,6 +153,31 @@ describe('documents, as sections', () => {
   });
 });
 
+describe('checklist markers', () => {
+  it('keeps a row whose marker is neither a space nor an x', () => {
+    // The cutover dry run found this: the pattern was `[ xX]`, so Bindery's `~` (in progress) and
+    // `→` (promoted) rows matched nothing and vanished — no task, and no line in the report, which
+    // accounts for files rather than the entities inside them. Five real tasks, four of them the
+    // in-progress ones that are the most interesting rows in the file.
+    const body = [
+      '## Phase 1',
+      '- [x] **T-1.1** — Done thing',
+      '- [ ] **T-1.2** — Not started',
+      '- [~] **T-1.3** — Underway',
+      '- [→] **T-1.4** — Promoted elsewhere',
+    ].join('\n');
+
+    const items = parseChecklist(body);
+    expect(items).toHaveLength(4);
+    expect(items.map((i) => i.marker)).toEqual(['x', ' ', '~', '→']);
+  });
+
+  it('counts only x as done, so an in-progress task is not reported as finished', () => {
+    const items = parseChecklist('- [~] **T-1.3** — Underway\n- [x] **T-1.1** — Done thing');
+    expect(items.map((i) => i.done)).toEqual([false, true]);
+  });
+});
+
 describe('citation rewriting (T-8.5, FRM-REQ-152)', () => {
   it('prefixes a bare ID with the project it belongs to', () => {
     const result = rewriteCitations('Satisfies REQ-021 and REQ-022.', 'BND');

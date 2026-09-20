@@ -58,6 +58,8 @@ export interface TaskWrite {
   readonly humanId: string;
   readonly title: string;
   readonly done: boolean;
+  /** Mapped from the checkbox marker, so `~` lands as `in_progress` rather than `todo`. */
+  readonly status: 'todo' | 'in_progress' | 'done';
   readonly synthesized: boolean;
   readonly phaseId: string | null;
   readonly sortOrder: number;
@@ -108,6 +110,11 @@ export function taskFrom(
     humanId: id === null ? `${code}-T-${phaseNumber}.${String(position)}` : `${code}-${id}`,
     title: title.length > 0 ? title.slice(0, 300) : item.text.slice(0, 300),
     done: item.done,
+    /**
+     * `~` is in progress and `→` is promoted elsewhere. Both are real states the corpus uses, and
+     * collapsing them to `todo` would report work that is underway as work not started.
+     */
+    status: item.marker === 'x' ? 'done' : item.marker === '~' ? 'in_progress' : 'todo',
     synthesized: id === null,
     phaseId: null,
     sortOrder: position,
@@ -122,7 +129,7 @@ export async function writeTask(ctx: WriteContext, task: TaskWrite): Promise<voi
       projectId: ctx.projectId,
       humanId: task.humanId,
       title: task.title,
-      status: task.done ? 'done' : 'todo',
+      status: task.status,
       ...(task.done ? { completedAt: new Date() } : {}),
       sortOrder: task.sortOrder,
       // Flagged, so a synthesized ID is never mistaken for one somebody chose (FRM-REQ-045).
@@ -131,7 +138,7 @@ export async function writeTask(ctx: WriteContext, task: TaskWrite): Promise<voi
     },
     update: {
       title: task.title,
-      status: task.done ? 'done' : 'todo',
+      status: task.status,
       ...(task.phaseId === null ? {} : { phaseId: task.phaseId }),
     },
     select: { id: true },

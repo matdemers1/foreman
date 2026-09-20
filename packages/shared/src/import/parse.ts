@@ -154,6 +154,11 @@ function splitRow(line: string): string[] {
 
 export interface ChecklistItem {
   readonly done: boolean;
+  /**
+   * The raw marker between the brackets, lower-cased. `x` is done and a space is not, but the
+   * corpus also uses `~` for in progress and `→` for promoted elsewhere, and those are tasks too.
+   */
+  readonly marker: string;
   readonly text: string;
   /** The heading this item sat under — the phase, in a scope of work. */
   readonly section: string | null;
@@ -180,11 +185,22 @@ export function parseChecklist(body: string): ChecklistItem[] {
       continue;
     }
 
-    const item = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line);
+    /**
+     * Any single character between the brackets, not just a space or an `x`.
+     *
+     * This read `[ xX]`, so a row using any other marker matched nothing and was skipped in
+     * silence — no task, and no line in the reconciliation report, because the report accounts for
+     * *files* and the file was read fine. Bindery's scope of work uses `~` for in progress and `→`
+     * for promoted, and the cutover dry run put five real tasks on the floor that way, four of
+     * them the in-progress ones that are the most interesting rows in the file.
+     */
+    const item = /^\s*[-*]\s+\[(.)\]\s+(.*)$/.exec(line);
     if (item === null) continue;
 
+    const marker = (item[1] ?? ' ').toLowerCase();
     items.push({
-      done: (item[1] ?? ' ').toLowerCase() === 'x',
+      done: marker === 'x',
+      marker,
       text: (item[2] ?? '').trim(),
       section,
       line: index + 1,

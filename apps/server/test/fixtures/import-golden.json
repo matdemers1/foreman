@@ -102,7 +102,7 @@
       "kind": "scope-of-work",
       "note": null,
       "produced": [
-        "222 tasks"
+        "227 tasks"
       ]
     },
     {
@@ -150,7 +150,7 @@
     "term": 29,
     "requirement": 295,
     "risk": 25,
-    "task": 384,
+    "task": 389,
     "task-synthesized": 90
   },
   "substitutions": 923
