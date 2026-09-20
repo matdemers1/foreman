@@ -233,6 +233,47 @@ export async function runImport(db: Db, options: ImportOptions): Promise<ImportR
     }
 
     /**
+     * Bring the project's ID counters up to what was just written.
+     *
+     * `allocate` takes the next number from `project.id_counters`, deliberately — not from
+     * `count(*)`, so a deleted `BND-REQ-007` never hands its number to something else. The importer
+     * writes human IDs straight from the source files and never touches that counter, so after a
+     * cutover every counter still read zero while the rows numbered into the hundreds: the next
+     * finding created through the API asked for `BND-CR-001` and hit a unique-constraint violation.
+     *
+     * Every audit skill writes findings. All four would have failed on every imported project.
+     */
+    if (!options.dryRun && project !== null) {
+      await db.$executeRaw`
+        with seen as (
+          -- nullif on both casts: a sequence part that is empty, and a counter stored as an empty
+          -- string rather than absent, both fail the cast with a message naming no row at all.
+          select split_part(human_id, '-', 2) as type,
+                 max(nullif(regexp_replace(split_part(human_id, '-', 3), '[^0-9].*$', ''), '')::int) as high
+          from (
+            select human_id from requirement where project_id = ${project.id}::uuid
+            union all select human_id from task       where project_id = ${project.id}::uuid
+            union all select human_id from adr        where project_id = ${project.id}::uuid
+            union all select human_id from finding    where project_id = ${project.id}::uuid
+            union all select human_id from risk       where project_id = ${project.id}::uuid
+            union all select human_id from decision   where project_id = ${project.id}::uuid
+            union all select human_id from audit      where project_id = ${project.id}::uuid
+            union all select human_id from phase      where project_id = ${project.id}::uuid
+          ) ids
+          where human_id ~ '^[A-Z0-9]+-[A-Z]+-[0-9]'
+          group by 1
+          having max(nullif(regexp_replace(split_part(human_id, '-', 3), '[^0-9].*$', ''), '')::int) is not null
+        )
+        update project p
+        set id_counters = coalesce(p.id_counters, '{}'::jsonb) || (
+          select coalesce(jsonb_object_agg(type, greatest(high, coalesce(nullif(p.id_counters ->> type, '')::int, 0))), '{}'::jsonb)
+          from seen
+        )
+        where p.id = ${project.id}::uuid
+      `;
+    }
+
+    /**
      * A phase whose tasks are all done is complete, and saying so is what makes a brief useful.
      *
      * Everything imports as `planned`, because the vault records phase progress only as the state

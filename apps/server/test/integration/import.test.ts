@@ -161,6 +161,30 @@ describe.skipIf(url === undefined)('the importer', { timeout: 30_000 }, () => {
     });
   });
 
+  describe('the ID counters after an import', () => {
+    it('leaves the counters past the IDs it just wrote', async () => {
+      // `allocate` takes the next number from the counter, never from `count(*)`, so a deleted
+      // `BND-REQ-007` cannot hand its number to something else. The importer writes human IDs
+      // straight from the source and never touched that counter — so after a cutover the counters
+      // read zero while the rows numbered into the hundreds, and the next finding created through
+      // the API asked for `BND-CR-001` and hit a unique-constraint violation. Every audit skill
+      // writes findings; all four would have failed on every imported project.
+      await runImport(db, { path: FIXTURES, dryRun: false });
+
+      const project = await db.project.findFirstOrThrow({ where: { code: 'BND' } });
+      const counters = project.idCounters as Record<string, number>;
+      const highestRequirement = await db.requirement.findFirst({
+        where: { projectId: project.id },
+        orderBy: { humanId: 'desc' },
+        select: { humanId: true },
+      });
+
+      const written = Number((highestRequirement?.humanId ?? '').split('-').at(-1));
+      expect(written).toBeGreaterThan(0);
+      expect(counters['REQ'] ?? 0).toBeGreaterThanOrEqual(written);
+    });
+  });
+
   describe('the golden diff (T-8.9)', () => {
     /**
      * The report, reduced to what should never change silently.
