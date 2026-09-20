@@ -167,6 +167,26 @@ describe('citation rewriting (T-8.5, FRM-REQ-152)', () => {
     expect(result.substitutions[0]?.context).toContain('Satisfies');
   });
 
+  it('leaves an ID alone when it is part of a file path with spaces in it', () => {
+    // Found in the cutover dry run. The span that skips paths only matches one running unbroken to
+    // a known extension, and this vault's paths are full of spaces — so `ADR-011` in
+    // `D3 Cloud Vault/Bindery/ADR-011 — A Declined File…md` read as open prose and was rewritten,
+    // pointing the text at a file that does not exist.
+    const line = 'Read — D3 Cloud Vault/Bindery/ADR-011 — A Declined File Is Not a Failure.md; done.';
+    const result = rewriteCitations(line, 'BND');
+
+    expect(result.text).toBe(line);
+    expect(result.skipped.map((s) => s.because)).toContain(
+      'follows a path separator, so it is part of an address',
+    );
+  });
+
+  it('still rewrites a citation that merely sits near a path', () => {
+    // The guard is the separator immediately before the ID, not the presence of a path on the line.
+    const result = rewriteCitations('See docs/thing.md and REQ-021.', 'BND');
+    expect(result.text).toBe('See docs/thing.md and BND-REQ-021.');
+  });
+
   it('leaves an already-prefixed ID alone', () => {
     const result = rewriteCitations('See BND-REQ-021 and AUTH-T-1.2.', 'BND');
     expect(result.text).toBe('See BND-REQ-021 and AUTH-T-1.2.');

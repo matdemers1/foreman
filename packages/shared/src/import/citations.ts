@@ -101,6 +101,23 @@ export function rewriteCitations(
       return match;
     }
 
+    /**
+     * Directly after a path separator, so it is part of an address.
+     *
+     * The span above catches a path only when it runs unbroken to a known extension, and this
+     * vault's paths are full of spaces — `D3 Cloud Vault/Bindery/ADR-011 — A Declined File Is Not
+     * a Failure.md` breaks the match long before `.md`, leaving `ADR-011` looking like a citation
+     * in open prose. Rewriting it points the text at a file that does not exist.
+     *
+     * This does mean `REQ-1/REQ-2` leaves the second one alone. That is the cheap failure on
+     * purpose: a missed rewrite is a citation that does not resolve, which is visible and fixable,
+     * and a wrong one silently changes what a document says.
+     */
+    if (/[\w)\]]\/$/.test(text.slice(Math.max(0, index - 2), index))) {
+      skipped.push({ id: match, because: 'follows a path separator, so it is part of an address', line });
+      return match;
+    }
+
     // A bare `T-1` in prose that is plainly not a citation — "T-shirt", "P-value".
     const after = text.slice(index + match.length, index + match.length + 2);
     if (/^[A-Za-z]/.test(after)) {
