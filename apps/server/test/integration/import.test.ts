@@ -17,7 +17,12 @@ const url = process.env['DATABASE_URL'];
 const FIXTURES = resolve(import.meta.dirname, '../../../../fixtures/vault');
 const GOLDEN = resolve(import.meta.dirname, '../fixtures/import-golden.json');
 
-describe.skipIf(url === undefined)('the importer', () => {
+/**
+ * One timeout for the file, not per test: every test here runs the importer over the real vault
+ * corpus, so the 5s default is wrong for all of them rather than for the two that happened to trip
+ * it on a CI runner. Locally they are a second or two each.
+ */
+describe.skipIf(url === undefined)('the importer', { timeout: 30_000 }, () => {
   let db: Db;
 
   beforeAll(() => {
@@ -108,8 +113,7 @@ describe.skipIf(url === undefined)('the importer', () => {
       expect(await db.requirement.count({ where: { humanId: { startsWith: 'BND-' } } })).toBe(
         afterFirst.requirements,
       );
-    }, 30_000); // Two full imports of the real corpus — the heaviest test here, and over the 5s
-    // default on a CI runner even though it is ~1.6s locally.
+    });
 
 
     it('imports the real register with its IDs intact', async () => {
