@@ -231,6 +231,29 @@ export async function runImport(db: Db, options: ImportOptions): Promise<ImportR
       });
       files.push(outcome);
     }
+
+    /**
+     * A phase whose tasks are all done is complete, and saying so is what makes a brief useful.
+     *
+     * Everything imports as `planned`, because the vault records phase progress only as the state
+     * of the tasks underneath. Left that way, Bindery — finished through Phase 20 — briefed as
+     * *Phase 0, Foundation*: the brief falls back to a phase that is not complete, and every one
+     * of them qualified.
+     */
+    if (!options.dryRun && project !== null) {
+      const phases = await db.phase.findMany({
+        where: { projectId: project.id, deletedAt: null },
+        select: { id: true, tasks: { where: { deletedAt: null }, select: { status: true } } },
+      });
+      for (const phase of phases) {
+        if (phase.tasks.length === 0) continue;
+        const done = phase.tasks.every((t) => t.status === 'done');
+        await db.phase.update({
+          where: { id: phase.id },
+          data: { status: done ? 'complete' : 'planned' },
+        });
+      }
+    }
   }
 
   const totals = {

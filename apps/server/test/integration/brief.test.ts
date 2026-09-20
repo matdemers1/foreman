@@ -122,6 +122,50 @@ describe.skipIf(url === undefined)('the session brief', () => {
     expect(brief.activePhase?.tasks).toEqual({ done: 1, total: 2 });
   });
 
+  it('prefers a phase explicitly marked active over any guess', async () => {
+    // The heuristic is a fallback for imported projects, where nothing set a status. A status
+    // somebody chose outranks it.
+    await addTask(`${CODE}-T-1.1`, { status: 'done' });
+    const { brief } = await getBrief();
+    expect(brief.activePhase?.humanId).toBe(`${CODE}-P-1`);
+  });
+
+  it('is the furthest phase in flight, not the earliest one with a straggler', async () => {
+    // What the cutover produced: Bindery, finished through Phase 20, briefed as *Phase 0,
+    // Foundation, 8 of 8 done* — because two unfinished tasks in an early phase sorted first. A
+    // project with twenty finished phases after it is not at Phase 1.
+    // The fixture marks phase 1 active, and an explicit status rightly beats the heuristic — so
+    // clear it to exercise the fallback, which is the path an imported project takes.
+    await db.phase.updateMany({ where: { projectId }, data: { status: 'planned' } });
+    const later = await db.phase.create({
+      data: { projectId, humanId: `${CODE}-P-9`, number: '9', sortOrder: 9, name: 'Much later' },
+    });
+
+    await addTask(`${CODE}-T-1.1`, { status: 'done' });
+    await addTask(`${CODE}-T-1.2`, { status: 'todo' }); // the straggler, in phase 1
+    await db.task.create({
+      data: { projectId, phaseId: later.id, humanId: `${CODE}-T-9.1`, title: 'Done', status: 'done' },
+    });
+    await db.task.create({
+      data: { projectId, phaseId: later.id, humanId: `${CODE}-T-9.2`, title: 'Open', status: 'todo' },
+    });
+
+    const { brief } = await getBrief();
+    expect(brief.activePhase?.humanId).toBe(`${CODE}-P-9`);
+  });
+
+  it('is the earliest phase when nothing has started at all', async () => {
+    // The other end: a project nobody has begun is at its first phase, not its last.
+    await db.phase.updateMany({ where: { projectId }, data: { status: 'planned' } });
+    await db.phase.create({
+      data: { projectId, humanId: `${CODE}-P-9`, number: '9', sortOrder: 9, name: 'Much later' },
+    });
+    await addTask(`${CODE}-T-1.1`, { status: 'todo' });
+
+    const { brief } = await getBrief();
+    expect(brief.activePhase?.humanId).toBe(`${CODE}-P-1`);
+  });
+
   it('never offers a blocked task as something to work on', async () => {
     await addTask(`${CODE}-T-1.1`, {
       status: 'blocked',
