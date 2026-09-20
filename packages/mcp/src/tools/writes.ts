@@ -134,7 +134,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       const args = SetStatusInput.parse(input);
       return client.patch(`/api/projects/${projectOf(args.id)}/${kindOf(args.id)}/${args.id}`, {
         status: args.status,
-        ...(args.reason === undefined ? {} : { blockedReason: args.reason }),
+        // Only when it is a *blocked* reason. This used to send it whatever the status was, so a
+        // note explaining why something was finished landed in `blockedReason` on a done task —
+        // which reads, to anyone who finds it later, as a record of that task being stuck.
+        ...(args.reason === undefined || args.status !== 'blocked'
+          ? {}
+          : { blockedReason: args.reason }),
       });
     },
   },

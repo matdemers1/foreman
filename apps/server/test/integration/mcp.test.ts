@@ -300,6 +300,38 @@ describe.skipIf(url === undefined)('the MCP shim, end to end', () => {
     });
   });
 
+  describe('a reason belongs to the status it explains', () => {
+    it('records a blocked reason when blocking', async () => {
+      const client = await connect(writeToken);
+      await client.callTool({
+        name: 'foreman_set_status',
+        arguments: { id: taskId, status: 'blocked', reason: 'Waiting on the scanner.' },
+      });
+      const task = await db.task.findUniqueOrThrow({ where: { humanId: taskId } });
+
+      expect(task.status).toBe('blocked');
+      expect(task.blockedReason).toBe('Waiting on the scanner.');
+    });
+
+    it('does not store a completion note as a blocked reason', async () => {
+      const client = await connect(writeToken);
+      // Independent of the test above: it leaves a real blocked reason behind, and a stale one
+      // surviving a move out of `blocked` is a separate question from the one being asked here.
+      await db.task.update({ where: { humanId: taskId }, data: { blockedReason: null } });
+      // Found while marking the cutover's own tasks done through this tool: the reason was sent
+      // whatever the status was, so a note explaining why something was *finished* landed in
+      // `blockedReason` — which reads, to anyone who finds it later, as a record of it being stuck.
+      await client.callTool({
+        name: 'foreman_set_status',
+        arguments: { id: taskId, status: 'done', reason: 'Snapshot taken and verified.' },
+      });
+      const task = await db.task.findUniqueOrThrow({ where: { humanId: taskId } });
+
+      expect(task.status).toBe('done');
+      expect(task.blockedReason).toBeNull();
+    });
+  });
+
   describe('the token is the boundary', () => {
     it('refuses a write with a read-only token, and says so readably', async () => {
       const client = await connect(readToken);
