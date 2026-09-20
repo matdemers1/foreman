@@ -1,14 +1,20 @@
 # CLAUDE.md — Foreman
 
-Plan-vs-reality ledger for the D3 Cloud ecosystem. Replaces the Obsidian vault as the source of truth for structured project state — requirements, phases, tasks, ADRs, audit findings, documents — behind two equal-peer surfaces: a React console and an **MCP server**. Read this file, then the vault, before writing code.
+Plan-vs-reality ledger for the D3 Cloud ecosystem. Replaces the Obsidian vault as the source of truth for structured project state — requirements, phases, tasks, ADRs, audit findings, documents — behind two equal-peer surfaces: a React console and an **MCP server**. Read this file, then `foreman_brief FRM`, before writing code.
 
 ## Where the plan lives
-All planning is in `../D3 Cloud Vault/Foreman/`.
-- **Scope of Work.md** — phases P0–P10, every task with `FRM-REQ` ids; check tasks off as they land.
-- **Requirements Register.md** — `FRM-REQ-001`…`FRM-REQ-152` in EARS notation, the traceability spine.
-- **Architecture.md**, **Data Model.md**, **API Contract.md**, **UX Flows & Screen Inventory.md**, **Glossary.md**.
-- **ADR-001** Node/Express/Prisma over Python/FastAPI · **ADR-002** a small verb surface over a large graph · **ADR-003** local stdio shim, not a remote MCP server · **ADR-004** dual login as a permanent ecosystem pattern · **ADR-005** attribution is declared, not inferred · **ADR-006** five registers are views, not documents · **ADR-007** database backup as the only escape hatch · **ADR-008** project-prefixed human IDs · **ADR-009** one cutover, not a migration window.
-- **Risk Register.md**, **Test Strategy.md**, **Phase Plans/** — open the phase plan before starting a phase.
+
+Foreman tracks itself as project **`FRM`** — 152 requirements, 11 phases, 13 ADRs. It has since the
+P10 cutover on 2026-09-20, which is the point: the tool holds its own remaining work.
+
+- `foreman_brief FRM` — the active phase, what is next, what is blocked, drift.
+- `foreman_coverage FRM` — uncovered Musts, tasks citing nothing, EARS warnings.
+- `foreman://FRM/architecture`, `/data-model`, `/api-contract`, `/ux-flows`, `/glossary`.
+- **ADR-001** Node/Express/Prisma over Python/FastAPI · **ADR-002** a small verb surface over a large graph · **ADR-003** local stdio shim, not a remote MCP server · **ADR-004** dual login as a permanent ecosystem pattern · **ADR-005** attribution is declared, not inferred · **ADR-006** five registers are views, not documents · **ADR-007** database backup as the only escape hatch · **ADR-008** project-prefixed human IDs · **ADR-009** one cutover, not a migration window · **ADR-013** remote MCP uses pre-registration, not DCR or CIMD.
+
+The archived vault at `../D3 Cloud Vault/Foreman/` holds the pre-cutover plan. Read it for history;
+never write to it.
+
 Start a session with `/start-development foreman`.
 
 ## Stack (locked)
@@ -36,7 +42,9 @@ pnpm dev:down
 pnpm lint && pnpm typecheck && pnpm test          # what CI runs first
 DATABASE_URL=postgresql://foreman:foreman@127.0.0.1:5432/foreman_test pnpm --filter foreman-server test:integration
 pnpm e2e
-pnpm import -- --dry-run --path "../D3 Cloud Vault"   # never without --dry-run until P10
+pnpm --filter foreman-server run import -- --path "../D3 Cloud Vault" --only "<Folder>" --write
+# Not writing is the default; `--write` is the flag. Used at the P10 cutover and for the fourteen
+# projects still only in the archive.
 ```
 
 ## Non-negotiables
