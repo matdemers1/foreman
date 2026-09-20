@@ -57,4 +57,11 @@ pnpm seed:example
 
 ## License
 
-Private. Not currently licensed for redistribution.
+Apache-2.0 — see [LICENSE](LICENSE).
+
+`fixtures/vault/` holds real planning documents from the Obsidian vault Foreman
+replaced, and they are published deliberately. They are the importer's golden
+corpus: the parser was tuned against this prose, and ten importer bugs at the
+2026-09-20 cutover were caught by it and would not have been caught by invented
+markdown. Synthetic fixtures would have made the test cheaper to publish and
+worse at its job.

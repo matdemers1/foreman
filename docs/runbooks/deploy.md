@@ -58,7 +58,7 @@ in Cloudflare, not in a file on the host, so the container needs only its token.
 CI builds the artifact; it does not ship it. Deploying is a deliberate act on the host:
 
 ```bash
-ssh root@192.168.1.231
+ssh root@<zima-lan-ip>
 cd /DATA/foreman
 # Edit both image: lines to the new sha-<40 hex> tag, then:
 export DOCKER_CONFIG=/DATA/.docker
