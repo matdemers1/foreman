@@ -73,12 +73,19 @@ describe.skipIf(url === undefined)('the importer', { timeout: 30_000 }, () => {
       expect(unexplained.map((f) => f.path)).toEqual([]);
     });
 
-    it('counts a project folder with no files at all', async () => {
-      // Personal Website is an overview in Master Notes and an empty folder here. A walker that
-      // skips it silently loses the fact that the project exists.
+    it('gives a project with an empty folder a row, and its overview', async () => {
+      // Personal Website's folder is empty; its overview lives in `Master Notes`. The project row
+      // has always appeared regardless — a walker that skips an empty folder loses the fact that
+      // the project exists — and the overview now comes with it, so the project is not merely a
+      // name. Before that, this project imported with no content whatsoever.
       const report = await runImport(db, { path: FIXTURES, dryRun: true });
-      const empty = report.projects.find((p) => p.folder === 'Personal Website');
-      expect(empty?.files).toBe(0);
+      const site = report.projects.find((p) => p.folder === 'Personal Website');
+
+      expect(site, 'the project row exists even with an empty folder').toBeDefined();
+      expect(site?.files).toBe(1);
+      expect(report.files.map((f) => f.path)).toContain(
+        'Master Notes/Overviews/Personal Website Overview.md',
+      );
     });
   });
 
@@ -136,6 +143,21 @@ describe.skipIf(url === undefined)('the importer', { timeout: 30_000 }, () => {
       expect(clearwhen?.status).toBe('mapped');
       expect(clearwhen?.note).toContain('synthesized');
       expect(report.entities['task-synthesized']).toBeGreaterThan(20);
+    });
+  });
+
+  describe("a project's overview, which lives outside its folder", () => {
+    it('imports the overview from Master Notes as a document on the project', async () => {
+      // `Master Notes/` is excluded from the project scan, correctly — it is not a project — and
+      // every project's overview sits inside it. So the prose description of what each project *is*
+      // was invisible to the importer, and Personal Website, whose folder holds nothing else at
+      // all, imported as a project with no content whatsoever.
+      await runImport(db, { path: FIXTURES, dryRun: false });
+
+      const overview = await db.document.findFirst({
+        where: { project: { code: 'PW' }, title: { contains: 'Overview' } },
+      });
+      expect(overview, 'Personal Website should have its overview').not.toBeNull();
     });
   });
 

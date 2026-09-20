@@ -132,6 +132,16 @@ export function codeFor(folder: string): string {
   return initials.slice(0, 8);
 }
 
+/** Whether a path is there, without making a missing one an error. */
+async function exists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function markdownIn(dir: string, root: string): Promise<string[]> {
   const found: string[] = [];
   for (const entry of await readdir(dir)) {
@@ -164,6 +174,18 @@ export async function runImport(db: Db, options: ImportOptions): Promise<ImportR
   for (const folder of folders) {
     const code = codeFor(folder);
     const paths = await markdownIn(join(root, folder), root);
+
+    /**
+     * The project's overview, which does not live in the project's folder.
+     *
+     * `Master Notes/` is excluded from the project scan — correctly, it is not a project — and the
+     * overviews sit inside it, one per project. So every project's prose description of *what it
+     * is* was invisible to the importer, including Personal Website's, whose folder holds nothing
+     * else at all. The comment below has said "Personal Website has an overview" since this was
+     * written; the importer simply never saw it.
+     */
+    const overview = join('Master Notes', 'Overviews', `${folder} Overview.md`);
+    if (await exists(join(root, overview))) paths.push(overview);
     projects.push({
       code,
       folder,

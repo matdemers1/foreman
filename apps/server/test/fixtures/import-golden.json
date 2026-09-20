@@ -1,7 +1,7 @@
 {
   "totals": {
-    "seen": 12,
-    "mapped": 12,
+    "seen": 17,
+    "mapped": 17,
     "partial": 0,
     "unmapped": 0
   },
@@ -9,27 +9,27 @@
     {
       "code": "BND",
       "folder": "Bindery",
-      "files": 8
+      "files": 9
     },
     {
       "code": "BURR",
       "folder": "Burrow",
-      "files": 1
+      "files": 2
     },
     {
       "code": "CW",
       "folder": "Clearwhen",
-      "files": 2
+      "files": 3
     },
     {
       "code": "AUTH",
       "folder": "D3 Auth",
-      "files": 1
+      "files": 2
     },
     {
       "code": "PW",
       "folder": "Personal Website",
-      "files": 0
+      "files": 1
     }
   ],
   "files": [
@@ -140,12 +140,57 @@
       "produced": [
         "78 tasks (6 with synthesized IDs)"
       ]
+    },
+    {
+      "path": "Master Notes/Overviews/Bindery Overview.md",
+      "status": "mapped",
+      "kind": "project-overview",
+      "note": "stored as a research document: no typed kind matches this filename",
+      "produced": [
+        "1 document, 9 sections"
+      ]
+    },
+    {
+      "path": "Master Notes/Overviews/Burrow Overview.md",
+      "status": "mapped",
+      "kind": "project-overview",
+      "note": "stored as a research document: no typed kind matches this filename",
+      "produced": [
+        "1 document, 5 sections"
+      ]
+    },
+    {
+      "path": "Master Notes/Overviews/Clearwhen Overview.md",
+      "status": "mapped",
+      "kind": "project-overview",
+      "note": "stored as a research document: no typed kind matches this filename",
+      "produced": [
+        "1 document, 6 sections"
+      ]
+    },
+    {
+      "path": "Master Notes/Overviews/D3 Auth Overview.md",
+      "status": "mapped",
+      "kind": "project-overview",
+      "note": "stored as a research document: no typed kind matches this filename",
+      "produced": [
+        "1 document, 8 sections"
+      ]
+    },
+    {
+      "path": "Master Notes/Overviews/Personal Website Overview.md",
+      "status": "mapped",
+      "kind": "project-overview",
+      "note": "stored as a research document: no typed kind matches this filename",
+      "produced": [
+        "1 document, 12 sections"
+      ]
     }
   ],
   "entities": {
     "adr": 2,
-    "document": 2,
-    "document_section": 22,
+    "document": 7,
+    "document_section": 62,
     "finding": 1,
     "term": 29,
     "requirement": 295,
@@ -153,5 +198,5 @@
     "task": 389,
     "task-synthesized": 90
   },
-  "substitutions": 923
+  "substitutions": 926
 }
