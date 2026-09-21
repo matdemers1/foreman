@@ -10,14 +10,29 @@ import { HumanId, ProjectCode } from '../ids.js';
  * shim insists on would be the same product answering the same question two ways.
  */
 
-export const CreatableKind = z.enum(['requirement', 'task', 'phase']);
+/**
+ * What `foreman_create` can make.
+ *
+ * `project` is here because its absence was an asymmetry rather than a boundary: the first write
+ * of any greenfield plan is the one write the MCP surface could not do, so a planning session had
+ * to drop to `curl` for its opening move and then switch back. ADR-002 caps the *verb* surface,
+ * not the kinds one verb reaches.
+ *
+ * ADRs, risks, decisions and terms are deliberately still absent. Each is a record with a body —
+ * context, decision and consequences on an ADR; likelihood, impact and a tripwire on a risk — and
+ * `foreman_update` cannot write any of those fields. Creating one over MCP would make a titled
+ * shell nothing could then fill in, which is worse than not offering it.
+ */
+export const CreatableKind = z.enum(['project', 'requirement', 'task', 'phase']);
 export type CreatableKind = z.infer<typeof CreatableKind>;
 
 export const CreateInput = z.object({
-  project: ProjectCode.describe('The project code, e.g. BND'),
+  project: ProjectCode.describe('The project code, e.g. BND — or the new code, creating one'),
   kind: CreatableKind,
-  /** What the entity says. A requirement's statement, a task's or phase's title. */
+  /** What the entity says. A requirement's statement, a task's, phase's or project's name. */
   text: z.string().min(1).max(4000).describe('The statement, title or name'),
+  /** Project only. Its one-line pitch. */
+  pitch: z.string().max(2000).optional(),
   phase: HumanId.optional().describe('The phase to file it under'),
   priority: Priority.optional(),
   size: Size.optional(),

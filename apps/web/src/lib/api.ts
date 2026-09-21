@@ -88,6 +88,7 @@ export const api = {
       // "no body" from "a body that is undefined", and `RequestInit` accepts only the first.
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     }),
+  del: (path: string) => request<undefined>(path, { method: 'DELETE' }),
 };
 
 export interface SessionUser {
@@ -478,6 +479,27 @@ export interface ReleaseNotes {
   unattributed: number;
 }
 
+export interface TokenRow {
+  id: string;
+  name: string;
+  /** The short, non-secret prefix — how a token is recognised in a list without revealing it. */
+  prefix: string;
+  scopes: string[];
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export interface IssuedToken {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  /** Shown exactly once. No route returns it again, on purpose. */
+  token: string;
+}
+
 export interface RepoRow {
   id: string;
   fullName: string;
@@ -668,6 +690,14 @@ export const foreman = {
   releaseNotes: (code: string, tag: string) =>
     api.get<ReleaseNotes>(`/api/projects/${code}/releases/${encodeURIComponent(tag)}/notes`),
   repos: (code: string) => api.get<Page<RepoRow>>(`/api/projects/${code}/repos`),
+
+  // --- API tokens -----------------------------------------------------------
+  // Console-only routes: a token may not mint another token, or a read-only one is a single
+  // request away from becoming a write token.
+  tokens: () => api.get<Page<TokenRow>>('/api/tokens'),
+  issueToken: (body: { name: string; scopes: string[]; expiresInDays?: number }) =>
+    api.post<IssuedToken>('/api/tokens', body),
+  revokeToken: (id: string) => api.del(`/api/tokens/${id}`),
   findings: (params: { project?: string; severity?: string; status?: string; lens?: string } = {}) => {
     const query = new URLSearchParams({ limit: '200' });
     // `exactOptionalPropertyTypes` means an absent key is absent, not undefined — so the only

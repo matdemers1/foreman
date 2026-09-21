@@ -66,7 +66,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
   {
     name: 'foreman_create',
     title: 'Create',
-    description: 'Add a requirement, task or phase to a project.',
+    description: 'Add a project, or a requirement, task or phase inside one.',
     inputSchema: CreateInput,
     // Creating loses nothing, so it is never gated.
     gate: () => Promise.resolve({ gated: false }),
@@ -75,6 +75,14 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       const body: Record<string, unknown> = {};
 
       switch (args.kind) {
+        case 'project':
+          // The only kind that is not created *inside* a project, so it posts to a different
+          // path: `project` is the code to give it rather than the code to file it under.
+          return client.post('/api/projects', {
+            code: args.project,
+            name: args.text,
+            ...(args.pitch === undefined ? {} : { pitch: args.pitch }),
+          });
         case 'requirement':
           body['statement'] = args.text;
           if (args.priority !== undefined) body['priority'] = args.priority;

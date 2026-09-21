@@ -555,3 +555,32 @@ dd a {
   letter-spacing: 0.04em;
   color: var(--color-fg-muted);
 }
+
+/* A secret, shown once. Monospace and selectable, wrapping rather than
+   scrolling: a token you have to scroll sideways to select is a token half
+   copied, and half a token fails at the far end with no clue why. */
+.fm-secret {
+  margin: 0;
+  padding: var(--space-12);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  border: var(--border-width) solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: var(--text-13);
+  line-height: var(--leading-13);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: all;
+}
+.fm-secret--quiet {
+  color: var(--color-fg-muted);
+  user-select: text;
+}
+
+/* The one-line explanation under a scope tick. Indented to the checkbox's
+   label so it reads as belonging to it rather than to the next row. */
+.fm-scope__detail {
+  margin-left: 1.625rem;
+  font-size: var(--text-12);
+  color: var(--color-fg-muted);
+}

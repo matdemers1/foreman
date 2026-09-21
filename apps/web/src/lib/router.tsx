@@ -88,6 +88,7 @@ export interface Route {
     | 'finding'
     | 'drift'
     | 'health'
+    | 'tokens'
     | 'search'
     | 'task'
     | 'not-found';
@@ -137,6 +138,7 @@ export function routeFor(path: string): Route {
   // JSON before the SPA ever sees the request. Two meanings of one path is a screen that renders
   // as a blob of JSON, which is how this was found.
   if (parts[0] === 'system' && parts[1] === undefined) return { screen: 'health' };
+  if (parts[0] === 'tokens' && parts[1] === undefined) return { screen: 'tokens' };
 
   // Findings are reached without a project: the inbox is cross-project by design, and a finding's
   // human ID already carries its project (ADR-008).

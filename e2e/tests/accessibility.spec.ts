@@ -43,6 +43,7 @@ const SCREENS: { name: string; path: string }[] = [
   { name: 'finding detail', path: '/findings/EXMP-CR-001' },
   { name: 'search', path: '/search?q=decision' },
   { name: 'health', path: '/system' },
+  { name: 'api tokens', path: '/tokens' },
 ];
 
 async function signIn(page: Page): Promise<void> {

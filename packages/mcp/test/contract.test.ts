@@ -3,6 +3,7 @@ import {
   BriefInput,
   CACHE,
   CoverageInput,
+  CreatableKind,
   FindingsInput,
   gateForDelete,
   gateForLink,
@@ -335,6 +336,49 @@ describe('the gate in front of the write tools (T-2.9, FRM-REQ-090, FRM-REQ-091)
       expect(patch).toHaveBeenCalledWith(`/api/projects/BND/findings/${id}`, { status: 'fixed' });
     },
   );
+
+  it('creates a project, the one write that bootstraps every other', async () => {
+    // The first write of any greenfield plan. Its absence was an asymmetry rather than a
+    // boundary: a planning session had to drop to curl for its opening move and then switch
+    // back, and `/plan-project` papered over it with a raw POST.
+    const post = vi.fn().mockResolvedValue({});
+    const create = WRITE_TOOLS.find((t) => t.name === 'foreman_create');
+    await create?.run({ post } as never, {
+      project: 'KDSH',
+      kind: 'project',
+      text: 'Kardashev',
+      pitch: 'Climb the energy scale.',
+    });
+
+    // A different path from every other kind: it is not created *inside* a project.
+    expect(post).toHaveBeenCalledWith('/api/projects', {
+      code: 'KDSH',
+      name: 'Kardashev',
+      pitch: 'Climb the energy scale.',
+    });
+  });
+
+  it('still files every other kind inside its project', async () => {
+    const post = vi.fn().mockResolvedValue({});
+    const create = WRITE_TOOLS.find((t) => t.name === 'foreman_create');
+    await create?.run({ post } as never, {
+      project: 'KDSH',
+      kind: 'requirement',
+      text: 'Kardashev shall simulate one tick per frame.',
+    });
+    expect(post).toHaveBeenCalledWith(
+      '/api/projects/KDSH/requirements',
+      { statement: 'Kardashev shall simulate one tick per frame.' },
+      {},
+    );
+  });
+
+  it('offers no kind whose body it could not then fill in', () => {
+    // ADRs, risks, decisions and terms each carry fields `foreman_update` cannot write, so
+    // creating one over MCP would make a titled shell nothing could fill. Better not offered
+    // than offered broken — and this is the assertion that keeps that decision deliberate.
+    expect(CreatableKind.options).toEqual(['project', 'requirement', 'task', 'phase']);
+  });
 
   it('records the fixing commit as a SHA, so a fix is not lost waiting on ingest', async () => {
     const patch = vi.fn().mockResolvedValue({});

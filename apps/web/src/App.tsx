@@ -25,6 +25,7 @@ import {
   ListTodo,
   Radar,
   ScrollText,
+  KeyRound,
   Search,
   ShieldAlert,
   SquareStack,
@@ -39,6 +40,7 @@ import { PhaseDetail } from './screens/PhaseDetail';
 import { Phases } from './screens/Phases';
 import { Dashboard } from './screens/Dashboard';
 import { Projects } from './screens/Projects';
+import { Tokens } from './screens/Tokens';
 import { ProjectOverview } from './screens/ProjectOverview';
 import { Activity } from './screens/Activity';
 import { Adrs } from './screens/Adrs';
@@ -153,6 +155,12 @@ export function App() {
               icon={<ActivityIcon />}
               label="Health"
               current={path === '/system'}
+            />
+            <SideNavItem
+              href="/tokens"
+              icon={<KeyRound />}
+              label="API tokens"
+              current={path === '/tokens'}
             />
             <ProjectSections path={path} />
           </SideNav>
@@ -290,6 +298,8 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <DriftView code={route.code ?? ''} />;
     case 'health':
       return <Health />;
+    case 'tokens':
+      return <Tokens />;
     case 'search':
       return <SearchScreen key={search} search={search} />;
     case 'task':
