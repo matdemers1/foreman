@@ -132,6 +132,25 @@ describe.skipIf(url === undefined)('the importer', { timeout: 30_000 }, () => {
       // The `Src` column of round codes survives as the source.
       expect(first?.source).toMatch(/^[A-Z]+\d*$/);
     });
+
+    it('lints what it imports, on the same terms as a requirement written through the API', async () => {
+      // The importer used to skip the lint entirely, so every imported requirement landed on the
+      // column defaults — `unparsed`, not ok, no note — and the EARS engine P3 tuned against 591
+      // real requirements produced nothing at all for the only corpus that matters.
+      await runImport(db, { path: FIXTURES, dryRun: false });
+      const imported = await db.requirement.findMany({ where: { humanId: { startsWith: 'BND-' } } });
+
+      expect(imported.length).toBeGreaterThan(100);
+      expect(
+        imported.some((r) => r.earsPattern !== 'unparsed'),
+        'a real register is not entirely unparseable',
+      ).toBe(true);
+      // Warning, never blocking (FRM-REQ-072): a statement the lint cannot read is still imported,
+      // and now carries the reason rather than a bare red mark.
+      for (const requirement of imported) {
+        if (!requirement.earsLintOk) expect(requirement.earsLintNote).not.toBeNull();
+      }
+    });
   });
 
   describe('synthesized task IDs (T-8.4, FRM-REQ-045, FRM-REQ-151)', () => {

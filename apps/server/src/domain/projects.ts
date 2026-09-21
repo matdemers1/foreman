@@ -373,6 +373,17 @@ export async function updateTask(db: Db, actor: Actor, humanId: string, input: T
         ...(input.phaseId !== undefined ? { phaseId: input.phaseId ?? null } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.blockedReason !== undefined ? { blockedReason: input.blockedReason ?? null } : {}),
+        // Leaving `blocked` retires the reason. A task that is moving again and still carries
+        // "waiting on the GitHub App installation" reads, to anyone who finds it later, as a
+        // task that is still waiting — and the reason is only ever rendered beside the status,
+        // so nothing would have shown the contradiction. Only when the caller did not say:
+        // an explicit `blockedReason` in the same patch is a deliberate act and wins.
+        ...(input.status !== undefined &&
+        input.status !== 'blocked' &&
+        before.status === 'blocked' &&
+        input.blockedReason === undefined
+          ? { blockedReason: null }
+          : {}),
         ...(input.size !== undefined ? { size: input.size } : {}),
         ...(input.doneWhen !== undefined ? { doneWhen: input.doneWhen } : {}),
         ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),

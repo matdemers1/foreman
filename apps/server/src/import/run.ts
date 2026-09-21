@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join, relative } from 'node:path';
 import {
+  lintEars,
   parseChecklist,
   parseFrontmatter,
   parseSections,
@@ -527,6 +528,13 @@ async function upsertRequirement(
   const statement = row['Req'] ?? row['Requirement'] ?? '';
   const priority = (row['Pri'] ?? 'M').trim().toUpperCase();
 
+  // Lint here, on the same terms as a requirement written through the API. The importer used to
+  // skip it, so all 210 of the real corpus landed on the column defaults — `unparsed`, not ok,
+  // and no note — and the EARS engine that P3 tuned against 591 real requirements produced
+  // nothing at all for the only corpus that matters. The lint warns and never blocks
+  // (FRM-REQ-072), so a statement it cannot read is still imported, now with the reason.
+  const ears = lintEars(statement);
+
   await db.requirement.upsert({
     where: { humanId },
     // Idempotent by natural key: running twice updates rather than duplicating (FRM-REQ-150).
@@ -535,12 +543,20 @@ async function upsertRequirement(
       humanId,
       seq,
       statement,
+      earsPattern: ears.pattern,
+      earsLintOk: ears.ok,
+      earsLintNote: ears.note ?? null,
       priority: (['M', 'S', 'C', 'W'].includes(priority) ? priority : 'M') as 'M',
       ...(row['Src'] === undefined ? {} : { source: row['Src'] }),
       ...(row['Acceptance'] === undefined ? {} : { acceptanceTest: row['Acceptance'] }),
     },
+    // The statement can change between runs, and the lint is a function of it — leaving the old
+    // verdict beside a new statement is the one state that is worse than not linting at all.
     update: {
       statement,
+      earsPattern: ears.pattern,
+      earsLintOk: ears.ok,
+      earsLintNote: ears.note ?? null,
       ...(row['Acceptance'] === undefined ? {} : { acceptanceTest: row['Acceptance'] }),
     },
   });

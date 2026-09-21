@@ -89,11 +89,16 @@ export async function coverageFor(db: Db, code: string): Promise<Coverage> {
       withoutAcceptanceTest.push(hole(requirement, 'no-acceptance-test'));
     }
 
-    if (!requirement.earsLintOk && requirement.earsLintNote !== null) {
+    // The verdict is `earsLintOk`; the note only explains it. Requiring both meant a requirement
+    // that failed the lint with no note was reported as no warning at all — which is how 210
+    // imported requirements showed an attention badge apiece on the Requirements screen while
+    // `foreman_coverage` answered `earsWarnings: []`. A missing explanation is worth saying out
+    // loud, not worth hiding the finding over.
+    if (!requirement.earsLintOk) {
       earsWarnings.push({
         humanId: requirement.humanId,
         statement: requirement.statement,
-        note: requirement.earsLintNote,
+        note: requirement.earsLintNote ?? 'the lint could not read this as a behaviour',
       });
     }
   }

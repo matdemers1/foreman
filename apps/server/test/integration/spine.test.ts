@@ -272,6 +272,45 @@ describe.skipIf(url === undefined)('the spine', () => {
       );
     });
 
+    it('retires the reason when the task stops being blocked', async () => {
+      // A task that is moving again and still says "waiting on the GitHub App installation" reads
+      // as a task that is still waiting. Nothing would have shown the contradiction: the reason is
+      // only ever rendered beside the status, so the stale copy sat in the record unseen.
+      await makeProject();
+      await post('/projects/SPN/tasks', {
+        title: 'Stuck for now',
+        status: 'blocked',
+        blockedReason: 'Waiting on the GitHub App installation.',
+      });
+
+      await patch('/projects/SPN/tasks/SPN-T-001', { status: 'in_progress' });
+
+      const { entity } = (await (await api('/entities/SPN-T-001')).json()) as {
+        entity: { blockedReason: string | null };
+      };
+      expect(entity.blockedReason).toBeNull();
+    });
+
+    it('keeps a reason the same patch supplies, whatever the status', async () => {
+      // An explicit value is a deliberate act and wins over the clearing rule.
+      await makeProject();
+      await post('/projects/SPN/tasks', {
+        title: 'Stuck for now',
+        status: 'blocked',
+        blockedReason: 'Waiting on the GitHub App installation.',
+      });
+
+      await patch('/projects/SPN/tasks/SPN-T-001', {
+        status: 'todo',
+        blockedReason: 'Kept on purpose.',
+      });
+
+      const { entity } = (await (await api('/entities/SPN-T-001')).json()) as {
+        entity: { blockedReason: string | null };
+      };
+      expect(entity.blockedReason).toBe('Kept on purpose.');
+    });
+
     it('lets one task cite three requirements', async () => {
       await makeProject();
       const ids: string[] = [];

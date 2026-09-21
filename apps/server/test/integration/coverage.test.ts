@@ -319,6 +319,24 @@ describe.skipIf(url === undefined)('coverage and the exit gate', () => {
       expect(coverage.earsWarnings[0]?.humanId).toBe(`${CODE}-REQ-001`);
       expect(coverage.earsWarnings[0]?.note).toContain('names a feature');
     });
+
+    it('still reports a failing requirement that carries no note', async () => {
+      // The verdict is `earsLintOk`; the note only explains it. Requiring both meant the 210
+      // imported requirements — every one on the column defaults, not ok and no note — showed an
+      // attention badge apiece on the Requirements screen while this answered `earsWarnings: []`.
+      const created = await post(`/projects/${CODE}/requirements`, {
+        statement: 'Per-user recovery codes',
+      });
+      const { humanId } = (await created.json()) as { humanId: string };
+      await db.requirement.update({ where: { humanId }, data: { earsLintNote: null } });
+
+      const coverage = await get<{ earsWarnings: { humanId: string; note: string }[] }>(
+        `/projects/${CODE}/coverage`,
+      );
+      const warning = coverage.earsWarnings.find((w) => w.humanId === humanId);
+      expect(warning, 'a failed lint with no note is still a failed lint').toBeDefined();
+      expect(warning?.note.length ?? 0).toBeGreaterThan(0);
+    });
   });
 
   describe('the traceability matrix (T-3.5, FRM-REQ-055)', () => {
