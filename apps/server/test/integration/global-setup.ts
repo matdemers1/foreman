@@ -10,6 +10,19 @@ import { Client } from 'pg';
  * Postgres service needs no bespoke provisioning.
  */
 export default async function setup(): Promise<void> {
+  // `@foreman/shared` is built before anything else, because some of these tests spawn a real CLI
+  // as a process and a spawned process resolves the workspace package to its `dist` — vitest's
+  // aliases only reach code running in-process. Every CLI script in package.json already builds it
+  // for exactly this reason; a test that drives one has the same dependency, and leaving it
+  // implicit meant the suite passed locally (where dist happened to exist) and failed in CI.
+  const built = spawnSync('pnpm', ['--filter', '@foreman/shared', 'build'], {
+    cwd: join(import.meta.dirname, '../../../..'),
+    encoding: 'utf8',
+  });
+  if (built.status !== 0) {
+    throw new Error(`building @foreman/shared failed:\n${built.stderr}${built.stdout}`);
+  }
+
   const url = process.env['DATABASE_URL'];
   if (url === undefined) return;
 
