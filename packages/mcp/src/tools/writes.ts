@@ -115,6 +115,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       if (args.priority !== undefined) body['priority'] = args.priority;
       if (args.size !== undefined) body['size'] = args.size;
       if (args.doneWhen !== undefined) body['doneWhen'] = args.doneWhen;
+      if (args.fixedCommitSha !== undefined) body['fixedCommitSha'] = args.fixedCommitSha;
       return client.patch(`/api/projects/${projectOf(args.id)}/${kind}/${args.id}`, body);
     },
   },
@@ -186,6 +187,15 @@ function kindOf(humanId: string): string {
       return 'tasks';
     case 'P':
       return 'phases';
+    // Every audit lens writes its findings under its own prefix, and they are all one table.
+    // Leaving them out meant `foreman_set_status` threw on the ID its own description invites —
+    // so a session that fixed a finding could read it and never close it, and the findings inbox
+    // stayed full of work that was already done.
+    case 'CR':
+    case 'DA':
+    case 'FR':
+    case 'API':
+      return 'findings';
     default:
       throw new Error(`${humanId} cannot be changed through this tool`);
   }

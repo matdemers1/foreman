@@ -36,6 +36,16 @@ export const UpdateInput = z.object({
   size: Size.optional(),
   doneWhen: z.string().max(2000).optional(),
   phase: HumanId.nullish().describe('Move to this phase, or null for the backlog'),
+  /**
+   * A finding's fixing commit, as a **SHA rather than a link** (FRM-REQ-117). Recorded here
+   * because the fix verdict is only green once that SHA is ingested, and the moment somebody
+   * knows the answer is the moment they close the finding — not whenever ingest catches up.
+   */
+  fixedCommitSha: z
+    .string()
+    .regex(/^[0-9a-f]{7,40}$/i)
+    .optional()
+    .describe('For a finding: the commit that fixed it'),
 });
 export type UpdateInput = z.infer<typeof UpdateInput>;
 
@@ -116,6 +126,16 @@ export function gateForStatus(
         because: `Moving a task from ${from ?? 'unknown'} back to ${to} undoes recorded progress.`,
       };
     }
+  }
+
+  // Closing a finding as `wont_fix` is the same shape of act as cancelling: the work is not
+  // done, and the record stops asking for it. `deferred` and `skipped` say "not now" and "not
+  // here", which stay reversible and readable, so they are not gated.
+  if (entityType === 'finding' && to === 'wont_fix') {
+    return {
+      gated: true,
+      because: 'Closing a finding as wont_fix retires it without the work being done.',
+    };
   }
 
   if (entityType === 'phase' && to === 'complete') {

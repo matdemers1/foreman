@@ -263,6 +263,14 @@ describe('the gate in front of the write tools (T-2.9, FRM-REQ-090, FRM-REQ-091)
     expect(gateForStatus('phase', 'active', 'complete').gated).toBe(true);
   });
 
+  it('gates retiring a finding as wont_fix, but not deferring or skipping it', () => {
+    // `deferred` and `skipped` say "not now" and "not here" and stay legible as open questions.
+    // `wont_fix` says the work will not happen, which is the same act as cancelling.
+    expect(gateForStatus('finding', 'open', 'wont_fix').gated).toBe(true);
+    expect(gateForStatus('finding', 'open', 'deferred').gated).toBe(false);
+    expect(gateForStatus('finding', 'open', 'skipped').gated).toBe(false);
+  });
+
   it("gates setting a requirement to Won't, because it leaves every coverage count", () => {
     const decision = gateForPriority('W');
     expect(decision.gated).toBe(true);
@@ -313,6 +321,28 @@ describe('the gate in front of the write tools (T-2.9, FRM-REQ-090, FRM-REQ-091)
     const setStatus = WRITE_TOOLS.find((t) => t.name === 'foreman_set_status');
     const decision = await setStatus?.gate({ get } as never, { id: 'BND-T-0.3', status: 'in_progress' });
     expect(decision?.gated).toBe(false);
+  });
+
+  // The tool's own description says "task, phase or finding". It threw on every finding ID,
+  // because the path lookup knew three prefixes and findings are written under four — so a
+  // session could read the inbox, do the work, and have no way to close what it had fixed.
+  it.each(['BND-CR-089', 'BND-DA-012', 'BND-FR-004', 'BND-API-003'])(
+    'closes a finding written under any audit lens: %s',
+    async (id) => {
+      const patch = vi.fn().mockResolvedValue({});
+      const setStatus = WRITE_TOOLS.find((t) => t.name === 'foreman_set_status');
+      await setStatus?.run({ patch } as never, { id, status: 'fixed' });
+      expect(patch).toHaveBeenCalledWith(`/api/projects/BND/findings/${id}`, { status: 'fixed' });
+    },
+  );
+
+  it('records the fixing commit as a SHA, so a fix is not lost waiting on ingest', async () => {
+    const patch = vi.fn().mockResolvedValue({});
+    const update = WRITE_TOOLS.find((t) => t.name === 'foreman_update');
+    await update?.run({ patch } as never, { id: 'BND-FR-004', fixedCommitSha: '1d68d46' });
+    expect(patch).toHaveBeenCalledWith('/api/projects/BND/findings/BND-FR-004', {
+      fixedCommitSha: '1d68d46',
+    });
   });
 });
 
