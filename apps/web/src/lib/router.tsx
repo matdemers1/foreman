@@ -71,6 +71,7 @@ export interface Route {
     | 'dashboard'
     | 'projects'
     | 'project-ideas'
+    | 'members'
     | 'project'
     | 'phases'
     | 'phase'
@@ -111,6 +112,7 @@ export function routeFor(path: string): Route {
   if (parts[0] === 'project-ideas' && parts[1] === undefined) {
     return { screen: 'project-ideas' };
   }
+  if (parts[0] === 'members' && parts[1] === undefined) return { screen: 'members' };
 
   if (parts[0] === 'projects' && parts[1] !== undefined) {
     const code = parts[1];

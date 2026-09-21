@@ -10,7 +10,7 @@ P10 cutover on 2026-09-20, which is the point: the tool holds its own remaining 
 - `foreman_brief FRM` — the active phase, what is next, what is blocked, drift.
 - `foreman_coverage FRM` — uncovered Musts, tasks citing nothing, EARS warnings.
 - `foreman://FRM/architecture`, `/data-model`, `/api-contract`, `/ux-flows`, `/glossary`.
-- **ADR-001** Node/Express/Prisma over Python/FastAPI · **ADR-002** a small verb surface over a large graph · **ADR-003** local stdio shim, not a remote MCP server · **ADR-004** dual login as a permanent ecosystem pattern · **ADR-005** attribution is declared, not inferred · **ADR-006** five registers are views, not documents · **ADR-007** database backup as the only escape hatch · **ADR-008** project-prefixed human IDs · **ADR-009** one cutover, not a migration window · **ADR-013** remote MCP uses pre-registration, not DCR or CIMD · **ADR-014** *(proposed)* MCP may delete what nothing cites · **ADR-015** a project idea is its own entity, not an idea with no project.
+- **ADR-001** Node/Express/Prisma over Python/FastAPI · **ADR-002** a small verb surface over a large graph · **ADR-003** local stdio shim, not a remote MCP server · **ADR-004** dual login as a permanent ecosystem pattern · **ADR-005** attribution is declared, not inferred · **ADR-006** five registers are views, not documents · **ADR-007** database backup as the only escape hatch · **ADR-008** project-prefixed human IDs · **ADR-009** one cutover, not a migration window · **ADR-013** remote MCP uses pre-registration, not DCR or CIMD · **ADR-014** *(proposed)* MCP may delete what nothing cites · **ADR-015** a project idea is its own entity, not an idea with no project · **ADR-016** *(proposed)* Foreman runs as one of two products, chosen by deployment.
 
 The archived vault at `../D3 Cloud Vault/Foreman/` holds the pre-cutover plan. Read it for history;
 never write to it.
@@ -70,6 +70,22 @@ pnpm --filter foreman-server run relint -- --write
 - **No host ports.** Cloudflare Tunnel only.
 - **No time estimates** anywhere — T-shirt sizes and dependency order only.
 - **No Co-Authored-By** or AI attribution in commits.
+
+## Two products, one codebase (ADR-016)
+
+`FOREMAN_MODE` is `solo` or `board`. **`solo` is everything below and on this page.** `board` is a
+second deployment — its own database, never shared — running an innovation-fund board for several
+people: roles, invitations, scoring, board-only discussion, and funding with an amount. See
+[docs/runbooks/innovation-board.md](docs/runbooks/innovation-board.md).
+
+The board's routes are mounted in **both** modes and answer 404 in `solo`, because a route that
+exists only in one build is a route only one build has ever run.
+
+**This narrows the anti-features below; it does not repeal them.** They protect the plan-vs-reality
+ledger — a comment on a requirement or an assignee on a finding is the issue tracker Foreman exists
+not to be. `board-stays-in-its-lane.test.ts` fails if a comment or a score ever references a
+requirement, task, phase, finding, ADR or decision. That test is the entire basis on which the
+reversal is scoped rather than wholesale, so it is the one to read before extending any of it.
 
 ## Anti-features — do not build these
 No sprints, velocity, story points or burndown · no time tracking · **no freeform wiki or note-taking** (the guardrail that stops Foreman decaying back into the vault) · no multi-user collaboration, comments, assignees or notifications · no public, client-facing or shareable views · no general issue or bug tracking · no due dates, Gantt or scheduling · no drag-and-drop as the primary interface · no pull-request ingestion · no server-side LLM call · no Redis.

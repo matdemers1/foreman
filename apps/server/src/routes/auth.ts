@@ -154,12 +154,18 @@ export function authRoutes(deps: AuthRouteDeps): Router {
         // D3 Auth button matters, and it is reached by exactly the people this branch answers.
         // Sending it only to signed-in callers meant the button could never appear at all.
         // It leaks nothing — whether a login button should render is not a secret.
-        res.status(401).json({ authenticated: false, oidcAvailable: deps.oidcAvailable ?? false });
+        res.status(401).json({
+          authenticated: false,
+          oidcAvailable: deps.oidcAvailable ?? false,
+          // On the 401 as well, for the same reason `oidcAvailable` is: the sign-in screen is the
+          // first thing a colleague sees, and it should say which product they are signing in to.
+          mode: deps.config.FOREMAN_MODE,
+        });
         return;
       }
       const user = await deps.db.user.findUniqueOrThrow({
         where: { id: userId },
-        select: { id: true, email: true, displayName: true, status: true },
+        select: { id: true, email: true, displayName: true, status: true, role: true },
       });
       const credential = await deps.db.credential.findUnique({
         where: { userId: user.id },
@@ -168,6 +174,10 @@ export function authRoutes(deps: AuthRouteDeps): Router {
       res.json({
         authenticated: true,
         user,
+        // What this deployment is, and what this person may do in it. The console asks once, at
+        // the top, rather than guessing from what the API happens to refuse.
+        mode: deps.config.FOREMAN_MODE,
+        currency: deps.config.CURRENCY,
         totpEnrolled: credential?.totpConfirmedAt !== undefined && credential.totpConfirmedAt !== null,
         // The console shows the second button only when there is something behind it.
         oidcAvailable: deps.oidcAvailable ?? false,

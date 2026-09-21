@@ -335,6 +335,10 @@ dd a {
   white-space: nowrap;
   background: var(--color-surface-raised);
   color: var(--color-fg-muted);
+  /* A pill is its content, never its container. `inline-flex` alone does not say so inside a
+     flex column, where it stretches to the full width and reads as a filled bar. */
+  align-self: flex-start;
+  width: fit-content;
 }
 .fm-pill--success { background: var(--color-success-muted); color: var(--color-success); }
 .fm-pill--danger { background: var(--color-danger-muted); color: var(--color-danger); }
@@ -608,4 +612,36 @@ dd a {
   margin-left: 1.625rem;
   font-size: var(--text-12);
   color: var(--color-fg-muted);
+}
+
+/* ─── The innovation board (ADR-016) ──────────────────────────────────────── */
+
+/* A submission's board score, beside its status. Mono, because two numbers separated by a slash
+   are read as a pair and a proportional font makes them drift apart down a column of cards. */
+.fm-item__score {
+  font-family: var(--font-mono);
+  font-size: var(--text-11);
+  color: var(--color-fg-muted);
+  white-space: nowrap;
+}
+
+/* One comment in a thread. Unclamped, unlike a card's pitch: a discussion that hides its own
+   second half is a discussion people have somewhere else. */
+.fm-item__body-full {
+  margin: 0;
+  font-size: var(--text-13);
+  line-height: var(--leading-13);
+  white-space: pre-wrap;
+}
+
+.fm-comment {
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+}
+
+/* A board-only note. Marked by a border and by the word on its pill — never by colour alone,
+   which is the one distinction here that must survive a monochrome screen. */
+.fm-comment--internal {
+  border-left: 2px solid var(--color-warning);
 }

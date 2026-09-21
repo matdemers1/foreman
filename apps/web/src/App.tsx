@@ -31,11 +31,13 @@ import {
   ShieldAlert,
   SquareStack,
   Table2,
+  Users,
 } from 'lucide-react';
 import { fetchSession, logout, type SessionState } from './lib/api';
 import { briefFor, projectCodeFor, SECTIONS } from './lib/project';
 import { useAsync } from './lib/useAsync';
 import { routeFor, useLocation } from './lib/router';
+import { SessionProvider } from './lib/session';
 import { Login } from './screens/Login';
 import { PhaseDetail } from './screens/PhaseDetail';
 import { Phases } from './screens/Phases';
@@ -54,6 +56,8 @@ import { Findings } from './screens/Findings';
 import { Glossary } from './screens/Glossary';
 import { Ideas } from './screens/Ideas';
 import { ProjectIdeas } from './screens/ProjectIdeas';
+import { Members } from './screens/Members';
+import { AcceptInvite } from './screens/AcceptInvite';
 import { Health } from './screens/Health';
 import { RequirementDetail } from './screens/RequirementDetail';
 import { RiskRegister } from './screens/RiskRegister';
@@ -115,6 +119,16 @@ export function App() {
     );
   }
 
+  // Before the login branch: somebody accepting an invitation has no account yet, which is the
+  // entire point of the link they followed.
+  if (path === '/accept') {
+    return (
+      <ThemeProvider>
+        <AcceptInvite />
+      </ThemeProvider>
+    );
+  }
+
   if (state.status === 'anonymous') {
     return (
       <ThemeProvider>
@@ -124,9 +138,11 @@ export function App() {
   }
 
   const { user } = state.session;
+  const board = state.session.mode === 'board';
 
   return (
     <ThemeProvider>
+      <SessionProvider session={state.session}>
       <AppShell
         storageKey="foreman.nav"
         brand={<AppShellBrand name="Foreman" href="/" />}
@@ -136,18 +152,31 @@ export function App() {
                 used to live here and would have been unusable at twenty projects — it is a screen
                 of its own now, and project ideas sit beside it because they are what becomes one. */}
             <SideNavItem href="/" icon={<HomeIcon />} label="Dashboard" current={path === '/'} />
-            <SideNavItem
-              href="/projects"
-              icon={<FolderKanban />}
-              label="Projects"
-              current={path === '/projects'}
-            />
+            {/* A fund board has submissions, not a portfolio. The ledger's screens are still
+                reachable by URL — the data is the same shape — but leading with them would
+                describe a product nobody there is using. */}
+            {!board && (
+              <SideNavItem
+                href="/projects"
+                icon={<FolderKanban />}
+                label="Projects"
+                current={path === '/projects'}
+              />
+            )}
             <SideNavItem
               href="/project-ideas"
               icon={<Lightbulb />}
-              label="Project ideas"
+              label={board ? 'Submissions' : 'Project ideas'}
               current={path === '/project-ideas'}
             />
+            {board && user.role === 'admin' && (
+              <SideNavItem
+                href="/members"
+                icon={<Users />}
+                label="Members"
+                current={path === '/members'}
+              />
+            )}
             <SideNavItem
               href="/findings"
               icon={<ListChecks />}
@@ -192,6 +221,7 @@ export function App() {
       >
         <Screen path={path} search={search} />
       </AppShell>
+      </SessionProvider>
     </ThemeProvider>
   );
 }
@@ -273,6 +303,8 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <Projects />;
     case 'project-ideas':
       return <ProjectIdeas />;
+    case 'members':
+      return <Members />;
     case 'project':
       return <ProjectOverview code={route.code ?? ''} />;
     case 'phases':

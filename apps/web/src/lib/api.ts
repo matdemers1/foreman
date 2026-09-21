@@ -96,11 +96,17 @@ export interface SessionUser {
   email: string;
   displayName: string;
   status: 'invited' | 'active' | 'suspended';
+  role: 'admin' | 'reviewer' | 'submitter';
 }
+
+/** What this deployment is. `solo` is Foreman; `board` is an innovation-fund board (ADR-016). */
+export type Mode = 'solo' | 'board';
 
 export interface SessionState {
   authenticated: true;
   user: SessionUser;
+  mode: Mode;
+  currency: string;
   totpEnrolled: boolean;
   /** Whether D3 Auth is reachable — not merely configured. A button to a 503 is worse than none. */
   oidcAvailable: boolean;
@@ -113,7 +119,11 @@ export async function fetchSession(): Promise<SessionState | AnonymousState> {
     if (error instanceof ApiError && error.status === 401) {
       // The body of a 401 is where the login screen learns whether to offer the second path.
       const body = error.body as Partial<AnonymousState> | undefined;
-      return { authenticated: false, oidcAvailable: body?.oidcAvailable ?? false };
+      return {
+        authenticated: false,
+        oidcAvailable: body?.oidcAvailable ?? false,
+        mode: body?.mode ?? 'solo',
+      };
     }
     throw error;
   }
@@ -123,6 +133,7 @@ export async function fetchSession(): Promise<SessionState | AnonymousState> {
 export interface AnonymousState {
   authenticated: false;
   oidcAvailable: boolean;
+  mode: Mode;
 }
 
 export type LoginResult = { status: 'signed_in' } | { status: 'totp_required' };
@@ -407,13 +418,52 @@ export interface ProjectIdeaRow {
   seq: number;
   title: string;
   pitch: string | null;
-  status: 'new' | 'considering' | 'parked' | 'rejected' | 'converted';
+  status: 'new' | 'considering' | 'shortlisted' | 'funded' | 'parked' | 'rejected' | 'converted';
+  fundedAmountCents: number | null;
+  /** Null for a submitter: scores are the board's until the decision is made (FRM-REQ-168). */
+  score: ScoreSummary | null;
+  submittedBy: { id: string; displayName: string } | null;
+  _count: { comments: number };
   reason: string | null;
   decidedAt: string | null;
   convertedAt: string | null;
   createdAt: string;
   updatedAt: string;
   project: { code: string; name: string; lifecycle: string } | null;
+}
+
+export interface MemberRow {
+  id: string;
+  email: string;
+  displayName: string;
+  role: 'admin' | 'reviewer' | 'submitter';
+  status: 'invited' | 'active' | 'suspended';
+  createdAt: string;
+  invite: { expiresAt: string; acceptedAt: string | null } | null;
+}
+
+export interface ScoreSummary {
+  count: number;
+  impact: number | null;
+  effort: number | null;
+  ratio: number | null;
+}
+
+export interface ScoreRow {
+  id: string;
+  impact: number;
+  effort: number;
+  note: string | null;
+  updatedAt: string;
+  user: { id: string; displayName: string };
+}
+
+export interface CommentRow {
+  id: string;
+  body: string;
+  internal: boolean;
+  createdAt: string;
+  user: { id: string; displayName: string; role: string };
 }
 
 export interface DecisionRow {
@@ -719,6 +769,29 @@ export const foreman = {
   ) => api.patch<IdeaRow>(`/api/projects/${code}/ideas/${humanId}`, body),
   deleteIdea: (code: string, humanId: string) =>
     api.del(`/api/projects/${code}/ideas/${humanId}`),
+
+  // --- The innovation board (ADR-016) ---------------------------------------
+  members: () => api.get<Page<MemberRow>>('/api/board/members'),
+  inviteMember: (body: { email: string; displayName: string; role: string }) =>
+    api.post<{ user: MemberRow; acceptUrl: string; expiresAt: string }>(
+      '/api/board/members/invite',
+      body,
+    ),
+  updateMember: (id: string, body: { role?: string; suspended?: boolean }) =>
+    api.patch<MemberRow>(`/api/board/members/${id}`, body),
+  scores: (humanId: string) =>
+    api.get<{ summary: ScoreSummary; scores: ScoreRow[] }>(`/api/board/ideas/${humanId}/scores`),
+  setScore: (humanId: string, body: { impact: number; effort: number; note?: string }) =>
+    api.put<ScoreRow>(`/api/board/ideas/${humanId}/scores`, body),
+  comments: (humanId: string) =>
+    api.get<Page<CommentRow>>(`/api/board/ideas/${humanId}/comments`),
+  addComment: (humanId: string, body: { body: string; internal: boolean }) =>
+    api.post<CommentRow>(`/api/board/ideas/${humanId}/comments`, body),
+  deleteComment: (id: string) => api.del(`/api/board/comments/${id}`),
+  fundIdea: (humanId: string, body: { amountCents: number; reason: string }) =>
+    api.post<ProjectIdeaRow>(`/api/board/ideas/${humanId}/fund`, body),
+  acceptInvite: (body: { token: string; password: string }) =>
+    api.post<{ email: string }>('/auth/invite/accept', body),
 
   // --- Project ideas --------------------------------------------------------
   // No project in any of these paths, because a project idea has none. That is the feature.

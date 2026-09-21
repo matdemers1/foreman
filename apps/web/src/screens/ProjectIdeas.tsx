@@ -19,8 +19,10 @@ import {
 } from '@d3cloud/ui';
 import { foreman, ApiError, type ProjectIdeaRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { useMode, useMoney, useReviews, useSession } from '../lib/session';
 import { Pill, SegmentBar, StatCard } from '../ui/viz';
 import { relativeDay, SERIES, type Tone } from '../ui/tone';
+import { IdeaDiscussion, FundIdea, ScoreIdea } from './BoardControls';
 
 /**
  * Project ideas — something that might become a project, before it is one
@@ -36,26 +38,42 @@ import { relativeDay, SERIES, type Tone } from '../ui/tone';
  * information to answer it. `PI-007` costs nothing.
  */
 
-const STATUSES = [
+const ALL = [
   { value: 'new', label: 'New' },
   { value: 'considering', label: 'Considering' },
+  { value: 'shortlisted', label: 'Shortlisted' },
+  { value: 'funded', label: 'Funded' },
   { value: 'parked', label: 'Parked' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'converted', label: 'Built' },
 ] as const;
 
-type Status = (typeof STATUSES)[number]['value'];
+type Status = (typeof ALL)[number]['value'];
 
-/** Set by converting, never by hand — so it is not on the form. */
-const EDITABLE = STATUSES.filter((s) => s.value !== 'converted');
+/**
+ * Which statuses a deployment offers (FRM-ADR-016).
+ *
+ * The record is the same in both — a candidate somebody might build — and what differs is where
+ * it can end up. A solo instance converts an idea into a Foreman project; a fund board funds it.
+ * Showing the other mode's endings would offer a button that cannot be pressed.
+ */
+const FOR_MODE: Record<'solo' | 'board', readonly Status[]> = {
+  solo: ['new', 'considering', 'parked', 'rejected', 'converted'],
+  board: ['new', 'considering', 'shortlisted', 'funded', 'parked', 'rejected'],
+};
+
+/** Reached by converting or funding, never by hand — so neither is on the edit form. */
+const DECIDED_ELSEWHERE: readonly Status[] = ['converted', 'funded'];
 
 const NEEDS_REASON: readonly string[] = ['parked', 'rejected'];
 
 function ideaTone(status: string): Tone {
   switch (status) {
     case 'converted':
+    case 'funded':
       return 'success';
     case 'considering':
+    case 'shortlisted':
       return 'accent';
     case 'parked':
       return 'warning';
@@ -69,6 +87,8 @@ function ideaTone(status: string): Tone {
 const SERIES_FOR: Record<Status, string> = {
   new: SERIES.waiting,
   considering: SERIES.active,
+  shortlisted: SERIES.info,
+  funded: SERIES.done,
   parked: SERIES.warning,
   rejected: SERIES.blocked,
   converted: SERIES.done,
@@ -77,22 +97,31 @@ const SERIES_FOR: Record<Status, string> = {
 const MEANING: Record<Status, string> = {
   new: 'Written down, not yet weighed',
   considering: 'Actively being thought about',
+  shortlisted: 'In front of the board',
+  funded: 'Approved, with money behind it',
   parked: 'Good, deliberately not now',
   rejected: 'Decided against — do not re-litigate',
   converted: 'Became a project',
 };
 
 export function ProjectIdeas() {
+  const mode = useMode();
+  const board = mode === 'board';
   const [nonce, setNonce] = useState(0);
   const [filter, setFilter] = useState<Status | null>(null);
   const refresh = useCallback(() => { setNonce((n) => n + 1); }, []);
+
+  const statuses = useMemo(
+    () => ALL.filter((s) => FOR_MODE[mode].includes(s.value)),
+    [mode],
+  );
 
   const { state } = useAsync(() => foreman.projectIdeas(), [nonce]);
   const items = state.status === 'ready' ? state.value.items : [];
 
   const counts = useMemo(() => {
     const by: Record<string, number> = {};
-    for (const status of STATUSES) by[status.value] = 0;
+    for (const status of ALL) by[status.value] = 0;
     for (const item of items) by[item.status] = (by[item.status] ?? 0) + 1;
     return by;
   }, [items]);
@@ -102,10 +131,14 @@ export function ProjectIdeas() {
   return (
     <Page>
       <PageHeader
-        title="Project ideas"
-        description="Things that might become projects. A code is chosen when one does, not before."
+        title={board ? 'Submissions' : 'Project ideas'}
+        description={
+          board
+            ? 'Anyone can submit. The board scores, discusses and decides — and says why.'
+            : 'Things that might become projects. A code is chosen when one does, not before.'
+        }
         count={items.length}
-        countNoun={{ one: 'idea', other: 'ideas' }}
+        countNoun={board ? { one: 'submission', other: 'submissions' } : { one: 'idea', other: 'ideas' }}
         actions={<ProjectIdeaForm onSaved={refresh} />}
       />
 
@@ -118,7 +151,7 @@ export function ProjectIdeas() {
       ) : (
         <Stack gap="24">
           <Grid minItemWidth="sm">
-            {STATUSES.map((status) => (
+            {statuses.map((status) => (
               <StatCard
                 key={status.value}
                 label={status.label}
@@ -135,7 +168,7 @@ export function ProjectIdeas() {
 
           {items.length > 0 && (
             <SegmentBar
-              segments={STATUSES.map((status) => ({
+              segments={statuses.map((status) => ({
                 label: status.label,
                 value: counts[status.value] ?? 0,
                 color: SERIES_FOR[status.value],
@@ -146,10 +179,18 @@ export function ProjectIdeas() {
           {shown.length === 0 ? (
             <EmptyState
               kind="empty"
-              heading={filter === null ? 'No project ideas yet' : `Nothing is ${filter}`}
+              heading={
+                filter === null
+                  ? board
+                    ? 'Nothing has been submitted yet'
+                    : 'No project ideas yet'
+                  : `Nothing is ${filter}`
+              }
             >
               {filter === null
-                ? 'Write one down from here, or from a session with foreman_create.'
+                ? board
+                  ? 'Anyone signed in can submit one from here.'
+                  : 'Write one down from here, or from a session with foreman_create.'
                 : 'Press the card again to see them all.'}
             </EmptyState>
           ) : (
@@ -166,16 +207,31 @@ export function ProjectIdeas() {
 }
 
 function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged: () => void }) {
-  const converted = idea.status === 'converted';
+  const board = useMode() === 'board';
+  const reviews = useReviews();
+  const money = useMoney();
+  const { user } = useSession();
+  const settled = DECIDED_ELSEWHERE.includes(idea.status);
+  // A submitter may reword their own and nothing else; a reviewer may do everything.
+  const mine = idea.submittedBy?.id === user.id;
+  const canEdit = !settled && (reviews || mine);
 
   return (
     <Card padding="md" role="group" aria-label={`${idea.humanId}: ${idea.title}`}>
       <Stack gap="12">
         <Cluster gap="8" align="center" justify="between">
           <span className="fm-item__id">{idea.humanId}</span>
-          <Pill tone={ideaTone(idea.status)}>
-            {STATUSES.find((s) => s.value === idea.status)?.label ?? idea.status}
-          </Pill>
+          <Cluster gap="8" align="center">
+            {/* Only a reviewer sees this, because the API only sends it to one (FRM-REQ-168). */}
+            {idea.score !== null && idea.score.count > 0 && (
+              <span className="fm-item__score" title={`${String(idea.score.count)} reviewer(s)`}>
+                {idea.score.impact}↑ / {idea.score.effort}↓
+              </span>
+            )}
+            <Pill tone={ideaTone(idea.status)}>
+              {ALL.find((s) => s.value === idea.status)?.label ?? idea.status}
+            </Pill>
+          </Cluster>
         </Cluster>
 
         <strong className="fm-item__title">{idea.title}</strong>
@@ -187,6 +243,13 @@ function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged:
           <p className="fm-item__reason">
             <span className="fm-muted">Because </span>
             {idea.reason}
+          </p>
+        )}
+
+        {idea.status === 'funded' && idea.fundedAmountCents !== null && (
+          <p className="fm-item__reason">
+            <span className="fm-muted">Funded </span>
+            <strong>{money(idea.fundedAmountCents)}</strong>
           </p>
         )}
 
@@ -203,19 +266,27 @@ function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged:
 
         <Cluster gap="8" align="center" justify="between">
           <span className="fm-muted">
-            {converted
+            {/* Who, as well as when. A board needs the name on the card; a solo instance has
+                nobody else's submissions to tell apart, so it only ever shows the date. */}
+            {board && idea.submittedBy !== null ? `${idea.submittedBy.displayName} · ` : ''}
+            {idea.status === 'converted'
               ? `Built ${relativeDay(idea.convertedAt)}`
               : idea.decidedAt === null
                 ? `Added ${relativeDay(idea.createdAt)}`
                 : `Decided ${relativeDay(idea.decidedAt)}`}
           </span>
-          {!converted && (
-            <Cluster gap="8" align="center">
+          <Cluster gap="8" align="center">
+            {board && <IdeaDiscussion idea={idea} onChanged={onChanged} />}
+            {board && reviews && !settled && <ScoreIdea idea={idea} onScored={onChanged} />}
+            {board && reviews && !settled && <FundIdea idea={idea} onFunded={onChanged} />}
+            {/* Converting is a solo instance's ending: a fund board funds things, it does not
+                turn them into entries in somebody's personal project ledger. */}
+            {!board && !settled && reviews && (
               <ConvertIdea idea={idea} onConverted={onChanged} />
-              <ProjectIdeaForm idea={idea} onSaved={onChanged} />
-              <DeleteProjectIdea idea={idea} onDeleted={onChanged} />
-            </Cluster>
-          )}
+            )}
+            {canEdit && <ProjectIdeaForm idea={idea} onSaved={onChanged} />}
+            {canEdit && <DeleteProjectIdea idea={idea} onDeleted={onChanged} />}
+          </Cluster>
         </Cluster>
       </Stack>
     </Card>
@@ -223,7 +294,15 @@ function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged:
 }
 
 function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: () => void }) {
+  const mode = useMode();
+  const reviews = useReviews();
   const editing = idea !== undefined;
+  // Deciding is the board's. A submitter gets the wording fields and no status control at all,
+  // rather than one that is refused on submit.
+  const canDecide = editing && reviews;
+  const options = ALL.filter(
+    (s) => FOR_MODE[mode].includes(s.value) && !DECIDED_ELSEWHERE.includes(s.value),
+  );
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(idea?.title ?? '');
   const [pitch, setPitch] = useState(idea?.pitch ?? '');
@@ -232,7 +311,7 @@ function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: ()
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const needsReason = editing && NEEDS_REASON.includes(status);
+  const needsReason = canDecide && NEEDS_REASON.includes(status);
 
   const reset = () => {
     setTitle(idea?.title ?? '');
@@ -255,8 +334,10 @@ function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: ()
       ? foreman.updateProjectIdea(idea.humanId, {
           title,
           pitch,
-          status,
-          ...(reason.trim().length === 0 ? {} : { reason }),
+          // Sent only when this person may set it. A field the server would refuse is a field the
+          // form should not have offered.
+          ...(canDecide ? { status } : {}),
+          ...(canDecide && reason.trim().length > 0 ? { reason } : {}),
         })
       : foreman.createProjectIdea({
           title,
@@ -285,14 +366,16 @@ function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: ()
       }}
       trigger={
         <Button {...(editing ? {} : { variant: 'primary' as const })}>
-          {editing ? 'Edit' : 'New project idea'}
+          {editing ? 'Edit' : mode === 'board' ? 'New submission' : 'New project idea'}
         </Button>
       }
-      title={editing ? `Edit ${idea.humanId}` : 'New project idea'}
+      title={editing ? `Edit ${idea.humanId}` : mode === 'board' ? 'New submission' : 'New project idea'}
       description={
         editing
           ? undefined
-          : 'No code yet — that is decided when it becomes a project, and it is permanent.'
+          : mode === 'board'
+            ? 'What it is and who it helps. The board scores it, and tells you either way.'
+            : 'No code yet — that is decided when it becomes a project, and it is permanent.'
       }
     >
       <form onSubmit={submit}>
@@ -326,10 +409,10 @@ function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: ()
             />
           </FormField>
 
-          {editing && (
+          {canDecide && (
             <FormField label="Status">
               <Select
-                options={EDITABLE.map((s) => ({ value: s.value, label: s.label }))}
+                options={options.map((s) => ({ value: s.value, label: s.label }))}
                 value={status}
                 onValueChange={setStatus}
               />
