@@ -51,6 +51,19 @@ export type AdrStatus = z.infer<typeof AdrStatus>;
 export const AdrRelationKind = z.enum(['extends', 'supersedes', 'superseded_by']);
 export type AdrRelationKind = z.infer<typeof AdrRelationKind>;
 
+/**
+ * The four states an idea can be in.
+ *
+ * Taken from the "Feature Ideas & Future Development" documents four projects already carry
+ * rather than invented: Accepted, Parked — *"good ideas, deliberately not now"* — and Rejected,
+ * under the heading *"do not re-litigate these"*. `new` is one nobody has judged yet.
+ */
+export const IdeaStatus = z.enum(['new', 'accepted', 'parked', 'rejected']);
+export type IdeaStatus = z.infer<typeof IdeaStatus>;
+
+/** The two that need a reason: a decision without one gets re-argued. */
+export const IDEA_NEEDS_REASON: readonly IdeaStatus[] = ['parked', 'rejected'];
+
 export const RiskLikelihood = z.enum(['low', 'medium', 'high']);
 export type RiskLikelihood = z.infer<typeof RiskLikelihood>;
 

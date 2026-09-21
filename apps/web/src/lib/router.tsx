@@ -82,6 +82,7 @@ export interface Route {
     | 'adrs'
     | 'risks'
     | 'glossary'
+    | 'ideas'
     | 'audits'
     | 'activity'
     | 'findings'
@@ -122,6 +123,7 @@ export function routeFor(path: string): Route {
     if (parts[2] === 'register' && parts[3] === undefined) return { screen: 'register', code };
     if (parts[2] === 'risks' && parts[3] === undefined) return { screen: 'risks', code };
     if (parts[2] === 'glossary' && parts[3] === undefined) return { screen: 'glossary', code };
+    if (parts[2] === 'ideas' && parts[3] === undefined) return { screen: 'ideas', code };
     if (parts[2] === 'adrs' && parts[3] === undefined) return { screen: 'adrs', code };
     if (parts[2] === 'audits' && parts[3] === undefined) return { screen: 'audits', code };
     if (parts[2] === 'activity' && parts[3] === undefined) return { screen: 'activity', code };

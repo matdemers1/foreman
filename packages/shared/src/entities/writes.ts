@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Priority, Size } from '../enums.js';
-import { HumanId, ProjectCode } from '../ids.js';
+import { HumanId, parseHumanId, ProjectCode } from '../ids.js';
 
 /**
  * The write surface, shared by the API and the MCP shim (FRM-REQ-089, FRM-REQ-090, FRM-REQ-091).
@@ -18,12 +18,15 @@ import { HumanId, ProjectCode } from '../ids.js';
  * to drop to `curl` for its opening move and then switch back. ADR-002 caps the *verb* surface,
  * not the kinds one verb reaches.
  *
+ * `idea` is here for the same reason: an idea is a title and a line of what it buys, so `text`
+ * says all of it and `foreman_update` can write the rest.
+ *
  * ADRs, risks, decisions and terms are deliberately still absent. Each is a record with a body —
  * context, decision and consequences on an ADR; likelihood, impact and a tripwire on a risk — and
  * `foreman_update` cannot write any of those fields. Creating one over MCP would make a titled
  * shell nothing could then fill in, which is worse than not offering it.
  */
-export const CreatableKind = z.enum(['project', 'requirement', 'task', 'phase']);
+export const CreatableKind = z.enum(['project', 'requirement', 'task', 'phase', 'idea']);
 export type CreatableKind = z.infer<typeof CreatableKind>;
 
 export const CreateInput = z.object({
@@ -33,6 +36,8 @@ export const CreateInput = z.object({
   text: z.string().min(1).max(4000).describe('The statement, title or name'),
   /** Project only. Its one-line pitch. */
   pitch: z.string().max(2000).optional(),
+  /** Idea only. What it buys, in basic terms — so one call is enough to record a whole idea. */
+  body: z.string().max(2000).optional(),
   phase: HumanId.optional().describe('The phase to file it under'),
   priority: Priority.optional(),
   size: Size.optional(),
@@ -50,6 +55,15 @@ export const UpdateInput = z.object({
   priority: Priority.optional(),
   size: Size.optional(),
   doneWhen: z.string().max(2000).optional(),
+  /** An idea's body — what it buys, in basic terms. */
+  body: z.string().max(2000).optional(),
+  /**
+   * Why an idea was parked or rejected.
+   *
+   * The whole value of writing a rejection down is that it is not re-argued six months later by
+   * somebody who cannot tell it was already considered.
+   */
+  reason: z.string().max(1000).optional(),
   phase: HumanId.nullish().describe('Move to this phase, or null for the backlog'),
   /**
    * A finding's fixing commit, as a **SHA rather than a link** (FRM-REQ-117). Recorded here
@@ -71,6 +85,33 @@ export const SetStatusInput = z.object({
   reason: z.string().max(1000).optional(),
 });
 export type SetStatusInput = z.infer<typeof SetStatusInput>;
+
+/**
+ * `foreman_delete` — the twelfth and last tool (ADR-002), and **ideas only**.
+ *
+ * ADR-002 originally made deletion absent from the shim rather than merely gated, reasoning that
+ * the one surface able to delete should be the one where a person is looking at what they are
+ * about to lose. That reasoning is about **citations**: deleting a requirement hides every
+ * reference to it, and the loss is in the references, not the row — which is precisely what a
+ * session issuing a tool call cannot see and a console screen shows.
+ *
+ * An idea has none. Nothing cites it, no coverage reads it, no traceability row points at it. It
+ * is a title and a paragraph, and the list is only useful if pruning it is as cheap as adding to
+ * it — a backlog nobody empties is a backlog nobody reads. So this is narrowed to ideas rather
+ * than reversed wholesale (FRM-ADR-014, raised as `proposed`): the ADR's protection stays exactly
+ * where its rationale applies, and every other kind still answers "delete it from the console".
+ *
+ * Soft, like every delete here — the row is hidden, its ID is never reused, and `foreman_undo`'s
+ * absence is not a problem because the console's undo reads the same audit event.
+ */
+export const DeleteInput = z.object({
+  id: HumanId.refine((value) => parseHumanId(value)?.type === 'IDEA', {
+    message:
+      'only an idea can be deleted over MCP — anything else is cited by something, and the ' +
+      'console is where you can see what the deletion takes with it',
+  }).describe('The idea to delete, e.g. BND-IDEA-004. Ideas only.'),
+});
+export type DeleteInput = z.infer<typeof DeleteInput>;
 
 export const LinkInput = z.object({
   from: HumanId,

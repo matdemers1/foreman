@@ -30,6 +30,7 @@ export const SECTIONS: readonly Section[] = [
   { slug: 'adrs', label: 'Decisions', group: 'Knowledge' },
   { slug: 'risks', label: 'Risks', group: 'Knowledge' },
   { slug: 'glossary', label: 'Glossary', group: 'Knowledge' },
+  { slug: 'ideas', label: 'Ideas', title: 'Ideas', group: 'Plan' },
   { slug: 'activity', label: 'Activity', group: 'Reality' },
   { slug: 'audits', label: 'Audits', group: 'Reality' },
   { slug: 'drift', label: 'Drift', group: 'Reality' },

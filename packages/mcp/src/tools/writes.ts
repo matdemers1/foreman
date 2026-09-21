@@ -1,7 +1,9 @@
 import {
   AttributeInput,
   CreateInput,
+  DeleteInput,
   gateForAttribute,
+  gateForDelete,
   gateForLink,
   gateForPriority,
   gateForStatus,
@@ -34,6 +36,7 @@ export interface WriteToolDefinition {
     | typeof UpdateInput
     | typeof SetStatusInput
     | typeof LinkInput
+    | typeof DeleteInput
     | typeof AttributeInput;
   /** Whether this call needs asking about first, decided from the arguments and current state. */
   gate(client: ForemanClient, input: unknown): Promise<GateDecision>;
@@ -83,6 +86,10 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
             name: args.text,
             ...(args.pitch === undefined ? {} : { pitch: args.pitch }),
           });
+        case 'idea':
+          body['title'] = args.text;
+          if (args.body !== undefined) body['body'] = args.body;
+          break;
         case 'requirement':
           body['statement'] = args.text;
           if (args.priority !== undefined) body['priority'] = args.priority;
@@ -123,6 +130,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       if (args.priority !== undefined) body['priority'] = args.priority;
       if (args.size !== undefined) body['size'] = args.size;
       if (args.doneWhen !== undefined) body['doneWhen'] = args.doneWhen;
+      if (args.body !== undefined) body['body'] = args.body;
+      if (args.reason !== undefined) body['reason'] = args.reason;
       if (args.fixedCommitSha !== undefined) body['fixedCommitSha'] = args.fixedCommitSha;
       return client.patch(`/api/projects/${projectOf(args.id)}/${kind}/${args.id}`, body);
     },
@@ -143,13 +152,33 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       const args = SetStatusInput.parse(input);
       return client.patch(`/api/projects/${projectOf(args.id)}/${kindOf(args.id)}/${args.id}`, {
         status: args.status,
-        // Only when it is a *blocked* reason. This used to send it whatever the status was, so a
-        // note explaining why something was finished landed in `blockedReason` on a done task —
-        // which reads, to anyone who finds it later, as a record of that task being stuck.
-        ...(args.reason === undefined || args.status !== 'blocked'
-          ? {}
-          : { blockedReason: args.reason }),
+        // Where the reason goes depends on what is being moved. A task carries it as
+        // `blockedReason` and only while blocked — sending it whatever the status was put a note
+        // explaining why something was *finished* into `blockedReason` on a done task, which
+        // reads to anyone who finds it later as a record of that task being stuck.
+        //
+        // An idea carries a plain `reason`, and parking or rejecting one *requires* it: the whole
+        // value of writing a rejection down is that it is not re-argued by somebody who cannot
+        // tell it was already considered.
+        ...reasonFor(args.id, args.status, args.reason),
       });
+    },
+  },
+  {
+    name: 'foreman_delete',
+    title: 'Delete an idea',
+    description:
+      'Drop an idea from the list. Ideas only — everything else is cited by something and is ' +
+      'deleted from the console. Soft, undoable, and always confirmed first.',
+    inputSchema: DeleteInput,
+    // Always gated, even though an idea is the cheapest thing here to lose. A gate that applies
+    // only to expensive deletions teaches that an ungated one is safe, and this is the verb whose
+    // scope is most likely to widen later.
+    gate: () => Promise.resolve(gateForDelete()),
+    run: async (client, input) => {
+      const args = DeleteInput.parse(input);
+      await client.del(`/api/projects/${projectOf(args.id)}/${kindOf(args.id)}/${args.id}`);
+      return { deleted: args.id };
     },
   },
   {
@@ -185,6 +214,22 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
   },
 ];
 
+/**
+ * Where a status change's reason belongs, by what is being moved.
+ *
+ * Two entities take one, under different names and different rules, and getting it wrong is
+ * silent: the note lands on a field nothing reads, or on a field that then misreports the row.
+ */
+function reasonFor(
+  humanId: string,
+  status: string,
+  reason: string | undefined,
+): Record<string, string> {
+  if (reason === undefined) return {};
+  if (parseHumanId(humanId)?.type === 'IDEA') return { reason };
+  return status === 'blocked' ? { blockedReason: reason } : {};
+}
+
 /** The path segment for an entity's kind, from its human ID. */
 function kindOf(humanId: string): string {
   const parsed = parseHumanId(humanId);
@@ -204,6 +249,8 @@ function kindOf(humanId: string): string {
     case 'FR':
     case 'API':
       return 'findings';
+    case 'IDEA':
+      return 'ideas';
     default:
       throw new Error(`${humanId} cannot be changed through this tool`);
   }

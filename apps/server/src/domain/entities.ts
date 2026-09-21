@@ -25,6 +25,7 @@ const BY_TYPE: Record<string, EntityType> = {
   FR: 'finding',
   API: 'finding',
   AUD: 'audit',
+  IDEA: 'idea',
 };
 
 export interface EntityResult {
@@ -134,6 +135,10 @@ async function findOne(
     }
     case 'risk': {
       const row = await db.risk.findFirst({ where });
+      return row === null ? null : { id: row.id, entity: row };
+    }
+    case 'idea': {
+      const row = await db.idea.findFirst({ where });
       return row === null ? null : { id: row.id, entity: row };
     }
     case 'finding': {

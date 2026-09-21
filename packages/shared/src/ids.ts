@@ -20,6 +20,7 @@ export const HUMAN_ID_TYPE = {
   finding_design: 'DA',
   finding_feature: 'FR',
   finding_api: 'API',
+  idea: 'IDEA',
   audit: 'AUD',
   term: 'TERM',
 } as const;

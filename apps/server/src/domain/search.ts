@@ -20,6 +20,7 @@ export const SEARCHABLE = [
   'phase',
   'decision',
   'risk',
+  'idea',
 ] as const;
 
 export type SearchableType = (typeof SEARCHABLE)[number];
@@ -258,6 +259,29 @@ export async function search(db: Db, query: string, options: SearchOptions = {})
         projectCode: row.project.code,
         title: row.title,
         snippet: snippet(row.tripwire, q),
+      });
+    }
+  }
+
+  if (wants('idea')) {
+    const rows = await db.idea.findMany({
+      where: {
+        deletedAt: null,
+        ...project,
+        OR: [{ title: contains }, { humanId: contains }, { body: contains }],
+      },
+      take: perType,
+      include: { project: { select: { code: true } } },
+    });
+    for (const row of rows) {
+      hits.push({
+        type: 'idea',
+        humanId: row.humanId,
+        projectCode: row.project.code,
+        title: row.title,
+        // The reason, when there is one: searching for something already rejected should show
+        // *why* in the result, not make you open it to find out it was decided.
+        snippet: snippet(row.reason ?? row.body ?? '', q),
       });
     }
   }

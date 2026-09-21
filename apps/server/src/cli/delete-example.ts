@@ -78,6 +78,9 @@ try {
     union all
     select 'document', count(*) from document d
       where not exists (select 1 from project p where p.id = d.project_id)
+    union all
+    select 'idea', count(*) from idea i
+      where not exists (select 1 from project p where p.id = i.project_id)
   `;
   const left = orphans.filter((row) => Number(row.rows) > 0);
   if (left.length > 0) {

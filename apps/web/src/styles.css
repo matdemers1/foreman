@@ -484,6 +484,31 @@ dd a {
   min-width: 0;
 }
 
+/* An idea's description, on a card in a grid. Clamped rather than truncated to one line: three
+   lines is usually the whole thing, and a card that grows with its text breaks the row's rhythm
+   without telling the reader anything. */
+.fm-item__body {
+  margin: 0;
+  font-size: var(--text-13);
+  line-height: var(--leading-13);
+  color: var(--color-fg-muted);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+/* Why an idea was parked or rejected. Marked, not clamped — this is the sentence that stops the
+   idea being raised again, so it is never the one cut short. */
+.fm-item__reason {
+  margin: 0;
+  padding-left: var(--space-8);
+  border-left: 2px solid var(--color-border);
+  font-size: var(--text-13);
+  line-height: var(--leading-13);
+}
+
 /* A quoted aside inside a card — an exit demo, a blocked reason. */
 .fm-callout {
   display: flex;

@@ -231,6 +231,48 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
     ],
   });
 
+  // Ideas: one of every status, so the screen's four counters and its bar all have something
+  // to show, and so the axe sweep sees a populated page rather than an empty state.
+  await db.idea.createMany({
+    data: [
+      {
+        projectId: project.id,
+        humanId: `${CODE}-IDEA-001`,
+        seq: 1,
+        title: 'Group projects into portfolios',
+        body: 'The sidebar will not hold nine of them, let alone twenty-three.',
+        status: 'new',
+      },
+      {
+        projectId: project.id,
+        humanId: `${CODE}-IDEA-002`,
+        seq: 2,
+        title: 'A keyboard palette for jumping between records',
+        body: 'Type a human ID from anywhere and land on it.',
+        status: 'accepted',
+        decidedAt: new Date('2026-09-15'),
+      },
+      {
+        projectId: project.id,
+        humanId: `${CODE}-IDEA-003`,
+        seq: 3,
+        title: 'Import the fourteen projects still only in the vault',
+        status: 'parked',
+        reason: 'Their plans are frozen and readable. Import one when work actually starts on it.',
+        decidedAt: new Date('2026-09-16'),
+      },
+      {
+        projectId: project.id,
+        humanId: `${CODE}-IDEA-004`,
+        seq: 4,
+        title: 'Comments and assignees on tasks',
+        status: 'rejected',
+        reason: 'Single operator, by design — FRM-REQ-099 asserts their absence.',
+        decidedAt: new Date('2026-09-17'),
+      },
+    ],
+  });
+
   await db.term.createMany({
     data: [
       {
@@ -291,6 +333,10 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
     'ux_flows',
     'phase_plan',
     'research',
+    // The prose ancestor of the ideas screen. Seeded so the link from that screen back to this
+    // document is exercised rather than assumed: four real projects carry one, and a records
+    // screen that cannot reach the document it succeeds is how the two quietly disagree.
+    'feature_ideas',
   ] as const) {
     const sections = SECTIONS[kind] ?? DEFAULT_SECTIONS;
     const document = await db.document.create({

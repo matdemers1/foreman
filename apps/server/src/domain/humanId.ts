@@ -16,8 +16,73 @@ import type { TransactionClient } from './audit.js';
 export type HumanIdKind = keyof typeof HUMAN_ID_TYPE;
 
 /**
- * Take the next sequence for a kind, inside the caller's transaction. The update and the read are
- * one statement, so two concurrent creates cannot take the same number.
+ * The table each counter-allocated kind's rows live in. Findings share one table across four
+ * prefixes; the prefix filter in `highWaterMark` is what separates them.
+ *
+ * Not user input — a closed map over `HumanIdKind`, which is what makes interpolating the table
+ * name below safe. `term` is absent because a term has no human ID.
+ */
+const TABLE: Partial<Record<HumanIdKind, string>> = {
+  requirement: 'requirement',
+  task: 'task',
+  phase: 'phase',
+  adr: 'adr',
+  decision: 'decision',
+  risk: 'risk',
+  finding_code_review: 'finding',
+  finding_design: 'finding',
+  finding_feature: 'finding',
+  finding_api: 'finding',
+  idea: 'idea',
+  audit: 'audit',
+};
+
+/**
+ * The largest sequence this project has actually issued for a type, read from the rows themselves.
+ *
+ * The counter is the fast path, but it is not the only way rows arrive: **the P10 importer wrote
+ * human IDs directly and never seeded `id_counters`**, so all nine imported projects sat on `{}`.
+ * The first ADR created through the API in any of them allocated `FRM-ADR-001`, collided with the
+ * imported row on the unique index, and surfaced as `internal error` — with nothing to say the
+ * cause was a counter thirteen behind the data. A restored partial dump would do the same.
+ *
+ * Deleted rows count. An ID is never reused (ADR-008), and `deleted_at` does not free its number.
+ */
+async function highWaterMark(
+  tx: TransactionClient,
+  projectId: string,
+  kind: HumanIdKind,
+): Promise<number> {
+  const table = TABLE[kind];
+  if (table === undefined) return 0;
+
+  // A human ID is exactly `CODE-TYPE-SEQ`: a code is letters and digits and a type is letters, so
+  // the third part is the whole sequence.
+  //
+  // Only undotted sequences count. A task takes its ID from its phase when it has one — `BND-T-0.3`
+  // — and from the counter when it does not, and `T-0.3` can never collide with `T-4`. Letting the
+  // dotted ones raise the floor would push the counter to 9 because some phase 8 has eight tasks.
+  const rows = await tx.$queryRawUnsafe<{ high: number | null }[]>(
+    `select max(split_part(human_id, '-', 3)::int) as high
+       from "${table}"
+      where project_id = $1::uuid
+        and split_part(human_id, '-', 2) = $2
+        and split_part(human_id, '-', 3) ~ '^[0-9]+$'`,
+    projectId,
+    HUMAN_ID_TYPE[kind],
+  );
+  // `max(…::int)` is an int4, which the driver hands back as a number — not the string or BigInt
+  // a wider integer type would give.
+  return rows[0]?.high ?? 0;
+}
+
+/**
+ * Take the next sequence for a kind, inside the caller's transaction.
+ *
+ * Two concurrent creates cannot take the same number: the counter is read and written in one
+ * `update … returning`, which holds the project row until the transaction commits, so the second
+ * re-reads the value the first wrote rather than the one it saw going in. The high-water mark only
+ * raises the floor, so it is safe to compute before taking that lock.
  */
 export async function nextSequence(
   tx: TransactionClient,
@@ -25,12 +90,13 @@ export async function nextSequence(
   kind: HumanIdKind,
 ): Promise<number> {
   const type = HUMAN_ID_TYPE[kind];
+  const floor = await highWaterMark(tx, projectId, kind);
   const rows = await tx.$queryRaw<{ id_counters: Record<string, number> }[]>`
     update project
     set id_counters = jsonb_set(
       id_counters,
       array[${type}],
-      to_jsonb(coalesce((id_counters ->> ${type})::int, 0) + 1),
+      to_jsonb(greatest(coalesce((id_counters ->> ${type})::int, 0), ${floor}::int) + 1),
       true
     )
     where id = ${projectId}::uuid

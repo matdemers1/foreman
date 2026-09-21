@@ -7,6 +7,8 @@ import {
   DocumentKind,
   DocumentUpdate,
   PageQuery,
+  IdeaCreate,
+  IdeaUpdate,
   RiskCreate,
   RiskUpdate,
   SectionCreate,
@@ -41,6 +43,8 @@ import {
   updateTerm,
 } from '../domain/record.js';
 import { findProject } from '../domain/projects.js';
+import { createIdea, ideasFor, updateIdea } from '../domain/ideas.js';
+import { softDelete } from '../domain/undo.js';
 import {
   documentAt,
   renderDocument,
@@ -442,6 +446,45 @@ export function recordRoutes(db: Db): Router {
   );
 
   // ─── Glossary ────────────────────────────────────────────────────────────
+
+  // ─── Ideas ───────────────────────────────────────────────────────────────
+
+  router.get(
+    '/:code/ideas',
+    handler(async (req, res) => {
+      const items = await ideasFor(db, param(req, 'code'));
+      res.json({ items, nextCursor: null, total: items.length });
+    }),
+  );
+
+  router.post(
+    '/:code/ideas',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(IdeaCreate, req, res);
+      if (body === null) return;
+      res.status(201).json(await createIdea(db, actorOf(req), param(req, 'code'), body));
+    }),
+  );
+
+  router.patch(
+    '/:code/ideas/:humanId',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(IdeaUpdate, req, res);
+      if (body === null) return;
+      res.json(await updateIdea(db, actorOf(req), param(req, 'humanId'), body));
+    }),
+  );
+
+  router.delete(
+    '/:code/ideas/:humanId',
+    canWrite,
+    handler(async (req, res) => {
+      await softDelete(db, actorOf(req), 'idea', param(req, 'humanId'));
+      res.status(204).end();
+    }),
+  );
 
   router.get(
     '/:code/glossary',

@@ -8,6 +8,8 @@ import {
 } from '@foreman/shared';
 import { Router } from 'express';
 import { z } from 'zod';
+import { IdeaStatus } from '@foreman/shared';
+import { allIdeas } from '../domain/ideas.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import type { Db } from '../db.js';
 import {
@@ -47,6 +49,23 @@ export function findingRoutes(db: Db): Router {
   const FindingsQuery = FindingsInput.extend({
     limit: z.coerce.number().int().min(1).max(200).default(50),
   });
+
+  /**
+   * Every project's ideas at once.
+   *
+   * Alongside the findings inbox rather than in its own file, because it is the same shape of
+   * thing: a per-project record whose value is mostly in reading all of them together. "What
+   * could we build next, anywhere" is not a question a project-scoped list answers.
+   */
+  router.get(
+    '/ideas',
+    handler(async (req, res) => {
+      const query = parseQuery(z.object({ status: IdeaStatus.optional() }), req, res);
+      if (query === null) return;
+      const items = await allIdeas(db, query.status);
+      res.json({ items, nextCursor: null, total: items.length });
+    }),
+  );
 
   router.get(
     '/findings',

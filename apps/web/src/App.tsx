@@ -21,6 +21,7 @@ import {
   FolderKanban,
   GitBranch,
   Home as HomeIcon,
+  Lightbulb,
   ListChecks,
   ListTodo,
   Radar,
@@ -51,6 +52,7 @@ import { DriftView } from './screens/DriftView';
 import { FindingDetail } from './screens/FindingDetail';
 import { Findings } from './screens/Findings';
 import { Glossary } from './screens/Glossary';
+import { Ideas } from './screens/Ideas';
 import { Health } from './screens/Health';
 import { RequirementDetail } from './screens/RequirementDetail';
 import { RiskRegister } from './screens/RiskRegister';
@@ -205,6 +207,7 @@ const SECTION_ICONS: Record<string, ReactNode> = {
   adrs: <ScrollText />,
   risks: <ShieldAlert />,
   glossary: <BookText />,
+  ideas: <Lightbulb />,
   activity: <GitBranch />,
   audits: <ListChecks />,
   drift: <Radar />,
@@ -286,6 +289,8 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <RiskRegister code={route.code ?? ''} />;
     case 'glossary':
       return <Glossary code={route.code ?? ''} />;
+    case 'ideas':
+      return <Ideas code={route.code ?? ''} />;
     case 'audits':
       return <AuditIndex code={route.code ?? ''} />;
     case 'activity':

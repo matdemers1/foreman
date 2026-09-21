@@ -377,7 +377,9 @@ describe('the gate in front of the write tools (T-2.9, FRM-REQ-090, FRM-REQ-091)
     // ADRs, risks, decisions and terms each carry fields `foreman_update` cannot write, so
     // creating one over MCP would make a titled shell nothing could fill. Better not offered
     // than offered broken — and this is the assertion that keeps that decision deliberate.
-    expect(CreatableKind.options).toEqual(['project', 'requirement', 'task', 'phase']);
+    // An idea qualifies on exactly that test: its whole body is a title and a paragraph, and
+    // `foreman_update` writes both.
+    expect(CreatableKind.options).toEqual(['project', 'requirement', 'task', 'phase', 'idea']);
   });
 
   it('records the fixing commit as a SHA, so a fix is not lost waiting on ingest', async () => {

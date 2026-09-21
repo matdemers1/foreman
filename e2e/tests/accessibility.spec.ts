@@ -36,6 +36,7 @@ const SCREENS: { name: string; path: string }[] = [
   { name: 'decisions', path: '/projects/EXMP/adrs' },
   { name: 'risks', path: '/projects/EXMP/risks' },
   { name: 'glossary', path: '/projects/EXMP/glossary' },
+  { name: 'ideas', path: '/projects/EXMP/ideas' },
   { name: 'audits', path: '/projects/EXMP/audits' },
   { name: 'activity', path: '/projects/EXMP/activity' },
   { name: 'drift', path: '/projects/EXMP/drift' },

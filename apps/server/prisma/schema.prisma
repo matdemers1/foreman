@@ -193,6 +193,17 @@ enum ReferenceKind {
   supersedes
 }
 
+/// The four states the real idea documents already use. Taken from them rather than invented:
+/// every project's "Feature Ideas & Future Development" sorts into Accepted, Parked — *"good
+/// ideas, deliberately not now"* — and Rejected, under the heading *"do not re-litigate these"*.
+/// `new` is the fourth because an idea has to exist before it has been judged.
+enum IdeaStatus {
+  new
+  accepted
+  parked
+  rejected
+}
+
 enum EntityType {
   project
   repo
@@ -212,6 +223,7 @@ enum EntityType {
   release
   deployment
   tech_item
+  idea
   user
   api_token
   job
@@ -284,6 +296,7 @@ model Project {
   findings     Finding[]
   deployments  Deployment[]
   techItems    TechItem[]
+  ideas        Idea[]
 
   @@index([lifecycle])
   @@map("project")
@@ -565,6 +578,48 @@ model Risk {
 
   @@index([projectId, status])
   @@map("risk")
+}
+
+/// A thing somebody might build, before it is a plan (FRM-REQ-153 … FRM-REQ-158).
+///
+/// Deliberately thin, and that is the feature. Foreman's anti-features name "no freeform wiki or
+/// note-taking" as the guardrail that stops it decaying back into the vault, and an ideas list is
+/// exactly where that decay would start. So: one title, one short body, one status, and no
+/// sections, revisions, attachments or nesting. An idea that needs a document is a project.
+///
+/// Project-scoped like every other cited record, because MCP addresses writes by human ID and a
+/// `BND-IDEA-004` is what makes `foreman_update` and `foreman_set_status` reach it. An idea for
+/// something that is not a project yet starts by creating the project.
+model Idea {
+  id        String @id @default(uuid(7)) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+
+  humanId String     @unique @map("human_id")
+  seq     Int
+  title   String
+  /// What it is, in basic terms. Capped in the schema layer, not here, so the limit is one number
+  /// in one place rather than a column type nobody reads.
+  body    String?
+  status  IdeaStatus @default(new)
+  /// Why it was parked or rejected, and required for both.
+  ///
+  /// This is the whole value of writing a rejection down: the existing documents head that
+  /// section *"do not re-litigate these"*, and a rejected idea with no reason gets proposed
+  /// again six months later by someone who cannot tell it was considered. Same rule as a
+  /// blocked task needing to say what is blocking it.
+  reason  String?
+  /// When it stopped being untriaged. Null while `new`.
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, seq])
+  @@index([projectId, status])
+  @@map("idea")
 }
 
 model Term {

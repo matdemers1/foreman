@@ -20,6 +20,7 @@ export const SEARCHABLE_TYPES = [
   'phase',
   'decision',
   'risk',
+  'idea',
 ] as const;
 
 export const SearchableType = z.enum(SEARCHABLE_TYPES);

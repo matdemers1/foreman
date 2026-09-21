@@ -4,6 +4,7 @@ import {
   DocumentKind,
   RiskImpact,
   RiskLikelihood,
+  IdeaStatus,
   RiskStatus,
 } from '../enums.js';
 import { Instant, Timestamps, Uuid } from './common.js';
@@ -199,6 +200,37 @@ export const RiskUpdate = RiskCreate.partial().extend({
   status: RiskStatus.optional(),
 });
 export type RiskUpdate = z.infer<typeof RiskUpdate>;
+
+// ─── Ideas ─────────────────────────────────────────────────────────────────
+
+/**
+ * A thing somebody might build, before it is a plan.
+ *
+ * **Deliberately thin.** Foreman's anti-features name "no freeform wiki or note-taking" as the
+ * guardrail that stops it decaying back into the vault, and an ideas list is exactly where that
+ * decay begins. One title, one short body, one status, one reason — no sections, no revisions, no
+ * nesting. An idea that needs a document is a project.
+ *
+ * `body` is capped at 2000 rather than the 4000 a document section gets, for the same reason: the
+ * existing idea documents phrase each as one line of *what it buys*, and a field with room for an
+ * essay gets one.
+ */
+export const IdeaCreate = z.object({
+  title: z.string().min(1).max(300),
+  body: z.string().max(2000).optional(),
+});
+export type IdeaCreate = z.infer<typeof IdeaCreate>;
+
+export const IdeaUpdate = IdeaCreate.partial().extend({
+  status: IdeaStatus.optional(),
+  /**
+   * Why it was parked or rejected. Required for both, checked against the merged state so a patch
+   * that sets only the status is refused rather than silently leaving the old reason — the same
+   * rule, and the same failure, as a task moving to `blocked`.
+   */
+  reason: z.string().max(1000).nullish(),
+});
+export type IdeaUpdate = z.infer<typeof IdeaUpdate>;
 
 // ─── Glossary ──────────────────────────────────────────────────────────────
 

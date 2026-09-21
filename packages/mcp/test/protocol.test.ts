@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { ForemanClient } from '../src/client.js';
 import { createServer } from '../src/server.js';
 import { MAX_TOOLS } from '../src/tools/index.js';
+import { WRITE_TOOLS } from '../src/tools/writes.js';
 
 /**
  * The shim over the **actual protocol** (T-1.9, T-2.8, T-4.9).
@@ -251,6 +252,52 @@ describe('the confirmation round-trip (T-2.9, ADR-011)', () => {
     expect(calls.some((c) => c.method === 'PATCH')).toBe(false);
   });
 
+  it('creates an idea with the title and the description, in one call', async () => {
+    const { client: api, calls } = fakeApi({
+      '/api/projects/BND/ideas': { humanId: 'BND-IDEA-004', title: 'A scanner shortcut' },
+    });
+    const { client } = await connect(api);
+
+    const result = await client.callTool({
+      name: 'foreman_create',
+      arguments: {
+        kind: 'idea',
+        project: 'BND',
+        text: 'A scanner shortcut',
+        body: 'One button that ingests whatever is on the glass.',
+      },
+    });
+
+    const call = calls.find((c) => c.method === 'POST');
+    expect(call?.path).toBe('/api/projects/BND/ideas');
+    // `text` is the title and `body` is the description: one tool spelling for five kinds, and
+    // the mapping is the thing that silently drops a field if it is wrong.
+    expect(call?.body).toEqual({
+      title: 'A scanner shortcut',
+      body: 'One button that ingests whatever is on the glass.',
+    });
+    expect(text(result)).toContain('BND-IDEA-004');
+  });
+
+  it('sends an idea’s reason as `reason`, not as `blockedReason`', async () => {
+    const { client: api, calls } = fakeApi({
+      '/api/entities/BND-IDEA-004': { type: 'idea', entity: { status: 'new' } },
+      '/api/projects/BND/ideas/BND-IDEA-004': { ok: true },
+    });
+    const { client } = await connect(api, { elicitation: () => ({ confirm: true }) });
+
+    await client.callTool({
+      name: 'foreman_set_status',
+      arguments: { id: 'BND-IDEA-004', status: 'rejected', reason: 'Bindery is desktop-first.' },
+    });
+
+    // A task carries its reason as `blockedReason` and only while blocked. Sending an idea's the
+    // same way would drop it on the floor — the server would take the rejection with no reason,
+    // which is the one state this feature exists to prevent.
+    const call = calls.find((c) => c.method === 'PATCH');
+    expect(call?.body).toEqual({ status: 'rejected', reason: 'Bindery is desktop-first.' });
+  });
+
   it('proceeds when confirmed', async () => {
     const { client: api, calls } = fakeApi({
       '/api/entities/BND-T-1.1': { type: 'task', entity: { status: 'in_progress' } },
@@ -418,16 +465,37 @@ describe('resources over the protocol (T-4.9, FRM-REQ-087)', () => {
 });
 
 describe('what the MCP surface deliberately cannot do', () => {
-  it('has no delete verb at all', async () => {
+  it('can delete an idea, and nothing else', async () => {
     const { client } = await connect(fakeApi().client);
     const { tools } = await client.listTools();
 
-    // ADR-002: a small verb surface. Deleting through the shim is not merely gated, it is absent —
-    // a soft delete is undoable from the console, and the one place that can do it is the one
-    // place a person is looking at what they are about to lose.
+    // This test used to assert that no delete verb existed at all (ADR-002), on the reasoning
+    // that the one surface able to delete should be the one where a person can see what they are
+    // about to lose. That reasoning is about *citations*, so FRM-ADR-014 narrows the absence to
+    // where it earns its keep rather than reversing it: an idea is cited by nothing, and a
+    // backlog nobody can prune is a backlog nobody reads.
     const names = tools.map((t) => t.name);
-    expect(names).not.toContain('foreman_delete');
-    expect(names.filter((n) => /delete|destroy|purge|remove/i.test(n))).toEqual([]);
+    expect(names).toContain('foreman_delete');
+    // Exactly one. A second spelling is how a narrowed verb quietly gets its scope back.
+    expect(names.filter((n) => /delete|destroy|purge|remove/i.test(n))).toEqual(['foreman_delete']);
+
+    const remove = WRITE_TOOLS.find((t) => t.name === 'foreman_delete');
+    expect(remove?.inputSchema.safeParse({ id: 'BND-IDEA-004' }).success).toBe(true);
+    // The narrowing is the schema's, not a branch inside `run` — so it holds for anything that
+    // parses this input, and the model is told why rather than getting a generic type error.
+    for (const cited of ['BND-REQ-012', 'BND-T-004', 'BND-P-3', 'BND-CR-037']) {
+      const result = remove?.inputSchema.safeParse({ id: cited });
+      expect(result?.success, cited).toBe(false);
+      expect(result?.error?.issues[0]?.message, cited).toContain('console');
+    }
+  });
+
+  it('gates that delete unconditionally, unlike every other write', async () => {
+    const remove = WRITE_TOOLS.find((t) => t.name === 'foreman_delete');
+    const decision = await remove?.gate({} as never, { id: 'BND-IDEA-004' });
+
+    expect(decision?.gated).toBe(true);
+    expect(decision?.because).toContain('citation');
   });
 
   it('exposes no prompt, and no sampling', async () => {

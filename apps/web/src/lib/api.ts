@@ -381,6 +381,25 @@ export interface RiskRow {
   phase: { humanId: string; name: string } | null;
 }
 
+/**
+ * An idea — a thing somebody might build, before it is a plan.
+ *
+ * `project` is present only on the cross-project listing, which is why it is optional here rather
+ * than a second type: one row shape, and the column appears when the field does.
+ */
+export interface IdeaRow {
+  id: string;
+  humanId: string;
+  title: string;
+  body: string | null;
+  status: 'new' | 'accepted' | 'parked' | 'rejected';
+  reason: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  project?: { code: string; name: string };
+}
+
 export interface DecisionRow {
   id: string;
   humanId: string;
@@ -670,6 +689,20 @@ export const foreman = {
   risks: (code: string) => api.get<Page<RiskRow>>(`/api/projects/${code}/risks`),
   decisions: (code: string) => api.get<Page<DecisionRow>>(`/api/projects/${code}/decisions`),
   glossary: (code: string) => api.get<Page<TermRow>>(`/api/projects/${code}/glossary`),
+
+  // --- Ideas ----------------------------------------------------------------
+  ideas: (code: string) => api.get<Page<IdeaRow>>(`/api/projects/${code}/ideas`),
+  allIdeas: (status?: string) =>
+    api.get<Page<IdeaRow>>(`/api/ideas${status === undefined ? '' : `?status=${status}`}`),
+  createIdea: (code: string, body: { title: string; body?: string }) =>
+    api.post<IdeaRow>(`/api/projects/${code}/ideas`, body),
+  updateIdea: (
+    code: string,
+    humanId: string,
+    body: { title?: string; body?: string; status?: string; reason?: string },
+  ) => api.patch<IdeaRow>(`/api/projects/${code}/ideas/${humanId}`, body),
+  deleteIdea: (code: string, humanId: string) =>
+    api.del(`/api/projects/${code}/ideas/${humanId}`),
   audits: (code: string) => api.get<Page<AuditRow>>(`/api/projects/${code}/audits`),
   search: (q: string, types: string[], project: string | null) => {
     const query = new URLSearchParams({ q, limit: '50' });
