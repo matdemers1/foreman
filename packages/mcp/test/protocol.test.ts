@@ -480,14 +480,73 @@ describe('what the MCP surface deliberately cannot do', () => {
     expect(names.filter((n) => /delete|destroy|purge|remove/i.test(n))).toEqual(['foreman_delete']);
 
     const remove = WRITE_TOOLS.find((t) => t.name === 'foreman_delete');
-    expect(remove?.inputSchema.safeParse({ id: 'BND-IDEA-004' }).success).toBe(true);
+    // An idea and a project idea: the two kinds nothing cites. `PI-007` was added deliberately,
+    // on the same test ADR-014 states — not because it was convenient to allow.
+    for (const uncited of ['BND-IDEA-004', 'PI-007']) {
+      expect(remove?.inputSchema.safeParse({ id: uncited }).success, uncited).toBe(true);
+    }
     // The narrowing is the schema's, not a branch inside `run` — so it holds for anything that
     // parses this input, and the model is told why rather than getting a generic type error.
-    for (const cited of ['BND-REQ-012', 'BND-T-004', 'BND-P-3', 'BND-CR-037']) {
+    // `BND` is here because a *project* is the thing a project idea is most easily confused with,
+    // and deleting one would take nine hundred records that cite each other.
+    for (const cited of ['BND-REQ-012', 'BND-T-004', 'BND-P-3', 'BND-CR-037', 'BND']) {
       const result = remove?.inputSchema.safeParse({ id: cited });
       expect(result?.success, cited).toBe(false);
-      expect(result?.error?.issues[0]?.message, cited).toContain('console');
     }
+    for (const cited of ['BND-REQ-012', 'BND-CR-037']) {
+      expect(remove?.inputSchema.safeParse({ id: cited }).error?.issues[0]?.message).toContain(
+        'console',
+      );
+    }
+  });
+
+  it('creates a project idea with no project, and refuses one with', async () => {
+    const { client: api, calls } = fakeApi({ '/api/project-ideas': { humanId: 'PI-007' } });
+    const { client } = await connect(api);
+
+    const made = await client.callTool({
+      name: 'foreman_create',
+      arguments: {
+        kind: 'project_idea',
+        text: 'A print notifier for the Bambu',
+        pitch: 'Texts you when a print finishes. MQTT locally, cloud as a fallback.',
+      },
+    });
+    const call = calls.find((c) => c.method === 'POST');
+    expect(call?.path).toBe('/api/project-ideas');
+    expect(call?.body).toEqual({
+      title: 'A print notifier for the Bambu',
+      pitch: 'Texts you when a print finishes. MQTT locally, cloud as a fallback.',
+    });
+    expect(text(made)).toContain('PI-007');
+
+    // Passing a project is the mistake worth catching by name: it means the caller thinks this is
+    // an idea *inside* a project, which is the other feature.
+    const wrong = await client.callTool({
+      name: 'foreman_create',
+      arguments: { kind: 'project_idea', project: 'BND', text: 'Wrong shape' },
+    });
+    expect(wrong.isError).toBe(true);
+    expect(text(wrong).toLowerCase()).toContain('belongs to no project');
+  });
+
+  it('routes a project idea’s status change away from the project paths', async () => {
+    const { client: api, calls } = fakeApi({
+      '/api/entities/PI-007': { type: 'project_idea', entity: { status: 'new' } },
+      '/api/project-ideas/PI-007': { ok: true },
+    });
+    const { client } = await connect(api, { elicitation: () => ({ confirm: true }) });
+
+    await client.callTool({
+      name: 'foreman_set_status',
+      arguments: { id: 'PI-007', status: 'parked', reason: 'After Someday Vault ships.' },
+    });
+
+    // `PI-007` has no project code, so the usual `/api/projects/${code}/…` would build a path with
+    // an empty segment and 404 — silently, as a tool result that reads like a refusal.
+    const call = calls.find((c) => c.method === 'PATCH');
+    expect(call?.path).toBe('/api/project-ideas/PI-007');
+    expect(call?.body).toEqual({ status: 'parked', reason: 'After Someday Vault ships.' });
   });
 
   it('gates that delete unconditionally, unlike every other write', async () => {

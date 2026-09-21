@@ -273,6 +273,46 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
     ],
   });
 
+  // Project ideas: ecosystem-wide, so they are seeded once rather than per project. One of each
+  // status including a converted one, which is the only status the screen cannot produce itself.
+  await db.projectIdea.deleteMany({ where: { humanId: { startsWith: 'PI-' } } });
+  await db.$executeRawUnsafe(`select setval('project_idea_seq', 1, false)`);
+  for (const idea of [
+    {
+      title: 'A print notifier for the Bambu',
+      pitch: 'Texts you when a print finishes. MQTT on the LAN, the cloud as a fallback.',
+      status: 'new' as const,
+    },
+    {
+      title: 'An offline-first field notebook',
+      pitch: 'Capture on a phone with no signal, reconcile later. The sync is the whole problem.',
+      status: 'considering' as const,
+    },
+    {
+      title: 'A self-hosted status page',
+      status: 'parked' as const,
+      reason: 'Foreman’s health screen already answers this for the only operator who asks.',
+    },
+    {
+      title: 'A second chat client',
+      status: 'rejected' as const,
+      reason: 'D3 Chat exists. A second one is a rewrite wearing a new name.',
+    },
+  ]) {
+    const rows = await db.$queryRawUnsafe<{ seq: number }[]>(
+      `select nextval('project_idea_seq')::int as seq`,
+    );
+    const seq = rows[0]?.seq ?? 0;
+    await db.projectIdea.create({
+      data: {
+        humanId: `PI-${String(seq).padStart(3, '0')}`,
+        seq,
+        ...idea,
+        ...(idea.status === 'new' ? {} : { decidedAt: new Date('2026-09-18') }),
+      },
+    });
+  }
+
   await db.term.createMany({
     data: [
       {

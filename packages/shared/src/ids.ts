@@ -33,8 +33,69 @@ export type HumanIdType = (typeof HUMAN_ID_TYPE)[keyof typeof HUMAN_ID_TYPE];
  */
 export const ProjectCode = z
   .string()
-  .regex(/^[A-Z][A-Z0-9]{1,7}$/, 'a project code is 2–8 upper-case letters or digits, letter first');
+  .regex(/^[A-Z][A-Z0-9]{1,7}$/, 'a project code is 2–8 upper-case letters or digits, letter first')
+  // `PI` is the project-idea prefix. A project holding that code would give `PI-REQ-001` and
+  // `PI-001` two different meanings one character apart, which is a confusion nobody would
+  // untangle later. Refused at the only moment it can be — a code is immutable (ADR-008).
+  .refine((code) => code !== PROJECT_IDEA_PREFIX, {
+    message: '`PI` is reserved: it prefixes project ideas, which belong to no project',
+  });
 export type ProjectCode = z.infer<typeof ProjectCode>;
+
+/**
+ * A **project idea** — something that might become a project — is the one record here that no
+ * project owns, so it is the one whose ID cannot be project-prefixed (ADR-008, ADR-015).
+ *
+ * `PI-007`: two segments where every project-scoped ID has three, so the two can never be
+ * confused by a parser or by a reader. `parseHumanId` rejects it deliberately; anything handling
+ * both reaches for `parseAnyId`.
+ */
+export const PROJECT_IDEA_PREFIX = 'PI';
+
+export const PROJECT_IDEA_ID_RE = /^PI-(\d+)$/;
+
+export const ProjectIdeaId = z
+  .string()
+  .regex(PROJECT_IDEA_ID_RE, 'expected PI-<SEQ>, e.g. PI-007');
+export type ProjectIdeaId = z.infer<typeof ProjectIdeaId>;
+
+export function parseProjectIdeaId(value: string): number | null {
+  const m = PROJECT_IDEA_ID_RE.exec(value.trim());
+  return m?.[1] === undefined ? null : Number(m[1]);
+}
+
+export function formatProjectIdeaId(seq: number): string {
+  return `${PROJECT_IDEA_PREFIX}-${String(seq).padStart(3, '0')}`;
+}
+
+/**
+ * Either kind of ID, for the places that take whatever a person typed — `/api/entities/:id`,
+ * search, and the MCP verbs that address an entity by name.
+ *
+ * Returns the *type* both kinds agree on, so a caller can switch on one value: a project idea
+ * reports type `PI` with a null code, which is exactly what distinguishes it.
+ */
+export function parseAnyId(
+  value: string,
+): { code: string | null; type: string; seq: string } | null {
+  const parsed = parseHumanId(value);
+  if (parsed !== null) return { code: parsed.code, type: parsed.type, seq: parsed.seq };
+
+  const m = PROJECT_IDEA_ID_RE.exec(value.trim());
+  return m?.[1] === undefined ? null : { code: null, type: PROJECT_IDEA_PREFIX, seq: m[1] };
+}
+
+/**
+ * Any ID Foreman issues — project-prefixed, or a project idea's.
+ *
+ * The MCP verbs that address an entity by name take this rather than `HumanId`, because a project
+ * idea is addressable and has no project code to prefix. Everything that genuinely requires a
+ * project — `phase`, `satisfies`, a citation — keeps `HumanId` and still refuses `PI-007`.
+ */
+export const AnyId = z
+  .string()
+  .refine((value) => parseAnyId(value) !== null, 'expected <CODE>-<TYPE>-<SEQ>, or PI-<SEQ>');
+export type AnyId = z.infer<typeof AnyId>;
 
 /**
  * The sequence segment. Usually zero-padded to three (`001`), but task IDs carry their phase —

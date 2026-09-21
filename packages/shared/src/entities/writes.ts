@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Priority, Size } from '../enums.js';
-import { HumanId, parseHumanId, ProjectCode } from '../ids.js';
+import { AnyId, HumanId, parseAnyId, ProjectCode } from '../ids.js';
 
 /**
  * The write surface, shared by the API and the MCP shim (FRM-REQ-089, FRM-REQ-090, FRM-REQ-091).
@@ -26,11 +26,25 @@ import { HumanId, parseHumanId, ProjectCode } from '../ids.js';
  * `foreman_update` cannot write any of those fields. Creating one over MCP would make a titled
  * shell nothing could then fill in, which is worse than not offering it.
  */
-export const CreatableKind = z.enum(['project', 'requirement', 'task', 'phase', 'idea']);
+export const CreatableKind = z.enum([
+  'project',
+  'requirement',
+  'task',
+  'phase',
+  'idea',
+  'project_idea',
+]);
 export type CreatableKind = z.infer<typeof CreatableKind>;
 
 export const CreateInput = z.object({
-  project: ProjectCode.describe('The project code, e.g. BND — or the new code, creating one'),
+  /**
+   * Optional only because of `project_idea`, which is the one kind that belongs to no project —
+   * it is a candidate *for* one. Required for every other kind, enforced below so the message
+   * says which kind needed it rather than "expected string".
+   */
+  project: ProjectCode.optional().describe(
+    'The project code, e.g. BND — or the new code, creating one. Omit for a project idea',
+  ),
   kind: CreatableKind,
   /** What the entity says. A requirement's statement, a task's, phase's or project's name. */
   text: z.string().min(1).max(4000).describe('The statement, title or name'),
@@ -46,11 +60,31 @@ export const CreateInput = z.object({
   number: z.number().optional(),
   /** Requirements this task satisfies. */
   satisfies: z.array(HumanId).optional(),
+}).superRefine((value, ctx) => {
+  if (value.kind === 'project_idea') {
+    if (value.project !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['project'],
+        message:
+          'a project idea belongs to no project — it is a candidate for one. Convert it from ' +
+          'the console when it becomes real, which is when the code is decided',
+      });
+    }
+    return;
+  }
+  if (value.project === undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['project'],
+      message: `a ${value.kind} belongs to a project, so a project code is required`,
+    });
+  }
 });
 export type CreateInput = z.infer<typeof CreateInput>;
 
 export const UpdateInput = z.object({
-  id: HumanId.describe('The entity to change, e.g. BND-T-0.3'),
+  id: AnyId.describe('The entity to change, e.g. BND-T-0.3 or PI-007'),
   text: z.string().min(1).max(4000).optional().describe('Replaces the statement, title or name'),
   priority: Priority.optional(),
   size: Size.optional(),
@@ -79,7 +113,7 @@ export const UpdateInput = z.object({
 export type UpdateInput = z.infer<typeof UpdateInput>;
 
 export const SetStatusInput = z.object({
-  id: HumanId,
+  id: AnyId,
   status: z.string().min(1).max(40).describe('The new status for this kind of entity'),
   /** Required when moving a task to `blocked`: a blocked task must say what is blocking it. */
   reason: z.string().max(1000).optional(),
@@ -97,19 +131,26 @@ export type SetStatusInput = z.infer<typeof SetStatusInput>;
  *
  * An idea has none. Nothing cites it, no coverage reads it, no traceability row points at it. It
  * is a title and a paragraph, and the list is only useful if pruning it is as cheap as adding to
- * it — a backlog nobody empties is a backlog nobody reads. So this is narrowed to ideas rather
- * than reversed wholesale (FRM-ADR-014, raised as `proposed`): the ADR's protection stays exactly
- * where its rationale applies, and every other kind still answers "delete it from the console".
+ * it — a backlog nobody empties is a backlog nobody reads. So this is narrowed to what nothing
+ * cites rather than reversed wholesale (FRM-ADR-014, raised as `proposed`): the ADR's protection
+ * stays exactly where its rationale applies, and every other kind still answers "from the console".
+ *
+ * A **project idea** qualifies on the same test and for the same reason, and is the only kind
+ * added to this list since. It is deletable here while a project is not, which is the distinction
+ * the whole feature rests on: `PI-007` is a sentence somebody wrote down, and `BND` is nine
+ * hundred records that cite each other.
  *
  * Soft, like every delete here — the row is hidden, its ID is never reused, and `foreman_undo`'s
  * absence is not a problem because the console's undo reads the same audit event.
  */
+const DELETABLE = ['IDEA', 'PI'];
+
 export const DeleteInput = z.object({
-  id: HumanId.refine((value) => parseHumanId(value)?.type === 'IDEA', {
+  id: AnyId.refine((value) => DELETABLE.includes(parseAnyId(value)?.type ?? ''), {
     message:
-      'only an idea can be deleted over MCP — anything else is cited by something, and the ' +
-      'console is where you can see what the deletion takes with it',
-  }).describe('The idea to delete, e.g. BND-IDEA-004. Ideas only.'),
+      'only an idea or a project idea can be deleted over MCP — anything else is cited by ' +
+      'something, and the console is where you can see what the deletion takes with it',
+  }).describe('The idea to delete, e.g. BND-IDEA-004 or PI-007.'),
 });
 export type DeleteInput = z.infer<typeof DeleteInput>;
 

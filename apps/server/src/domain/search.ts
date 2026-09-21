@@ -21,6 +21,7 @@ export const SEARCHABLE = [
   'decision',
   'risk',
   'idea',
+  'project_idea',
 ] as const;
 
 export type SearchableType = (typeof SEARCHABLE)[number];
@@ -282,6 +283,30 @@ export async function search(db: Db, query: string, options: SearchOptions = {})
         // The reason, when there is one: searching for something already rejected should show
         // *why* in the result, not make you open it to find out it was decided.
         snippet: snippet(row.reason ?? row.body ?? '', q),
+      });
+    }
+  }
+
+  if (wants('project_idea')) {
+    const rows = await db.projectIdea.findMany({
+      where: {
+        deletedAt: null,
+        // The same project filter, doing something slightly different on purpose: a project idea
+        // has no project until it becomes one, so a search scoped to BND turns up the idea BND
+        // grew out of and no others. "Where did this come from" is a question worth answering.
+        ...project,
+        OR: [{ title: contains }, { humanId: contains }, { pitch: contains }],
+      },
+      take: perType,
+      include: { project: { select: { code: true } } },
+    });
+    for (const row of rows) {
+      hits.push({
+        type: 'project_idea',
+        humanId: row.humanId,
+        projectCode: row.project?.code ?? null,
+        title: row.title,
+        snippet: snippet(row.reason ?? row.pitch ?? '', q),
       });
     }
   }

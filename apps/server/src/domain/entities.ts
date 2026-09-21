@@ -1,4 +1,4 @@
-import { parseHumanId } from '@foreman/shared';
+import { parseAnyId, PROJECT_IDEA_PREFIX } from '@foreman/shared';
 import type { Db } from '../db.js';
 import type { EntityType } from '../generated/prisma/enums.js';
 import { NotFound } from './errors.js';
@@ -26,12 +26,16 @@ const BY_TYPE: Record<string, EntityType> = {
   API: 'finding',
   AUD: 'audit',
   IDEA: 'idea',
+  // The one entry whose ID carries no project code: a project idea belongs to no project, which
+  // is the entire point of it (FRM-ADR-015).
+  [PROJECT_IDEA_PREFIX]: 'project_idea',
 };
 
 export interface EntityResult {
   readonly type: EntityType;
   readonly humanId: string;
-  readonly projectCode: string;
+  /** Null for a project idea, which is the only entity that belongs to no project. */
+  readonly projectCode: string | null;
   readonly entity: Record<string, unknown>;
   /** What cites this: the reason the `reference` table exists. */
   readonly backlinks: readonly {
@@ -47,12 +51,14 @@ export async function getByHumanId(
   humanId: string,
   options: { backlinks?: boolean } = {},
 ): Promise<EntityResult> {
-  const parsed = parseHumanId(humanId);
+  // `parseAnyId`, not `parseHumanId`: this is the one place that has to take both an ID that
+  // names a project and the one kind that cannot.
+  const parsed = parseAnyId(humanId);
   if (parsed === null) {
     // Not a lookup failure: an unprefixed ID is ambiguous by construction, and saying so is more
     // useful than "not found".
     throw new NotFound(
-      `${humanId} is not a project-prefixed human ID (expected something like BND-REQ-021)`,
+      `${humanId} is not a human ID Foreman issues (expected BND-REQ-021, or PI-007)`,
     );
   }
 
@@ -139,6 +145,13 @@ async function findOne(
     }
     case 'idea': {
       const row = await db.idea.findFirst({ where });
+      return row === null ? null : { id: row.id, entity: row };
+    }
+    case 'project_idea': {
+      const row = await db.projectIdea.findFirst({
+        where,
+        include: { project: { select: { code: true, name: true, lifecycle: true } } },
+      });
       return row === null ? null : { id: row.id, entity: row };
     }
     case 'finding': {

@@ -311,8 +311,13 @@ describe.skipIf(url === undefined)('portfolio and search', () => {
     it('says why an unprefixed ID cannot resolve, rather than just "not found"', async () => {
       const res = await fetch(`${origin}/api/entities/REQ-001`, { headers: { cookie } });
       expect(res.status).toBe(404);
-      // The ADR-008 argument, delivered where it is useful.
-      expect(((await res.json()) as { error: string }).error).toContain('project-prefixed');
+      // The ADR-008 argument, delivered where it is useful: the message shows the shapes that do
+      // resolve rather than only saying this one did not.
+      const { error } = (await res.json()) as { error: string };
+      expect(error).toContain('BND-REQ-021');
+      // `PI-007` is in there too — a project idea is the one ID with no code, and a message that
+      // said "project-prefixed" would now be telling half the truth.
+      expect(error).toContain('PI-007');
     });
 
     it('404s an ID that is well-formed but names nothing', async () => {

@@ -53,6 +53,7 @@ import { FindingDetail } from './screens/FindingDetail';
 import { Findings } from './screens/Findings';
 import { Glossary } from './screens/Glossary';
 import { Ideas } from './screens/Ideas';
+import { ProjectIdeas } from './screens/ProjectIdeas';
 import { Health } from './screens/Health';
 import { RequirementDetail } from './screens/RequirementDetail';
 import { RiskRegister } from './screens/RiskRegister';
@@ -131,14 +132,21 @@ export function App() {
         brand={<AppShellBrand name="Foreman" href="/" />}
         nav={
           <SideNav>
-            {/* Five destinations, and they do not grow. The project list used to live here and
-                would have been unusable at twenty projects — it is a screen of its own now. */}
+            {/* A fixed set of destinations that does not grow with the data. The project list
+                used to live here and would have been unusable at twenty projects — it is a screen
+                of its own now, and project ideas sit beside it because they are what becomes one. */}
             <SideNavItem href="/" icon={<HomeIcon />} label="Dashboard" current={path === '/'} />
             <SideNavItem
               href="/projects"
               icon={<FolderKanban />}
               label="Projects"
               current={path === '/projects'}
+            />
+            <SideNavItem
+              href="/project-ideas"
+              icon={<Lightbulb />}
+              label="Project ideas"
+              current={path === '/project-ideas'}
             />
             <SideNavItem
               href="/findings"
@@ -263,6 +271,8 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <Dashboard />;
     case 'projects':
       return <Projects />;
+    case 'project-ideas':
+      return <ProjectIdeas />;
     case 'project':
       return <ProjectOverview code={route.code ?? ''} />;
     case 'phases':

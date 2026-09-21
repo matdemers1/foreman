@@ -70,6 +70,7 @@ export interface Route {
   readonly screen:
     | 'dashboard'
     | 'projects'
+    | 'project-ideas'
     | 'project'
     | 'phases'
     | 'phase'
@@ -105,6 +106,11 @@ export function routeFor(path: string): Route {
   // `/projects` is a screen now, not a path nothing matched. It was the one destination the
   // sidebar offered and the router had never handled, so it rendered the not-found page.
   if (parts[0] === 'projects' && parts[1] === undefined) return { screen: 'projects' };
+  // Before the `/projects/:code` branch would ever see it, and a separate path entirely: a
+  // project idea is not a project, which is the whole distinction.
+  if (parts[0] === 'project-ideas' && parts[1] === undefined) {
+    return { screen: 'project-ideas' };
+  }
 
   if (parts[0] === 'projects' && parts[1] !== undefined) {
     const code = parts[1];

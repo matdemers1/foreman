@@ -2,11 +2,14 @@ import { z } from 'zod';
 import {
   AdrStatus,
   DocumentKind,
+  ProjectIdeaStatus,
+  ProjectLifecycle,
   RiskImpact,
   RiskLikelihood,
   IdeaStatus,
   RiskStatus,
 } from '../enums.js';
+import { ProjectCode } from '../ids.js';
 import { Instant, Timestamps, Uuid } from './common.js';
 
 /**
@@ -231,6 +234,50 @@ export const IdeaUpdate = IdeaCreate.partial().extend({
   reason: z.string().max(1000).nullish(),
 });
 export type IdeaUpdate = z.infer<typeof IdeaUpdate>;
+
+// ─── Project idea ──────────────────────────────────────────────────────────
+
+/**
+ * A **project idea** — something that might become a project (FRM-ADR-015).
+ *
+ * `pitch` earns more room than an idea's `body` because it has somewhere to go: converting copies
+ * it into the project's `pitch`, so this is the one field in the ideas feature where writing a
+ * paragraph is the point rather than a warning sign.
+ */
+export const ProjectIdeaCreate = z.object({
+  title: z.string().min(1).max(300),
+  pitch: z.string().max(4000).optional(),
+});
+export type ProjectIdeaCreate = z.infer<typeof ProjectIdeaCreate>;
+
+/**
+ * No `converted` here, and that is the whole reason this is not `ProjectIdeaStatus.optional()`.
+ *
+ * `converted` means a project exists. Letting a PATCH set it would produce an idea claiming to
+ * have become something, with nothing to point at — a lie the screen would then render as a
+ * dead link. It is reachable by converting, and by nothing else.
+ */
+export const ProjectIdeaUpdate = ProjectIdeaCreate.partial().extend({
+  status: ProjectIdeaStatus.exclude(['converted']).optional(),
+  reason: z.string().max(1000).nullish(),
+});
+export type ProjectIdeaUpdate = z.infer<typeof ProjectIdeaUpdate>;
+
+/**
+ * Converting an idea into a project.
+ *
+ * The code is asked for **here** rather than when the idea is written down, which is the point of
+ * separating the two: a code is immutable and embedded in every ID the project will ever have
+ * (ADR-008), so demanding one for "maybe someday" is asking a permanent question at the moment
+ * there is least information to answer it. By the time somebody converts, they know.
+ */
+export const ProjectIdeaConvert = z.object({
+  code: ProjectCode,
+  /** Defaults to the idea's title, which is usually already the name. */
+  name: z.string().min(1).max(200).optional(),
+  lifecycle: ProjectLifecycle.optional(),
+});
+export type ProjectIdeaConvert = z.infer<typeof ProjectIdeaConvert>;
 
 // ─── Glossary ──────────────────────────────────────────────────────────────
 

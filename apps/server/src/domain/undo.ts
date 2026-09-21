@@ -31,6 +31,7 @@ const UNDOABLE = [
   'audit',
   'tech_item',
   'idea',
+  'project_idea',
 ] as const;
 
 export type UndoableType = (typeof UNDOABLE)[number];
@@ -70,6 +71,8 @@ function model(tx: TransactionClient, type: UndoableType) {
       return tx.techItem;
     case 'idea':
       return tx.idea;
+    case 'project_idea':
+      return tx.projectIdea;
   }
 }
 

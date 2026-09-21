@@ -8,6 +8,7 @@ import {
   gateForPriority,
   gateForStatus,
   LinkInput,
+  parseAnyId,
   parseHumanId,
   SetStatusInput,
   UpdateInput,
@@ -69,7 +70,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
   {
     name: 'foreman_create',
     title: 'Create',
-    description: 'Add a project, or a requirement, task or phase inside one.',
+    description:
+      'Add a project, a project idea, or a requirement, task, phase or idea inside a project.',
     inputSchema: CreateInput,
     // Creating loses nothing, so it is never gated.
     gate: () => Promise.resolve({ gated: false }),
@@ -78,11 +80,19 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       const body: Record<string, unknown> = {};
 
       switch (args.kind) {
+        case 'project_idea':
+          // The one kind with no project in its path, because it has no project — it is a
+          // candidate for one. Converting it is deliberately console-only: that is where a code
+          // is chosen, and a code is immutable (ADR-008).
+          return client.post('/api/project-ideas', {
+            title: args.text,
+            ...(args.pitch === undefined ? {} : { pitch: args.pitch }),
+          });
         case 'project':
           // The only kind that is not created *inside* a project, so it posts to a different
           // path: `project` is the code to give it rather than the code to file it under.
           return client.post('/api/projects', {
-            code: args.project,
+            code: args.project ?? '',
             name: args.text,
             ...(args.pitch === undefined ? {} : { pitch: args.pitch }),
           });
@@ -105,7 +115,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
           break;
       }
 
-      return client.post(`/api/projects/${args.project}/${args.kind}s`, body, {
+      // Every remaining kind required a project code, enforced by `CreateInput` itself.
+      return client.post(`/api/projects/${args.project ?? ''}/${args.kind}s`, body, {
         // A phase is addressed by its human ID; the server resolves it.
         ...(args.phase === undefined ? {} : { phase: args.phase }),
         ...(args.satisfies === undefined ? {} : { satisfies: args.satisfies }),
@@ -126,6 +137,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       const args = UpdateInput.parse(input);
       const kind = kindOf(args.id);
       const body: Record<string, unknown> = {};
+      if (kind === 'project-ideas') {
+        // Its `pitch` is the field `text` and `body` both mean here, and it has no project path.
+        if (args.text !== undefined) body['title'] = args.text;
+        if (args.body !== undefined) body['pitch'] = args.body;
+        if (args.reason !== undefined) body['reason'] = args.reason;
+        return client.patch(`/api/project-ideas/${args.id}`, body);
+      }
       if (args.text !== undefined) body[kind === 'requirements' ? 'statement' : 'title'] = args.text;
       if (args.priority !== undefined) body['priority'] = args.priority;
       if (args.size !== undefined) body['size'] = args.size;
@@ -150,6 +168,12 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
     },
     run: async (client, input) => {
       const args = SetStatusInput.parse(input);
+      if (kindOf(args.id) === 'project-ideas') {
+        return client.patch(`/api/project-ideas/${args.id}`, {
+          status: args.status,
+          ...(args.reason === undefined ? {} : { reason: args.reason }),
+        });
+      }
       return client.patch(`/api/projects/${projectOf(args.id)}/${kindOf(args.id)}/${args.id}`, {
         status: args.status,
         // Where the reason goes depends on what is being moved. A task carries it as
@@ -177,7 +201,11 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
     gate: () => Promise.resolve(gateForDelete()),
     run: async (client, input) => {
       const args = DeleteInput.parse(input);
-      await client.del(`/api/projects/${projectOf(args.id)}/${kindOf(args.id)}/${args.id}`);
+      await client.del(
+        kindOf(args.id) === 'project-ideas'
+          ? `/api/project-ideas/${args.id}`
+          : `/api/projects/${projectOf(args.id)}/${kindOf(args.id)}/${args.id}`,
+      );
       return { deleted: args.id };
     },
   },
@@ -226,13 +254,13 @@ function reasonFor(
   reason: string | undefined,
 ): Record<string, string> {
   if (reason === undefined) return {};
-  if (parseHumanId(humanId)?.type === 'IDEA') return { reason };
+  if (parseAnyId(humanId)?.type === 'IDEA') return { reason };
   return status === 'blocked' ? { blockedReason: reason } : {};
 }
 
 /** The path segment for an entity's kind, from its human ID. */
 function kindOf(humanId: string): string {
-  const parsed = parseHumanId(humanId);
+  const parsed = parseAnyId(humanId);
   switch (parsed?.type) {
     case 'REQ':
       return 'requirements';
@@ -251,6 +279,10 @@ function kindOf(humanId: string): string {
       return 'findings';
     case 'IDEA':
       return 'ideas';
+    // Not under `/api/projects/…` at all. Callers check for this segment rather than building
+    // the usual path, which is why it is spelled the way the route is.
+    case 'PI':
+      return 'project-ideas';
     default:
       throw new Error(`${humanId} cannot be changed through this tool`);
   }

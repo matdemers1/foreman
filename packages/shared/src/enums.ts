@@ -64,6 +64,30 @@ export type IdeaStatus = z.infer<typeof IdeaStatus>;
 /** The two that need a reason: a decision without one gets re-argued. */
 export const IDEA_NEEDS_REASON: readonly IdeaStatus[] = ['parked', 'rejected'];
 
+/**
+ * A **project idea** — something that might become a project of its own.
+ *
+ * Deliberately not `IdeaStatus`. A feature idea is accepted and then built inside a project it
+ * already belongs to; a project idea has one more state to reach, and reaching it creates
+ * something: `converted` means a project now exists, and it is set by converting, never by hand.
+ * `considering` is the step in between that a feature idea has no use for — the point where
+ * somebody is actually thinking about it rather than having merely written it down.
+ */
+export const ProjectIdeaStatus = z.enum([
+  'new',
+  'considering',
+  'parked',
+  'rejected',
+  'converted',
+]);
+export type ProjectIdeaStatus = z.infer<typeof ProjectIdeaStatus>;
+
+/** Same rule, same reason as an idea's: a decision with no reason written down gets re-argued. */
+export const PROJECT_IDEA_NEEDS_REASON: readonly ProjectIdeaStatus[] = ['parked', 'rejected'];
+
+/** Reachable by converting, and by nothing else. A PATCH that asks for it is refused. */
+export const PROJECT_IDEA_CONVERTED: ProjectIdeaStatus = 'converted';
+
 export const RiskLikelihood = z.enum(['low', 'medium', 'high']);
 export type RiskLikelihood = z.infer<typeof RiskLikelihood>;
 
@@ -158,6 +182,8 @@ export const EntityType = z.enum([
   'release',
   'deployment',
   'tech_item',
+  'idea',
+  'project_idea',
   'user',
   'api_token',
   'job',

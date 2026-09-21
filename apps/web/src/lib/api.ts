@@ -400,6 +400,22 @@ export interface IdeaRow {
   project?: { code: string; name: string };
 }
 
+/** A project idea. `project` is set only once it has been converted into one. */
+export interface ProjectIdeaRow {
+  id: string;
+  humanId: string;
+  seq: number;
+  title: string;
+  pitch: string | null;
+  status: 'new' | 'considering' | 'parked' | 'rejected' | 'converted';
+  reason: string | null;
+  decidedAt: string | null;
+  convertedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  project: { code: string; name: string; lifecycle: string } | null;
+}
+
 export interface DecisionRow {
   id: string;
   humanId: string;
@@ -703,6 +719,25 @@ export const foreman = {
   ) => api.patch<IdeaRow>(`/api/projects/${code}/ideas/${humanId}`, body),
   deleteIdea: (code: string, humanId: string) =>
     api.del(`/api/projects/${code}/ideas/${humanId}`),
+
+  // --- Project ideas --------------------------------------------------------
+  // No project in any of these paths, because a project idea has none. That is the feature.
+  projectIdeas: (status?: string) =>
+    api.get<Page<ProjectIdeaRow>>(
+      `/api/project-ideas${status === undefined ? '' : `?status=${status}`}`,
+    ),
+  createProjectIdea: (body: { title: string; pitch?: string }) =>
+    api.post<ProjectIdeaRow>('/api/project-ideas', body),
+  updateProjectIdea: (
+    humanId: string,
+    body: { title?: string; pitch?: string; status?: string; reason?: string },
+  ) => api.patch<ProjectIdeaRow>(`/api/project-ideas/${humanId}`, body),
+  deleteProjectIdea: (humanId: string) => api.del(`/api/project-ideas/${humanId}`),
+  convertProjectIdea: (humanId: string, body: { code: string; name?: string }) =>
+    api.post<{ idea: ProjectIdeaRow; project: { code: string; name: string } }>(
+      `/api/project-ideas/${humanId}/convert`,
+      body,
+    ),
   audits: (code: string) => api.get<Page<AuditRow>>(`/api/projects/${code}/audits`),
   search: (q: string, types: string[], project: string | null) => {
     const query = new URLSearchParams({ q, limit: '50' });

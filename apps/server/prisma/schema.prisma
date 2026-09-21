@@ -86,6 +86,15 @@ enum AdrRelationKind {
   superseded_by
 }
 
+/// A project idea's states. `converted` is reachable by converting and by nothing else.
+enum ProjectIdeaStatus {
+  new
+  considering
+  parked
+  rejected
+  converted
+}
+
 enum RiskLevel {
   low
   medium
@@ -224,6 +233,7 @@ enum EntityType {
   deployment
   tech_item
   idea
+  project_idea
   user
   api_token
   job
@@ -297,6 +307,7 @@ model Project {
   deployments  Deployment[]
   techItems    TechItem[]
   ideas        Idea[]
+  cameFrom     ProjectIdea[]    @relation("ConvertedFrom")
 
   @@index([lifecycle])
   @@map("project")
@@ -620,6 +631,44 @@ model Idea {
   @@unique([projectId, seq])
   @@index([projectId, status])
   @@map("idea")
+}
+
+/// A **project idea** — something that might become a project of its own, before it is one.
+///
+/// The one record here that belongs to no project, which is the whole point of it and the reason
+/// it is a separate table rather than an `Idea` with a nullable parent (FRM-ADR-015). Its ID is
+/// `PI-007`: two segments where every project-scoped ID has three, drawn from a sequence rather
+/// than from a project's counter, because there is no project to count against.
+///
+/// `projectId` is the project it *became*, set only by converting — not the project it belongs to.
+model ProjectIdea {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  humanId String @unique @map("human_id")
+  seq     Int    @unique
+  title   String
+  /// What it is, in basic terms. This becomes the project's pitch when it is converted, which is
+  /// the reason to write more than a line here and nowhere else in the ideas feature.
+  pitch   String?
+  status  ProjectIdeaStatus @default(new)
+  /// Why it was parked or rejected, and required for both. Same rule, same reason as an idea's.
+  reason  String?
+  decidedAt DateTime? @map("decided_at") @db.Timestamptz(6)
+
+  /// The project this became. Null until converted, and the only way `status` reaches `converted`.
+  projectId   String?   @map("project_id") @db.Uuid
+  convertedAt DateTime? @map("converted_at") @db.Timestamptz(6)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  /// `SetNull`, not `Cascade`: a hard-deleted project must not take the record of the idea that
+  /// became it. The idea outlives the project, the way a decision outlives what it decided.
+  project Project? @relation("ConvertedFrom", fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("project_idea")
 }
 
 model Term {
