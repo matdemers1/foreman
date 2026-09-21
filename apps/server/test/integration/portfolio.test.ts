@@ -15,7 +15,7 @@ import type { SearchHit } from '../../src/domain/search.js';
 const url = process.env['DATABASE_URL'];
 const EMAIL = 'portfolio@example.com';
 const PASSWORD = 'a-password-for-the-portfolio-tests';
-const CODES = ['PFA', 'PFB'];
+const CODES = ['PFA', 'PFB', 'PFC'];
 
 describe.skipIf(url === undefined)('portfolio and search', () => {
   let db: Db;
@@ -127,6 +127,30 @@ describe.skipIf(url === undefined)('portfolio and search', () => {
       data: { code: 'PFB', name: 'Beta', slug: 'beta', lifecycle: 'planned' },
     });
 
+    // PFC: phases, none of them marked `active`. This is not a corner case — it is the state
+    // every one of the nine projects imported at the cutover is in, because the importer does not
+    // set a phase status. The portfolio read `status: 'active'` and nothing else, so it answered
+    // `null` for all of them while the brief beside it named a phase.
+    const c = await db.project.create({
+      data: { code: 'PFC', name: 'Gamma', slug: 'gamma', lifecycle: 'building' },
+    });
+    const early = await db.phase.create({
+      data: { projectId: c.id, humanId: 'PFC-P-1', number: 1, sortOrder: 1, name: 'Early', status: 'planned' },
+    });
+    const late = await db.phase.create({
+      data: { projectId: c.id, humanId: 'PFC-P-4', number: 4, sortOrder: 4, name: 'Late', status: 'planned' },
+    });
+    await db.task.createMany({
+      data: [
+        // A straggler in an early phase, and real progress in a later one. "Furthest along" is
+        // the point: a project with two unfinished tasks in Phase 1 and progress in Phase 4 is
+        // not at Phase 1.
+        { projectId: c.id, phaseId: early.id, humanId: 'PFC-T-1.1', title: 'Straggler', status: 'todo' },
+        { projectId: c.id, phaseId: late.id, humanId: 'PFC-T-4.1', title: 'Landed', status: 'done' },
+        { projectId: c.id, phaseId: late.id, humanId: 'PFC-T-4.2', title: 'Next', status: 'todo' },
+      ],
+    });
+
     server = await new Promise<Server>((resolve) => {
       const s = createApp({ config, db }).listen(0, () => { resolve(s); });
     });
@@ -173,6 +197,24 @@ describe.skipIf(url === undefined)('portfolio and search', () => {
       expect(beta?.lastActivityAt).toBeNull();
       // And a count of zero is still a count, not an absence.
       expect(beta?.tasks).toEqual({ open: 0, blocked: 0, done: 0 });
+    });
+
+    it('names the phase in flight even when none is marked active', async () => {
+      // The state every imported project is in. `status: 'active'` alone answered `null` here.
+      const { items } = await get<{ items: PortfolioRow[] }>('/portfolio');
+      expect(items.find((row) => row.code === 'PFC')?.phase?.humanId).toBe('PFC-P-4');
+    });
+
+    it('agrees with the brief about which phase that is', async () => {
+      // One question, one answer. Phase 7 learned this for drift — one engine, three surfaces,
+      // and a test asserting they agree — and the same discipline belongs here: the fix that
+      // taught the brief to find the furthest-along phase never reached the portfolio beside it.
+      const { items } = await get<{ items: PortfolioRow[] }>('/portfolio');
+      for (const code of CODES) {
+        const brief = await get<{ activePhase: { humanId: string } | null }>(`/brief/${code}`);
+        const row = items.find((item) => item.code === code);
+        expect(row?.phase?.humanId ?? null, code).toBe(brief.activePhase?.humanId ?? null);
+      }
     });
   });
 

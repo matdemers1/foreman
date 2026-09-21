@@ -1,6 +1,7 @@
 import type { Db } from '../db.js';
 import { driftFor } from './drift.js';
 import { NotFound } from './errors.js';
+import { phaseInFlight } from './wherewestand.js';
 
 /**
  * The session brief (FRM-REQ-082, FRM-REQ-083, FRM-REQ-092) — the most-used path in the system.
@@ -93,39 +94,8 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
   const project = await db.project.findFirst({ where: { code, deletedAt: null } });
   if (project === null) throw new NotFound(`project ${code}`);
 
-  /**
-   * The active phase, or the furthest along one if none is marked active — a project mid-flight
-   * always has a "where are we", even when nobody remembered to set a status.
-   *
-   * "Furthest along" is the point. This used to take the *first* `planned` phase ascending, which
-   * is the opposite: after the cutover, Bindery — complete through Phase 20 — briefed as *Phase 0,
-   * Foundation, 8 of 8 done*, because a couple of stragglers in early phases sorted first. A
-   * project with two unfinished tasks in Phase 1 and twenty finished phases after it is not at
-   * Phase 1.
-   *
-   * So: the furthest phase that has started but is not finished. Falling back to the earliest
-   * unstarted one, which is where a project nobody has begun actually is.
-   */
-  const started = await db.phase.findFirst({
-    where: {
-      projectId: project.id,
-      status: { not: 'complete' },
-      deletedAt: null,
-      tasks: { some: { status: 'done', deletedAt: null } },
-    },
-    orderBy: { sortOrder: 'desc' },
-  });
-
-  const activePhase =
-    (await db.phase.findFirst({
-      where: { projectId: project.id, status: 'active', deletedAt: null },
-      orderBy: { sortOrder: 'asc' },
-    })) ??
-    started ??
-    (await db.phase.findFirst({
-      where: { projectId: project.id, status: { not: 'complete' }, deletedAt: null },
-      orderBy: { sortOrder: 'asc' },
-    }));
+  // One definition, shared with the portfolio. See `wherewestand.ts` for why it is not inline.
+  const activePhase = await phaseInFlight(db, project.id);
 
   const [nextTasks, blocked, criticals, latestCheck, uncovered, unconfirmed, firedRisks, commits] =
     await Promise.all([

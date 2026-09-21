@@ -1,4 +1,5 @@
 import type { Db } from '../db.js';
+import { phaseInFlight } from './wherewestand.js';
 import { driftFor } from './drift.js';
 
 /**
@@ -40,11 +41,10 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
     projects.map(async (project): Promise<PortfolioRow> => {
       const [phase, open, blocked, done, criticals, check, uncovered, unconfirmed, lastCommit] =
         await Promise.all([
-          db.phase.findFirst({
-            where: { projectId: project.id, status: 'active', deletedAt: null },
-            orderBy: { sortOrder: 'asc' },
-            select: { humanId: true, number: true, name: true },
-          }),
+          // The same definition the brief uses. Taking `status: 'active'` alone said `null` for
+          // every one of the nine projects imported at the cutover, while the brief beside it
+          // named a phase for each — one question, two surfaces, two answers.
+          phaseInFlight(db, project.id),
           db.task.count({
             where: {
               projectId: project.id,
