@@ -19,6 +19,25 @@ export interface StageContext {
 
 export type StageHandler = (ctx: StageContext) => Promise<unknown>;
 
+/**
+ * "There is nothing here to do", raised by a stage — not a failure.
+ *
+ * Two situations produce it, and both were being dead-lettered. An optional integration that is
+ * not configured: `GitHubNotConfigured` already says in its own comment that "not configured is a
+ * normal state", and the runner did not know. And a job whose subject has since been deleted: the
+ * three `reconcile-repo` rows sitting failed in production name a repo that was removed with the
+ * example project at the cutover, and they held `/health` at `ok: false` from that day on.
+ *
+ * A health endpoint that is permanently red for an expected reason is one nobody reads, which is
+ * the same argument as an error filter full of things that then succeed.
+ */
+export class NothingToDo extends Error {
+  constructor(readonly because: string) {
+    super(because);
+    this.name = 'NothingToDo';
+  }
+}
+
 export interface StageDefinition {
   readonly name: string;
   readonly run: StageHandler;

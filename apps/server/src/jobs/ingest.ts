@@ -1,5 +1,6 @@
 import type { GitHubClient } from '../adapters/github.js';
 import { GitHubNotConfigured } from '../adapters/github.js';
+import { NothingToDo } from './types.js';
 import type { Db } from '../db.js';
 import { proposalsFor, proposeAttributions } from '../domain/attribution.js';
 import {
@@ -29,7 +30,9 @@ export interface IngestDeps {
 }
 
 function githubOf(deps: IngestDeps): GitHubClient {
-  if (deps.github === null) throw new GitHubNotConfigured();
+  // Not configured is a normal state — `GitHubNotConfigured` says so in its own comment — and it
+  // was nonetheless dead-lettering the nightly reconcile. A clone with no GitHub App still runs.
+  if (deps.github === null) throw new NothingToDo(new GitHubNotConfigured().message);
   return deps.github;
 }
 
@@ -184,10 +187,15 @@ interface RepoPayload {
 async function linkedRepo(ctx: StageContext) {
   const { repoId } = ctx.payload as RepoPayload;
   if (repoId === undefined) throw new Error('this job needs a repoId in its payload');
-  return ctx.db.repo.findUniqueOrThrow({
+  const repo = await ctx.db.repo.findUnique({
     where: { id: repoId },
     select: { id: true, projectId: true, fullName: true, backfilledAt: true },
   });
+  // A job whose subject has been deleted has nothing to do, and retrying cannot bring it back.
+  // Three of these sat failed in production, naming a repo removed with the example project at
+  // the cutover, holding `/health` at `ok: false` from that day on.
+  if (repo === null) throw new NothingToDo(`repo ${repoId} no longer exists`);
+  return repo;
 }
 
 export function backfillJob(deps: IngestDeps): JobDefinition {

@@ -1,7 +1,7 @@
 import { Prisma, type Db } from '../db.js';
 import type { Logger } from '../logger.js';
 import { backoffMs, claim, heartbeat, LEASE_MS } from './queue.js';
-import type { JobRegistry, StageContext } from './types.js';
+import { NothingToDo, type JobRegistry, type StageContext } from './types.js';
 
 /**
  * Runs a claimed job's stages in order, **skipping the ones already recorded as succeeded**.
@@ -88,6 +88,31 @@ export async function runJob(deps: RunDeps, jobId: string): Promise<RunOutcome> 
         ran.push(stage.name);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+
+        // A stage with nothing to do has not failed. Recorded as succeeded with the reason as its
+        // output, so the job reads as "ran, found nothing" rather than as a fault — and, more to
+        // the point, so it stops counting against `/health`. Not retried either: an absent
+        // integration and a deleted subject are both answers, and asking again gets the same one.
+        if (error instanceof NothingToDo) {
+          const output = { skipped: true, because: error.because };
+          await db.jobStage.update({
+            where: { id: stageRow.id },
+            data: {
+              status: 'succeeded',
+              finishedAt: new Date(),
+              output,
+              lastError: null,
+            },
+          });
+          priorOutput[stage.name] = output;
+          ran.push(stage.name);
+          logger.info(
+            { jobId, stage: stage.name, because: error.because },
+            'stage had nothing to do',
+          );
+          continue;
+        }
+
         await db.jobStage.update({
           where: { id: stageRow.id },
           data: { status: 'failed', finishedAt: new Date(), lastError: message },

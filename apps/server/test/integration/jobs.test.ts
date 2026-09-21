@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type Db } from '../../src/db.js';
 import { logger } from '../../src/logger.js';
 import { claim, drainOne, enqueue, JobRegistry, replayStage, runJob } from '../../src/jobs/index.js';
+import { NothingToDo } from '../../src/jobs/types.js';
 
 /**
  * FRM-REQ-141 — a stage forced to fail re-runs **alone**, without repeating the stages before it.
@@ -42,6 +43,33 @@ describe.skipIf(url === undefined)('job queue', () => {
         run: (ctx) => {
           runs['third'] = (runs['third'] ?? 0) + 1;
           return Promise.resolve({ sawSecond: ctx.priorOutput['second'] });
+        },
+      },
+    ],
+  });
+
+  registry.register({
+    kind: 'test-nothing-to-do',
+    stages: [
+      {
+        name: 'first',
+        run: () => {
+          runs['first'] = (runs['first'] ?? 0) + 1;
+          return Promise.resolve({ fetched: 10 });
+        },
+      },
+      {
+        name: 'absent',
+        run: () => {
+          runs['absent'] = (runs['absent'] ?? 0) + 1;
+          throw new NothingToDo('the GitHub App is not configured');
+        },
+      },
+      {
+        name: 'third',
+        run: () => {
+          runs['third'] = (runs['third'] ?? 0) + 1;
+          return Promise.resolve({ ok: true });
         },
       },
     ],
@@ -172,5 +200,54 @@ describe.skipIf(url === undefined)('job queue', () => {
 
   it('drains an empty queue without doing anything', async () => {
     expect(await drainOne(deps())).toBeNull();
+  });
+
+  describe('a stage with nothing to do is not a failure', () => {
+    it('succeeds, carries on, and records why', async () => {
+      // An optional integration that is not configured, and a job whose subject has been deleted,
+      // are both answers rather than faults. They were dead-lettering: three `reconcile-repo` rows
+      // naming a repo removed at the cutover held `/health` at `ok: false` from that day on, and a
+      // health endpoint permanently red for an expected reason is one nobody reads.
+      const { id } = await enqueue(db, registry, 'test-nothing-to-do');
+      const result = await runJob(deps(), id);
+
+      expect(result.status).toBe('succeeded');
+      expect(result.ran).toEqual(['first', 'absent', 'third']);
+
+      const job = await db.job.findUniqueOrThrow({ where: { id } });
+      expect(job.status).toBe('succeeded');
+      expect(job.lastError).toBeNull();
+
+      const stage = await db.jobStage.findFirstOrThrow({ where: { jobId: id, name: 'absent' } });
+      expect(stage.status).toBe('succeeded');
+      expect(stage.lastError).toBeNull();
+      // The reason is the output, so "ran, found nothing" is legible afterwards.
+      const output = stage.output as { skipped: boolean; because: string };
+      expect(output.skipped).toBe(true);
+      expect(output.because).toContain('GitHub');
+    });
+
+    it('does not count against the health endpoint, even out of attempts', async () => {
+      // The property that actually matters: `/health` answers `ok: failed === 0`, and these three
+      // rows held it false for days. `maxAttempts: 1` is the state production was in — the retries
+      // were already spent — because a job merely queued for another go is not yet counted, and a
+      // test that never exhausts them would pass with the fix removed.
+      const { id } = await enqueue(db, registry, 'test-nothing-to-do', { maxAttempts: 1 });
+      await runJob(deps(), id);
+
+      const failed = await db.job.count({ where: { kind: 'test-nothing-to-do', status: 'failed' } });
+      expect(failed).toBe(0);
+      expect((await db.job.findUniqueOrThrow({ where: { id } })).status).toBe('succeeded');
+    });
+
+    it('still fails a stage that genuinely failed', async () => {
+      // The distinction has to cut both ways, or it is just a way to make errors disappear.
+      failSecond = true;
+      const { id } = await enqueue(db, registry, 'test-three-stages');
+      const result = await runJob(deps(), id);
+
+      expect(result.status).toBe('failed');
+      expect(result.failedStage).toBe('second');
+    });
   });
 });
