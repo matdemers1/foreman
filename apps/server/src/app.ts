@@ -29,6 +29,7 @@ import { webhookRoutes } from './routes/webhooks.js';
 import { buildRegistry, type JobRegistry } from './jobs/index.js';
 import { linkRoutes } from './routes/links.js';
 import { projectIdeaRoutes } from './routes/projectIdeas.js';
+import { boardRoutes } from './routes/board.js';
 import { tokenRoutes } from './routes/tokens.js';
 import { undoRoutes } from './routes/undo.js';
 import type { OidcClient } from './auth/oidc.js';
@@ -108,7 +109,8 @@ export function createApp({ config, db, oidc = null, registry, verifier: given }
   mount(app, '/api/undo', undoRoutes(db));
   mount(app, '/api/tokens', tokenRoutes(db));
   mount(app, '/api/links', linkRoutes(db));
-  mount(app, '/api/project-ideas', projectIdeaRoutes(db));
+  mount(app, '/api/project-ideas', projectIdeaRoutes(db, config));
+  mount(app, '/api/board', boardRoutes(db, config));
   mount(app, '/api/projects', coverageRoutes(db));
   mount(app, '/api/projects', recordRoutes(db));
   mount(app, '/api/projects', realityRoutes(db, jobs));

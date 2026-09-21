@@ -4,6 +4,7 @@ import {
   DocumentKind,
   ProjectIdeaStatus,
   ProjectLifecycle,
+  UserRole,
   RiskImpact,
   RiskLikelihood,
   IdeaStatus,
@@ -271,6 +272,44 @@ export type ProjectIdeaUpdate = z.infer<typeof ProjectIdeaUpdate>;
  * (ADR-008), so demanding one for "maybe someday" is asking a permanent question at the moment
  * there is least information to answer it. By the time somebody converts, they know.
  */
+/**
+ * Deciding to fund a submission (FRM-ADR-016).
+ *
+ * The amount is in **minor units** — cents, pence — because money in a float loses a penny
+ * eventually and money in a decimal has to be serialised by something that agrees with you about
+ * decimals. An integer of cents is the one representation with no opinion in it.
+ */
+export const ProjectIdeaFund = z.object({
+  amountCents: z.number().int().nonnegative().max(1_000_000_00),
+  /** Why this, and why this much. Required — a funding decision with no rationale is a rumour. */
+  reason: z.string().min(1).max(2000),
+});
+export type ProjectIdeaFund = z.infer<typeof ProjectIdeaFund>;
+
+/**
+ * One reviewer's read on one submission.
+ *
+ * Impact and effort, not a single number: a fund board's real question is what it gets for what
+ * it costs, and one score collapses the two into an average nobody can argue with.
+ */
+export const IdeaScoreInput = z.object({
+  impact: z.number().int().min(1).max(5),
+  effort: z.number().int().min(1).max(5),
+  note: z.string().max(1000).optional(),
+});
+export type IdeaScoreInput = z.infer<typeof IdeaScoreInput>;
+
+export const IdeaCommentCreate = z.object({
+  body: z.string().min(1).max(4000),
+  /**
+   * Visible to reviewers only. This is the field that makes discussion usable for a board rather
+   * than performative: without somewhere to deliberate, the board deliberates somewhere else and
+   * what lands here is a press release.
+   */
+  internal: z.boolean().default(false),
+});
+export type IdeaCommentCreate = z.infer<typeof IdeaCommentCreate>;
+
 export const ProjectIdeaConvert = z.object({
   code: ProjectCode,
   /** Defaults to the idea's title, which is usually already the name. */
@@ -278,6 +317,31 @@ export const ProjectIdeaConvert = z.object({
   lifecycle: ProjectLifecycle.optional(),
 });
 export type ProjectIdeaConvert = z.infer<typeof ProjectIdeaConvert>;
+
+// ─── Members ───────────────────────────────────────────────────────────────
+
+export const InviteCreate = z.object({
+  email: z.email().max(320),
+  displayName: z.string().min(1).max(200),
+  role: UserRole,
+});
+export type InviteCreate = z.infer<typeof InviteCreate>;
+
+export const InviteAccept = z.object({
+  token: z.string().min(20).max(200),
+  /**
+   * Long rather than clever. A length floor is the only password rule that survives contact with
+   * people, and the alternative — one of each character class — reliably produces `Password1!`.
+   */
+  password: z.string().min(12).max(200),
+});
+export type InviteAccept = z.infer<typeof InviteAccept>;
+
+export const MemberUpdate = z.object({
+  role: UserRole.optional(),
+  suspended: z.boolean().optional(),
+});
+export type MemberUpdate = z.infer<typeof MemberUpdate>;
 
 // ─── Glossary ──────────────────────────────────────────────────────────────
 

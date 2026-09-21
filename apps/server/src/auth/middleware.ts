@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { Config } from '../config.js';
 import type { Db } from '../db.js';
+import { REVIEWS, type UserRole } from '@foreman/shared';
 import type { ActorKind } from '../generated/prisma/enums.js';
 import { safeEqual } from './passwords.js';
 import type { Verifier } from './resource-server.js';
@@ -19,6 +20,11 @@ export interface AuthContext {
   readonly sessionId?: string;
   readonly tokenId?: string;
   readonly scopes: readonly string[];
+  /**
+   * The account's role (FRM-ADR-016). `null` for a token, which has scopes instead — a token is
+   * not a person and has no business appearing on a board as one.
+   */
+  readonly role: UserRole | null;
 }
 
 declare module 'express-serve-static-core' {
@@ -82,6 +88,7 @@ export function attachAuth({ db, config, verifier }: AuthMiddlewareDeps) {
             actorKind: 'mcp',
             tokenId: token.id,
             scopes: token.scopes,
+            role: null,
           };
         }
         next();
@@ -94,7 +101,7 @@ export function attachAuth({ db, config, verifier }: AuthMiddlewareDeps) {
         if (session !== null) {
           const user = await db.user.findUnique({
             where: { id: session.userId },
-            select: { email: true },
+            select: { email: true, role: true },
           });
           req.auth = {
             userId: session.userId,
@@ -102,6 +109,10 @@ export function attachAuth({ db, config, verifier }: AuthMiddlewareDeps) {
             actorKind: 'user',
             sessionId: session.sessionId,
             scopes: ['*'],
+            // Read per request rather than baked into the session, so a role change takes effect
+            // on the next click instead of the next sign-in. Demoting somebody who is mid-session
+            // is exactly when you need it to land.
+            role: user?.role ?? null,
           };
         }
       }
@@ -147,7 +158,51 @@ async function resourceAuth(
     // Deliberately not `admin`, and never `*`: a remote token must not mint other tokens or manage
     // accounts, whoever is holding it. The console remains the only place that can.
     scopes: ['read', 'write'],
+    // Null for the same reason: a remote token acts with scopes, not with the seniority of
+    // whoever minted it. Reviewing and deciding are things a person does in the console.
+    role: null,
   };
+}
+
+/**
+ * Guard: the caller's role must be one of these (FRM-ADR-016).
+ *
+ * Separate from `requireScope`, and not a re-spelling of it. A scope says what a *credential* may
+ * do; a role says what a *person* may do. A token with `write` may create a submission and must
+ * never decide one, which is a sentence neither concept can express alone.
+ *
+ * In `solo` mode this passes anything authenticated: the single operator is the admin, and a
+ * guard that can only ever say yes is better stated once here than scattered as conditionals.
+ */
+export function requireRole(config: Pick<Config, 'FOREMAN_MODE'>, ...allowed: UserRole[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (req.auth === undefined) {
+      res.status(401).json({ error: 'authentication required' });
+      return;
+    }
+    if (config.FOREMAN_MODE === 'solo') {
+      next();
+      return;
+    }
+    if (req.auth.role === null || !allowed.includes(req.auth.role)) {
+      // What was needed, not merely "no": the reader is a colleague who will otherwise ask.
+      res.status(403).json({
+        error: `this needs the ${allowed.join(' or ')} role`,
+      });
+      return;
+    }
+    next();
+  };
+}
+
+/** Whether the caller may review — score, comment internally, and decide. */
+export function reviews(
+  config: Pick<Config, 'FOREMAN_MODE'>,
+  auth: AuthContext | undefined,
+): boolean {
+  if (auth === undefined) return false;
+  if (config.FOREMAN_MODE === 'solo') return true;
+  return auth.role !== null && REVIEWS.includes(auth.role);
 }
 
 /** Guard: a request without an identity gets 401 and nothing else. */

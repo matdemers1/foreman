@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Config } from '../config.js';
 import type { Db } from '../db.js';
+import { InviteAccept } from '@foreman/shared';
 import { record } from '../domain/audit.js';
+import { acceptInvite } from '../domain/members.js';
 import { logger } from '../logger.js';
 import { isSecureOrigin, requireUser } from '../auth/middleware.js';
 import * as native from '../auth/native.js';
@@ -30,6 +32,41 @@ export interface AuthRouteDeps {
 export function authRoutes(deps: AuthRouteDeps): Router {
   const router = Router();
   const secure = isSecureOrigin(deps.config);
+
+  /**
+   * Spend an invitation: choose a password (FRM-ADR-016).
+   *
+   * Here rather than under `/api/board`, for two reasons. It is an authentication flow — it sets
+   * a credential — and `/api` is guarded in its entirety by the search router mounted at that
+   * prefix, so a public endpoint cannot live under it at all.
+   *
+   * It deliberately does not return a session. Accepting proves the person holds the token from
+   * their email; signing in proves they know the password they just chose.
+   */
+  router.post('/invite/accept', (req, res, next) => {
+    void (async () => {
+      const parsed = InviteAccept.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({
+          error: 'the request body is not valid',
+          fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+        });
+        return;
+      }
+      if (deps.config.FOREMAN_MODE !== 'board') {
+        res.status(404).json({ error: 'this Foreman is not running an innovation board' });
+        return;
+      }
+      try {
+        const { email } = await acceptInvite(deps.db, deps.config, parsed.data);
+        res.json({ email, next: 'sign in with the password you just set' });
+      } catch {
+        // One answer for every failure, decided in the domain: telling them apart tells an
+        // attacker which of their guesses was a real invitation.
+        res.status(404).json({ error: 'that invitation is not usable — ask for a new one' });
+      }
+    })().catch(next);
+  });
 
   router.post('/login', (req, res) => {
     void (async () => {

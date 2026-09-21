@@ -94,6 +94,49 @@ export function createMailer(
   };
 }
 
+/**
+ * Mail to a named person, rather than an alert to the operator (FRM-ADR-016).
+ *
+ * Three differences from `send`, and each one matters:
+ *
+ * - **`to` is an argument.** An alert always goes to `ALERT_TO`; a decision goes to whoever
+ *   submitted the thing that was decided.
+ * - **Never deduplicated.** Two people funded on the same afternoon must both be told. The hourly
+ *   suppression that keeps a stalled queue from shouting would silently drop the second one.
+ * - **Never throws.** A relay that is down must not fail the funding decision that had already
+ *   been committed to the database by the time this runs. It returns why, and the caller carries
+ *   on — which is why every route that sends one also returns the information another way.
+ */
+export async function notifyDecision(
+  config: Pick<Config, 'MAIL_RELAY_URL' | 'MAIL_RELAY_TOKEN' | 'BASE_URL'>,
+  message: { to: string; subject: string; body: string },
+  deps: { fetch?: typeof fetch } = {},
+): Promise<MailResult> {
+  const { MAIL_RELAY_URL: url, MAIL_RELAY_TOKEN: token } = config;
+  if (url === undefined || token === undefined) {
+    return { sent: false, reason: 'no mail relay is configured' };
+  }
+
+  try {
+    const res = await (deps.fetch ?? fetch)(url, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ to: message.to, subject: message.subject, text: message.body }),
+    });
+    if (!res.ok) {
+      // The address is logged, the body is not: a decision's wording is nobody's business but the
+      // people it was sent to, and a log is the one place it would sit forever.
+      logger.error({ to: message.to, status: res.status }, 'notification refused');
+      return { sent: false, reason: `the relay answered ${String(res.status)}` };
+    }
+    return { sent: true };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    logger.error({ to: message.to, err: reason }, 'notification failed');
+    return { sent: false, reason };
+  }
+}
+
 /** The four conditions, worded so the subject line alone says what happened. */
 export const ALERTS = {
   ingestFailed: (detail: string): Alert => ({

@@ -80,6 +80,26 @@ const Env = z.object({
   /** Where the built console lives. Set in the image; absent in development, where Vite serves it. */
   CONSOLE_DIST: z.string().optional(),
 
+  /**
+   * What this deployment is (FRM-ADR-016).
+   *
+   * `solo` is Foreman as built: one operator, no roles worth enforcing, ideas that become
+   * projects. `board` is the innovation-fund deployment: several people, roles that mean
+   * something, submissions that get scored, discussed and funded.
+   *
+   * **A flag rather than a fork**, and a flag rather than a build: the same image runs both, so
+   * there is one thing to patch when something is wrong with it. It is deliberately not inferred
+   * from anything — a deployment's identity is a decision somebody made, not a consequence of how
+   * many accounts happen to exist.
+   */
+  FOREMAN_MODE: z.enum(['solo', 'board']).default('solo'),
+
+  /** ISO 4217, for rendering a funded amount. Amounts are stored in minor units regardless. */
+  CURRENCY: z.string().length(3).default('USD'),
+
+  /** How long an invitation stays usable. Re-issued rather than extended once it lapses. */
+  INVITE_TTL_HOURS: z.coerce.number().int().positive().max(720).default(168),
+
   /** Seeded on first boot so there is an account to log in as. */
   OPERATOR_EMAIL: z.string().optional(),
   OPERATOR_DISPLAY_NAME: z.string().optional(),

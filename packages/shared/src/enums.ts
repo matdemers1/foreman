@@ -76,10 +76,39 @@ export const IDEA_NEEDS_REASON: readonly IdeaStatus[] = ['parked', 'rejected'];
 export const ProjectIdeaStatus = z.enum([
   'new',
   'considering',
+  'shortlisted',
+  'funded',
   'parked',
   'rejected',
   'converted',
 ]);
+
+/**
+ * The statuses each deployment mode offers.
+ *
+ * Both lists are subsets of one enum rather than two enums, because the *record* is the same
+ * thing in both: a candidate somebody might build. What differs is where it can end up — a solo
+ * instance converts an idea into a Foreman project, and a fund board funds it.
+ */
+export const SOLO_STATUSES: readonly ProjectIdeaStatus[] = [
+  'new',
+  'considering',
+  'parked',
+  'rejected',
+  'converted',
+];
+
+export const BOARD_STATUSES: readonly ProjectIdeaStatus[] = [
+  'new',
+  'considering',
+  'shortlisted',
+  'funded',
+  'parked',
+  'rejected',
+];
+
+/** Reached by deciding to fund, and carrying an amount. */
+export const PROJECT_IDEA_FUNDED: ProjectIdeaStatus = 'funded';
 export type ProjectIdeaStatus = z.infer<typeof ProjectIdeaStatus>;
 
 /** Same rule, same reason as an idea's: a decision with no reason written down gets re-argued. */
@@ -87,6 +116,18 @@ export const PROJECT_IDEA_NEEDS_REASON: readonly ProjectIdeaStatus[] = ['parked'
 
 /** Reachable by converting, and by nothing else. A PATCH that asks for it is refused. */
 export const PROJECT_IDEA_CONVERTED: ProjectIdeaStatus = 'converted';
+
+/**
+ * What an account may do (FRM-ADR-016).
+ *
+ * Ordered most-privileged first, which is the order a person reads them in and the order the
+ * members screen lists them. A solo instance has exactly one account, and it is an `admin`.
+ */
+export const UserRole = z.enum(['admin', 'reviewer', 'submitter']);
+export type UserRole = z.infer<typeof UserRole>;
+
+/** Who may see an internal comment, score a submission, or decide one. */
+export const REVIEWS: readonly UserRole[] = ['admin', 'reviewer'];
 
 export const RiskLikelihood = z.enum(['low', 'medium', 'high']);
 export type RiskLikelihood = z.infer<typeof RiskLikelihood>;
@@ -184,6 +225,8 @@ export const EntityType = z.enum([
   'tech_item',
   'idea',
   'project_idea',
+  'idea_score',
+  'idea_comment',
   'user',
   'api_token',
   'job',

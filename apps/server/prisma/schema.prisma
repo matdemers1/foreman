@@ -87,12 +87,30 @@ enum AdrRelationKind {
 }
 
 /// A project idea's states. `converted` is reachable by converting and by nothing else.
+/// A project idea's states, ordered so that open work sorts before decided work.
+///
+/// `shortlisted` and `funded` exist for the innovation-fund board (FRM-ADR-016) and are offered
+/// only in `board` mode; `converted` is the solo instance's end state — it became a Foreman
+/// project. `parked` and `rejected` are the two off-ramps in both, and both demand a reason.
 enum ProjectIdeaStatus {
   new
   considering
+  shortlisted
+  funded
   parked
   rejected
   converted
+}
+
+/// What a person may do. One role per account, per deployment — deployments do not share a
+/// database, so there is nothing for a second dimension to scope to (FRM-ADR-016).
+enum UserRole {
+  /// Everything, plus managing members.
+  admin
+  /// The board: sees every submission, scores, comments internally, and decides.
+  reviewer
+  /// Submits and discusses. Sees the board; edits only their own.
+  submitter
 }
 
 enum RiskLevel {
@@ -234,6 +252,8 @@ enum EntityType {
   tech_item
   idea
   project_idea
+  idea_score
+  idea_comment
   user
   api_token
   job
@@ -659,6 +679,14 @@ model ProjectIdea {
   projectId   String?   @map("project_id") @db.Uuid
   convertedAt DateTime? @map("converted_at") @db.Timestamptz(6)
 
+  /// Who submitted it. Null for everything written before roles existed, and for anything a
+  /// token wrote — which is why it is nullable rather than required: an idea with no author is a
+  /// real state, and pretending otherwise would mean inventing one.
+  submittedById String? @map("submitted_by_id") @db.Uuid
+  /// What was awarded, in minor units. Integer, not a float and not a decimal that has to be
+  /// serialised: money in cents is the one representation that cannot quietly lose a penny.
+  fundedAmountCents Int? @map("funded_amount_cents")
+
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -666,9 +694,99 @@ model ProjectIdea {
   /// `SetNull`, not `Cascade`: a hard-deleted project must not take the record of the idea that
   /// became it. The idea outlives the project, the way a decision outlives what it decided.
   project Project? @relation("ConvertedFrom", fields: [projectId], references: [id], onDelete: SetNull)
+  /// `SetNull`: a departed colleague's account may go, and their submissions stay. The audit
+  /// event still records who wrote it.
+  submittedBy User? @relation("SubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
+  scores   IdeaScore[]
+  comments IdeaComment[]
 
   @@index([status])
+  @@index([submittedById])
   @@map("project_idea")
+}
+
+/// One reviewer's read on one submission (FRM-ADR-016).
+///
+/// Impact and effort rather than a single number, because a fund board's actual question is
+/// *what do we get for what it costs* — and a lone score collapses the two into an average
+/// nobody can argue with. Both are 1–5; the board is ranked by their ratio.
+///
+/// One row per reviewer per idea, enforced by the unique index: scoring twice is changing your
+/// mind, not voting twice.
+model IdeaScore {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectIdeaId String @map("project_idea_id") @db.Uuid
+  userId        String @map("user_id") @db.Uuid
+
+  impact Int
+  effort Int
+  /// Why this reviewer scored it that way. Optional, and the most useful field on the table.
+  note   String?
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  projectIdea ProjectIdea @relation(fields: [projectIdeaId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectIdeaId, userId])
+  @@index([projectIdeaId])
+  @@map("idea_score")
+}
+
+/// Discussion on a submission (FRM-ADR-016).
+///
+/// `internal` is the field that makes this work for a fund board rather than a forum: the board
+/// deliberates where the submitter cannot see, and answers where they can. Without it the board
+/// would hold its real conversation somewhere else, and the record here would be theatre.
+///
+/// Deliberately **only** on a project idea and an idea. A comment on a requirement or a finding
+/// is the beginning of the issue tracker Foreman exists not to be, and a test asserts the
+/// boundary.
+model IdeaComment {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  projectIdeaId String @map("project_idea_id") @db.Uuid
+  userId        String @map("user_id") @db.Uuid
+
+  body     String
+  /// Visible to reviewers and admins only.
+  internal Boolean @default(false)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  projectIdea ProjectIdea @relation(fields: [projectIdeaId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectIdeaId, internal])
+  @@map("idea_comment")
+}
+
+/// A pending invitation (FRM-ADR-016).
+///
+/// The token is stored as a hash, like an API token: a leaked database row must not be a way in.
+/// Single use and time-boxed — `acceptedAt` is what spends it, and an expired invite is re-issued
+/// rather than extended.
+model Invite {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId    String @unique @map("user_id") @db.Uuid
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt DateTime? @map("accepted_at") @db.Timestamptz(6)
+  /// Who sent it. Null if the account was seeded rather than invited.
+  invitedById String? @map("invited_by_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("invite")
 }
 
 model Term {
@@ -1118,6 +1236,10 @@ model User {
   email       String     @unique
   displayName String     @map("display_name")
   status      UserStatus @default(invited)
+  /// Defaults to the least privilege, so an invite that forgets to say cannot hand over the
+  /// board. The migration promotes every account that already existed — on a solo instance that
+  /// is the one operator, who was an admin in everything but name.
+  role        UserRole   @default(submitter)
 
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -1126,7 +1248,12 @@ model User {
   credential Credential?
   identities Identity[]
   sessions   Session[]
+  invite     Invite?
+  submitted  ProjectIdea[]  @relation("SubmittedBy")
+  scores     IdeaScore[]
+  comments   IdeaComment[]
 
+  @@index([role])
   @@map("user")
 }
 

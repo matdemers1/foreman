@@ -7,6 +7,7 @@ import {
   type ProjectIdeaUpdate,
 } from '@foreman/shared';
 import type { Db } from '../db.js';
+import { summarise } from './board.js';
 import { record, type Actor, type TransactionClient } from './audit.js';
 import { Conflict, Invalid, NotFound } from './errors.js';
 import { createProject } from './projects.js';
@@ -39,7 +40,10 @@ const SELECT = {
   convertedAt: true,
   createdAt: true,
   updatedAt: true,
+  fundedAmountCents: true,
   project: { select: { code: true, name: true, lifecycle: true } },
+  submittedBy: { select: { id: true, displayName: true } },
+  _count: { select: { comments: { where: { deletedAt: null, internal: false } } } },
 } as const;
 
 /**
@@ -60,14 +64,32 @@ async function nextSeq(tx: TransactionClient): Promise<number> {
   return seq;
 }
 
-export async function allProjectIdeas(db: Db, status?: ProjectIdeaStatus) {
-  return db.projectIdea.findMany({
-    where: { deletedAt: null, ...(status === undefined ? {} : { status }) },
-    // Untriaged first — the list exists to be worked through — then newest. `converted` sorts
-    // last of the five, which is right: it is the only status that is finished rather than open.
+/**
+ * Every project idea, with the board's view of each attached when the caller is on the board.
+ *
+ * `canReview` decides whether score summaries come back at all, and it is applied here rather
+ * than by the caller: a summary that reaches the client and is hidden by the console has still
+ * been delivered to the submitter whose idea it scores (FRM-REQ-168).
+ */
+export async function allProjectIdeas(
+  db: Db,
+  options: { status?: ProjectIdeaStatus; canReview?: boolean } = {},
+) {
+  const rows = await db.projectIdea.findMany({
+    where: { deletedAt: null, ...(options.status === undefined ? {} : { status: options.status }) },
+    // Untriaged first — the list exists to be worked through — then newest. The enum is ordered
+    // so open work sorts above decided work, which is why this is one `orderBy` and not a case.
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-    select: SELECT,
+    select: { ...SELECT, scores: { select: { impact: true, effort: true } } },
   });
+
+  // The raw scores are dropped here and the summary is attached only for a reviewer, so a
+  // submitter's response carries neither. Computing and discarding is deliberate: one query, and
+  // the decision about who sees it lives in one line rather than in two divergent queries.
+  return rows.map(({ scores, ...rest }) => ({
+    ...rest,
+    score: options.canReview === true ? summarise(scores) : null,
+  }));
 }
 
 export async function findProjectIdea(db: Db, humanId: string) {
@@ -79,7 +101,12 @@ export async function findProjectIdea(db: Db, humanId: string) {
   return idea;
 }
 
-export async function createProjectIdea(db: Db, actor: Actor, input: ProjectIdeaCreate) {
+export async function createProjectIdea(
+  db: Db,
+  actor: Actor,
+  input: ProjectIdeaCreate,
+  submittedById?: string | null,
+) {
   return db.$transaction(async (tx) => {
     const seq = await nextSeq(tx);
     const idea = await tx.projectIdea.create({
@@ -88,6 +115,11 @@ export async function createProjectIdea(db: Db, actor: Actor, input: ProjectIdea
         seq,
         title: input.title,
         ...(input.pitch === undefined ? {} : { pitch: input.pitch }),
+        // Null when a token wrote it: a token is not a person, and inventing an author would put
+        // a name on the board next to something nobody there actually said.
+        ...(submittedById === null || submittedById === undefined
+          ? {}
+          : { submittedById }),
       },
       select: SELECT,
     });

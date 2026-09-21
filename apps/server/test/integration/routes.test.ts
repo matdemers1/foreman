@@ -22,6 +22,9 @@ const PUBLIC = new Set([
   'GET /readyz', // readiness, for the container
   'GET /health', // operational view; carries counts, never content
   'POST /auth/login', // the thing you use to become authenticated
+  // Accepting an invitation: the person has no account yet, which is the entire point of it.
+  // The token from their email is the credential, and it is single-use, hashed and time-boxed.
+  'POST /auth/invite/accept',
   'POST /auth/logout', // must work whatever state the session is in
   'GET /auth/session', // answers 401 as its normal negative case
   'GET /auth/oidc/start', // a redirect to the provider
