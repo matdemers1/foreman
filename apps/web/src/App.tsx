@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   AccountMenu,
   AppShell,
@@ -15,18 +15,30 @@ import {
 } from '@d3cloud/ui';
 import {
   Activity as ActivityIcon,
+  BookText,
+  CalendarRange,
+  FileStack,
   FolderKanban,
+  GitBranch,
   Home as HomeIcon,
   ListChecks,
+  ListTodo,
+  Radar,
+  ScrollText,
   Search,
+  ShieldAlert,
+  SquareStack,
+  Table2,
 } from 'lucide-react';
-import { fetchSession, foreman, logout, type SessionState } from './lib/api';
+import { fetchSession, logout, type SessionState } from './lib/api';
+import { briefFor, projectCodeFor, SECTIONS } from './lib/project';
 import { useAsync } from './lib/useAsync';
 import { routeFor, useLocation } from './lib/router';
 import { Login } from './screens/Login';
 import { PhaseDetail } from './screens/PhaseDetail';
 import { Phases } from './screens/Phases';
-import { Portfolio } from './screens/Portfolio';
+import { Dashboard } from './screens/Dashboard';
+import { Projects } from './screens/Projects';
 import { ProjectOverview } from './screens/ProjectOverview';
 import { Activity } from './screens/Activity';
 import { Adrs } from './screens/Adrs';
@@ -115,9 +127,15 @@ export function App() {
         brand={<AppShellBrand name="Foreman" href="/" />}
         nav={
           <SideNav>
-            {/* Phase 0 wires the shell; each destination arrives with the screen behind it. */}
-            <SideNavItem href="/" icon={<HomeIcon />} label="Portfolio" current={path === '/'} />
-            <ProjectNav path={path} />
+            {/* Five destinations, and they do not grow. The project list used to live here and
+                would have been unusable at twenty projects — it is a screen of its own now. */}
+            <SideNavItem href="/" icon={<HomeIcon />} label="Dashboard" current={path === '/'} />
+            <SideNavItem
+              href="/projects"
+              icon={<FolderKanban />}
+              label="Projects"
+              current={path === '/projects'}
+            />
             <SideNavItem
               href="/findings"
               icon={<ListChecks />}
@@ -136,6 +154,7 @@ export function App() {
               label="Health"
               current={path === '/system'}
             />
+            <ProjectSections path={path} />
           </SideNav>
         }
         footer={
@@ -160,35 +179,67 @@ export function App() {
 }
 
 /**
- * The projects themselves, not a link to a list of them.
+ * The sections of the project you are currently in — and nothing when you are not in one.
  *
- * This was a static "Projects" item pointing at `/projects`, which no route has ever matched —
- * the router only ever handled `/projects/:code`, so it rendered the not-found screen. There is no
- * projects-list screen to point at either: the portfolio at `/` is that list (S-04). The design
- * has always said the sidebar lists projects, so it does.
+ * This replaced a list of every project, which had two problems: it grew without bound (nine
+ * projects today, and the sidebar is the one surface that cannot scroll away), and it offered the
+ * one destination you already had while offering nothing from inside a project. Two clicks into
+ * `/projects/BND/adrs` the sidebar showed you ten other projects and no way to Bindery's phases.
  *
- * A failure here is silent on purpose: the sidebar losing its project list should not take the
- * screen down with it, and the portfolio still answers "where is everything".
+ * Grouped the way the tool thinks: what was planned, what was decided, and what is actually there.
  */
-function ProjectNav({ path }: { path: string }) {
-  const { state } = useAsync(() => foreman.portfolio(), []);
+const SECTION_ICONS: Record<string, ReactNode> = {
+  phases: <CalendarRange />,
+  requirements: <ListTodo />,
+  'scope-of-work': <SquareStack />,
+  register: <Table2 />,
+  documents: <FileStack />,
+  adrs: <ScrollText />,
+  risks: <ShieldAlert />,
+  glossary: <BookText />,
+  activity: <GitBranch />,
+  audits: <ListChecks />,
+  drift: <Radar />,
+};
 
-  // Nothing while loading or on failure: a nav that flashes a skeleton on every screen change is
-  // noisier than one that simply appears, and the portfolio still answers "where is everything".
-  if (state.status !== 'ready' || state.value.items.length === 0) return null;
+function ProjectSections({ path }: { path: string }) {
+  const code = projectCodeFor(path);
+  const { state } = useAsync(
+    () => (code === null ? Promise.resolve(null) : briefFor(code)),
+    [code],
+  );
+
+  if (code === null) return null;
+
+  // The code until the name arrives. A group title that appears a beat late shifts every item
+  // under it, which is worse than a title that is briefly terse.
+  const name = state.status === 'ready' && state.value !== null ? state.value.project.name : code;
+  const groups = ['Plan', 'Knowledge', 'Reality'] as const;
 
   return (
-    <SideNavGroup title="Projects">
-      {state.value.items.map((project) => (
+    <>
+      <SideNavGroup title={name}>
         <SideNavItem
-          key={project.code}
-          href={`/projects/${project.code}`}
-          icon={<FolderKanban />}
-          label={project.name}
-          current={path.startsWith(`/projects/${project.code}`)}
+          href={`/projects/${code}`}
+          icon={<HomeIcon />}
+          label="Overview"
+          current={path === `/projects/${code}`}
         />
+      </SideNavGroup>
+      {groups.map((group) => (
+        <SideNavGroup key={group} title={group}>
+          {SECTIONS.filter((section) => section.group === group).map((section) => (
+            <SideNavItem
+              key={section.slug}
+              href={`/projects/${code}/${section.slug}`}
+              icon={SECTION_ICONS[section.slug]}
+              label={section.label}
+              current={path.startsWith(`/projects/${code}/${section.slug}`)}
+            />
+          ))}
+        </SideNavGroup>
       ))}
-    </SideNavGroup>
+    </>
   );
 }
 
@@ -197,8 +248,10 @@ function Screen({ path, search }: { path: string; search: string }) {
   const route = routeFor(path);
 
   switch (route.screen) {
-    case 'portfolio':
-      return <Portfolio />;
+    case 'dashboard':
+      return <Dashboard />;
+    case 'projects':
+      return <Projects />;
     case 'project':
       return <ProjectOverview code={route.code ?? ''} />;
     case 'phases':

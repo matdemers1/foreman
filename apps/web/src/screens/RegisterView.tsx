@@ -8,13 +8,13 @@ import {
   EmptyState,
   Link,
   Page,
-  PageHeader,
   Skeleton,
   Table,
   type TableColumn,
 } from '@d3cloud/ui';
 import { foreman, type MatrixRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
 
 /**
  * The Requirements Register, generated (T-3.9, FRM-REQ-057, FRM-REQ-055, ADR-006).
@@ -87,10 +87,10 @@ export function RegisterView({ code }: { code: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title="Requirements register"
+      <ProjectHeader
+        code={code}
+        section="register"
         description={`Generated for ${code}: every requirement, and what satisfies it.`}
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       {coverage.state.status === 'ready' ? (

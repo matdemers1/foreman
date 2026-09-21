@@ -131,7 +131,9 @@ test.describe('decisions, risks and the glossary', () => {
     await signIn(page);
     await page.goto('/projects/EXMP/adrs');
 
-    await expect(page.getByRole('heading', { name: 'Decision records' })).toBeVisible();
+    // Headed "Decisions", the same word the sidebar uses. It read "Decision records" while the
+    // link said "Decisions", which is a small thing that makes a reader doubt they arrived.
+    await expect(page.getByRole('heading', { name: 'Decisions' })).toBeVisible();
     const chain = page.locator('[data-mermaid] svg').first();
     await expect(chain).toBeVisible({ timeout: 15_000 });
     await expect(chain.getByText('EXMP-ADR-001').first()).toBeVisible();
@@ -148,7 +150,7 @@ test.describe('decisions, risks and the glossary', () => {
     await signIn(page);
     await page.goto('/projects/EXMP/risks');
 
-    await expect(page.getByRole('heading', { name: 'Risk register' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Risks' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Tripwire' })).toBeVisible();
     await expect(page.getByText(/tripwires? has fired/)).toBeVisible();
   });

@@ -2,15 +2,14 @@ import {
   Alert,
   Badge,
   EmptyState,
-  Link,
   Page,
-  PageHeader,
   Skeleton,
   Table,
   type TableColumn,
 } from '@d3cloud/ui';
 import { foreman, type RiskRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
 
 /**
  * The Risk Register, generated (T-4.12, FRM-REQ-073, ADR-006).
@@ -73,10 +72,10 @@ export function RiskRegister({ code }: { code: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title="Risk register"
+      <ProjectHeader
+        code={code}
+        section="risks"
         description={`Generated for ${code}. Each risk with the condition that forces a re-plan.`}
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       {fired.length === 0 ? null : (

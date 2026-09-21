@@ -1,13 +1,12 @@
 import {
   Alert,
   Badge,
-  Card,
-  CardTitle,
-  DescriptionItem,
-  DescriptionList,
+  Cluster,
   EmptyState,
+  Grid,
   Page,
   PageHeader,
+  Section,
   Skeleton,
   Stack,
   Table,
@@ -15,6 +14,8 @@ import {
 } from '@d3cloud/ui';
 import { foreman, type HealthReport, type TechRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { Pill, SegmentBar, StatCard } from '../ui/viz';
+import { relativeDay, SERIES } from '../ui/tone';
 
 /**
  * S-26 and S-07 — is Foreman itself well, and what is everything made of.
@@ -97,74 +98,110 @@ export function Health() {
         </EmptyState>
       ) : (
         <>
-          <Problems report={health.state.value} />
+          <Stack gap="24">
+            <Problems report={health.state.value} />
 
-          <Card>
-            <CardTitle>The queue</CardTitle>
-            <DescriptionList>
-              <DescriptionItem term="Waiting" numeric>
-                {health.state.value.queue.queued}
-                {health.state.value.queue.stalled ? (
-                  <>
-                    {' '}
-                    <Badge tone="danger">stalled</Badge>
-                  </>
-                ) : null}
-              </DescriptionItem>
-              <DescriptionItem term="Running" numeric>
-                {health.state.value.queue.running}
-              </DescriptionItem>
-              <DescriptionItem term="Failed" numeric>
-                {health.state.value.queue.failed}
-              </DescriptionItem>
-              <DescriptionItem term="Oldest waiting">
-                {when(health.state.value.queue.oldestQueuedAt)}
-              </DescriptionItem>
-            </DescriptionList>
-          </Card>
+            {/* The queue, as three figures and a bar. `failed` is the one that turns `/health`
+                red, so it gets the tint; waiting work is normal and does not. */}
+            <Grid minItemWidth="sm">
+              <StatCard
+                label="Waiting"
+                value={health.state.value.queue.queued}
+                tone={health.state.value.queue.stalled ? 'danger' : 'neutral'}
+                detail={
+                  health.state.value.queue.stalled
+                    ? 'Stalled — queued with nothing running'
+                    : `Oldest ${relativeDay(health.state.value.queue.oldestQueuedAt)}`
+                }
+              />
+              <StatCard
+                label="Running"
+                value={health.state.value.queue.running}
+                tone="accent"
+                detail="In a worker right now"
+              />
+              <StatCard
+                label="Failed"
+                value={health.state.value.queue.failed}
+                tone={health.state.value.queue.failed === 0 ? 'success' : 'danger'}
+                detail={
+                  health.state.value.queue.failed === 0
+                    ? 'Nothing dead-lettered'
+                    : 'Out of attempts'
+                }
+              />
+              <StatCard
+                label="Restore drill"
+                // The one that matters: an untested backup is not a backup (R-04).
+                value={relativeDay(health.state.value.lastRestoreDrill)}
+                tone={health.state.value.lastRestoreDrill === null ? 'danger' : 'success'}
+                detail={
+                  health.state.value.lastRestoreDrill === null
+                    ? 'Never performed'
+                    : 'Last proved recoverable'
+                }
+              />
+            </Grid>
 
-          <Card>
-            <CardTitle>Last seen</CardTitle>
-            <DescriptionList>
-              <DescriptionItem term="Ingest">{when(health.state.value.lastIngest)}</DescriptionItem>
-              <DescriptionItem term="Reconcile">
-                {when(health.state.value.lastReconcile)}
-              </DescriptionItem>
-              <DescriptionItem term="Backup">
-                {health.state.value.lastBackup === null
-                  ? 'never'
-                  : `${when(health.state.value.lastBackup.at)} · ${String(
-                      Math.round(health.state.value.lastBackup.bytes / 1024),
-                    )} KiB`}
-              </DescriptionItem>
-              <DescriptionItem term="Restore drill">
-                {/* The one that matters: an untested backup is not a backup (R-04). */}
-                {when(health.state.value.lastRestoreDrill)}
-              </DescriptionItem>
-            </DescriptionList>
-          </Card>
+            <Grid minItemWidth="md">
+              <Section title="The queue" surface="card">
+                <SegmentBar
+                  segments={[
+                    { label: 'Running', value: health.state.value.queue.running, color: SERIES.active },
+                    { label: 'Waiting', value: health.state.value.queue.queued, color: SERIES.waiting },
+                    { label: 'Failed', value: health.state.value.queue.failed, color: SERIES.blocked },
+                  ]}
+                />
+              </Section>
 
-          {health.state.value.stageFailures.length === 0 ? null : (
-            <Card>
-              <CardTitle>Recent stage failures</CardTitle>
-              <Stack gap="8" as="ul">
-                {health.state.value.stageFailures.map((failure) => (
-                  <li key={`${failure.jobKind}:${failure.stage}:${failure.at}`}>
-                    <code>
-                      {failure.jobKind} / {failure.stage}
-                    </code>{' '}
-                    <span className="fm-muted">{when(failure.at)}</span>
-                    <div className="fm-muted">{failure.error}</div>
-                  </li>
-                ))}
-              </Stack>
-            </Card>
-          )}
+              <Section title="Last seen" surface="card">
+                <Stack gap="6">
+                  <Seen label="Ingest" at={health.state.value.lastIngest} />
+                  <Seen label="Reconcile" at={health.state.value.lastReconcile} />
+                  <Seen
+                    label="Backup"
+                    at={health.state.value.lastBackup?.at ?? null}
+                    extra={
+                      health.state.value.lastBackup === null
+                        ? undefined
+                        : `${String(Math.round(health.state.value.lastBackup.bytes / 1024))} KiB`
+                    }
+                  />
+                  <Seen label="Restore drill" at={health.state.value.lastRestoreDrill} />
+                </Stack>
+              </Section>
+            </Grid>
+
+            {health.state.value.stageFailures.length > 0 && (
+              <Section
+                title="Recent stage failures"
+                surface="card"
+                description="A stage that failed is a stage that can be replayed alone."
+              >
+                <Stack gap="8">
+                  {health.state.value.stageFailures.map((failure) => (
+                    <div
+                      key={`${failure.jobKind}:${failure.stage}:${failure.at}`}
+                      className="fm-item fm-item--stacked"
+                    >
+                      <Cluster gap="8" align="center">
+                        <Pill tone="danger" dot>
+                          {failure.jobKind}
+                        </Pill>
+                        <code className="fm-item__id">{failure.stage}</code>
+                        <span className="fm-muted">{when(failure.at)}</span>
+                      </Cluster>
+                      <span className="fm-muted">{failure.error}</span>
+                    </div>
+                  ))}
+                </Stack>
+              </Section>
+            )}
+          </Stack>
         </>
       )}
 
-      <Card>
-        <CardTitle>What everything is built on</CardTitle>
+      <Section title="What everything is built on" surface="card">
         {tech.state.status !== 'ready' ? (
           <Skeleton lines={5} />
         ) : (
@@ -192,7 +229,20 @@ export function Health() {
             />
           </Stack>
         )}
-      </Card>
+      </Section>
     </Page>
+  );
+}
+
+/** One "when did this last happen" row. An em dash is never "just now". */
+function Seen({ label, at, extra }: { label: string; at: string | null; extra?: string | undefined }) {
+  return (
+    <div className="fm-fact">
+      <span className="fm-fact__label">{label}</span>
+      <span className={at === null ? 'fm-fact__value fm-fact__value--warning' : 'fm-fact__value'}>
+        {at === null ? 'never' : relativeDay(at)}
+        {extra === undefined ? '' : ` · ${extra}`}
+      </span>
+    </div>
   );
 }

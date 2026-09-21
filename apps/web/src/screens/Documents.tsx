@@ -3,13 +3,13 @@ import {
   EmptyState,
   Link,
   Page,
-  PageHeader,
   Skeleton,
   Table,
   type TableColumn,
 } from '@d3cloud/ui';
 import { foreman, type DocumentRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
 
 /**
  * S-21 — the documents of one project, by kind.
@@ -59,10 +59,10 @@ export function Documents({ code }: { code: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title="Documents"
+      <ProjectHeader
+        code={code}
+        section="documents"
         description="Everything authored for this project, addressable by section."
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       {state.status === 'loading' ? (

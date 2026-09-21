@@ -7,7 +7,6 @@ import {
   FormField,
   Link,
   Page,
-  PageHeader,
   Select,
   Skeleton,
   Table,
@@ -15,6 +14,8 @@ import {
 } from '@d3cloud/ui';
 import { foreman, type RequirementFilters, type RequirementRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
+import { CoverageSummary } from '../components/CoverageSummary';
 
 /**
  * S-13 — the register, at the volume it actually has.
@@ -130,11 +131,13 @@ export function Requirements({ code, search }: { code: string; search: string })
 
   return (
     <Page>
-      <PageHeader
-        title="Requirements"
+      <ProjectHeader
+        code={code}
+        section="requirements"
         description={`The register for ${code}, and what does or does not satisfy it.`}
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
+
+      <CoverageSummary code={code} />
 
       <FilterBar
         aria-label="Filter the requirements"

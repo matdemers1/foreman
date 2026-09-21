@@ -13,13 +13,13 @@ import {
   FormField,
   Link,
   Page,
-  PageHeader,
   Select,
   Skeleton,
   Stack,
 } from '@d3cloud/ui';
 import { foreman, type CommitRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
 
 /**
  * S-24 — what actually happened: commits, their attribution proposals, CI and what is deployed.
@@ -54,10 +54,10 @@ export function Activity({ code }: { code: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title="Activity"
+      <ProjectHeader
+        code={code}
+        section="activity"
         description="Commits, what they were for, and what is running."
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       <Cluster gap="16">

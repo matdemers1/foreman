@@ -1,15 +1,14 @@
 import {
   Badge,
   EmptyState,
-  Link,
   Page,
-  PageHeader,
   Skeleton,
   Table,
   type TableColumn,
 } from '@d3cloud/ui';
 import { foreman, type AuditRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
 
 /**
  * The Audit Index, generated (T-4.12, FRM-REQ-073, ADR-006).
@@ -75,10 +74,10 @@ export function AuditIndex({ code }: { code: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title="Audits"
+      <ProjectHeader
+        code={code}
+        section="audits"
         description={`Generated for ${code} — the counts come from the findings, so they cannot disagree with them.`}
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       {state.status === 'loading' ? (

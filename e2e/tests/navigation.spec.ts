@@ -40,18 +40,45 @@ test.describe('the sidebar', () => {
     }
   });
 
-  test('lists the projects themselves, and reaches one by clicking', async ({ page }) => {
+  test('reaches a project through Projects, not through a list of every project', async ({
+    page,
+  }) => {
     await signIn(page);
 
-    // The design is portfolio-first: the sidebar lists projects rather than linking to a list of
-    // them, because the portfolio at `/` already is that list.
+    // The sidebar used to list every project, which does not survive twenty of them. It offers
+    // the screen that lists them instead, and that screen is a real route — it was previously a
+    // link to `/projects`, which the router had never handled and which rendered not-found.
     const nav = page.getByRole('navigation').first();
-    const project = nav.getByRole('link', { name: 'Example Project' });
-    await expect(project).toBeVisible();
-
-    await project.click();
-    await expect(page).toHaveURL(/\/projects\/EXMP$/);
+    await nav.getByRole('link', { name: 'Projects' }).click();
+    await expect(page).toHaveURL(/\/projects$/);
     await expect(page.getByText('That page does not exist')).toHaveCount(0);
+
+    await page.getByRole('link', { name: /Example Project/ }).first().click();
+    await expect(page).toHaveURL(/\/projects\/EXMP$/);
+  });
+
+  test("shows the current project's sections, from inside any one of them", async ({ page }) => {
+    await signIn(page);
+
+    // The navigation fix this replaced: two clicks into a project the sidebar offered ten other
+    // projects and no way to this one's phases, so the only route onwards was the back button.
+    await page.goto('/projects/EXMP/adrs');
+    const nav = page.getByRole('navigation').first();
+
+    await expect(nav.getByRole('link', { name: 'Phases' })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'Requirements' })).toBeVisible();
+
+    await nav.getByRole('link', { name: 'Phases' }).click();
+    await expect(page).toHaveURL(/\/projects\/EXMP\/phases$/);
+  });
+
+  test('the section chrome names the project, and climbs back to it', async ({ page }) => {
+    await signIn(page);
+    await page.goto('/projects/EXMP/adrs');
+
+    // A breadcrumb, rather than a three-character link in the corner.
+    await page.getByRole('link', { name: 'Example Project' }).first().click();
+    await expect(page).toHaveURL(/\/projects\/EXMP$/);
   });
 
   test('still says so plainly for a path that really is nothing', async ({ page }) => {

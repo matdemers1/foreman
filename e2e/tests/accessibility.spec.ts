@@ -22,7 +22,8 @@ const PASSWORD = process.env['E2E_PASSWORD'] ?? 'foreman-dev-password-9174';
 
 /** Every screen a person can reach, with the seeded project. */
 const SCREENS: { name: string; path: string }[] = [
-  { name: 'portfolio', path: '/' },
+  { name: 'dashboard', path: '/' },
+  { name: 'projects', path: '/projects' },
   { name: 'project overview', path: '/projects/EXMP' },
   { name: 'phases', path: '/projects/EXMP/phases' },
   { name: 'phase detail', path: '/projects/EXMP/phases/EXMP-P-1' },

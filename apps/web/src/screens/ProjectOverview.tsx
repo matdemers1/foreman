@@ -1,37 +1,46 @@
 import {
-  Badge,
   Button,
   Card,
-  CardTitle,
   Cluster,
-  DescriptionItem,
-  DescriptionList,
   EmptyState,
   Grid,
   Link,
   Page,
-  PageHeader,
+  Section,
   Skeleton,
   Stack,
 } from '@d3cloud/ui';
 import { foreman, type Brief } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { EditForm, LIFECYCLES } from './EditForms';
+import { ProjectHeader } from '../components/ProjectHeader';
+import { forgetBrief, SECTIONS } from '../lib/project';
+import { plainText } from '../lib/text';
+import { Donut, Pill, StatCard } from '../ui/viz';
+import { ciTone, SERIES, severityTone } from '../ui/tone';
 
 /**
- * S-09 — a project's overview: pitch, lifecycle, how far the phase in flight has got, CI, and what
- * is stuck.
+ * S-09 — a project's overview.
  *
  * It is the brief, rendered. The same call a Claude session makes answers this screen, which is the
  * point of both surfaces being peers: they cannot disagree, because there is only one answer.
+ *
+ * What changed is the arrangement. It was two description lists — "Phase: 1 — Retrieval", "Tasks:
+ * 11 of 13 done" — which is a correct answer you have to read twice to feel. The phase now has a
+ * ring, the four drift figures are four numbers you can see from across the room, and the three
+ * lists that matter are cards rather than bullets.
+ *
+ * The row of section links is gone: the sidebar carries them now, from every screen rather than
+ * only from this one.
  */
 
-function Ci({ ci }: { ci: Brief['ci'] }) {
-  if (ci.unknown) return <span className="fm-muted">unknown — nothing ingested yet</span>;
+function CiLine({ ci }: { ci: Brief['ci'] }) {
   return (
-    <Cluster gap="8">
-      <Badge tone={ci.conclusion === 'success' ? 'neutral' : 'danger'}>{ci.conclusion}</Badge>
-      {ci.commitSha === null ? null : <code>{ci.commitSha.slice(0, 7)}</code>}
+    <Cluster gap="8" align="center">
+      <Pill tone={ciTone(ci.conclusion, ci.unknown)} dot>
+        {ci.unknown ? 'never reported' : (ci.conclusion ?? 'unknown')}
+      </Pill>
+      {ci.commitSha !== null && <code className="fm-card__code">{ci.commitSha.slice(0, 7)}</code>}
     </Cluster>
   );
 }
@@ -54,7 +63,7 @@ export function ProjectOverview({ code }: { code: string }) {
           kind={state.notFound ? 'no-results' : 'error'}
           heading={state.notFound ? `No project called ${code}` : 'That project did not load'}
         >
-          {state.notFound ? 'Check the code, or pick one from the portfolio.' : state.message}
+          {state.notFound ? 'Check the code, or pick one from Projects.' : state.message}
         </EmptyState>
       </Page>
     );
@@ -62,167 +71,210 @@ export function ProjectOverview({ code }: { code: string }) {
 
   const brief = state.value;
   const phase = brief.activePhase;
+  const done = phase?.tasks.done ?? 0;
+  const total = phase?.tasks.total ?? 0;
+  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
 
   return (
     <Page>
-      <PageHeader
-        title={brief.project.name}
-        description={brief.project.pitch ?? undefined}
+      <ProjectHeader
+        code={code}
+        {...(brief.project.pitch === null ? {} : { description: brief.project.pitch })}
         actions={
-          <>
-            <Badge tone={brief.project.lifecycle === 'building' ? 'attention' : 'neutral'}>
-              {brief.project.lifecycle}
-            </Badge>
-            <EditForm
-              title={`Edit ${brief.project.name}`}
-              // The code is absent on purpose: it is immutable, and every human ID embeds it.
-              description="A project's code cannot change — every ID in it embeds the code."
-              path={`/api/projects/${code}`}
-              trigger={<Button>Edit</Button>}
-              onSaved={reload}
-              initial={{
-                name: brief.project.name,
-                lifecycle: brief.project.lifecycle,
-                pitch: brief.project.pitch ?? '',
-              }}
-              fields={[
-                { name: 'name', label: 'Name', kind: 'text' },
-                { name: 'lifecycle', label: 'Lifecycle', kind: 'select', options: LIFECYCLES },
-                { name: 'pitch', label: 'Pitch', kind: 'textarea', optional: true },
-              ]}
-            />
-          </>
+          <EditForm
+            title={`Edit ${brief.project.name}`}
+            // The code is absent on purpose: it is immutable, and every human ID embeds it.
+            description="A project's code cannot change — every ID in it embeds the code."
+            path={`/api/projects/${code}`}
+            trigger={<Button>Edit</Button>}
+            onSaved={() => {
+              // The sidebar and the breadcrumb read a cached brief. Without this they keep showing
+              // the old name until a reload, on the one screen where you just changed it.
+              forgetBrief(code);
+              reload();
+            }}
+            initial={{
+              name: brief.project.name,
+              lifecycle: brief.project.lifecycle,
+              pitch: brief.project.pitch ?? '',
+            }}
+            fields={[
+              { name: 'name', label: 'Name', kind: 'text' },
+              { name: 'lifecycle', label: 'Lifecycle', kind: 'select', options: LIFECYCLES },
+              { name: 'pitch', label: 'Pitch', kind: 'textarea', optional: true },
+            ]}
+          />
         }
       />
 
-      <nav className="fm-sections" aria-label="Sections of this project">
-        <Link href={`/projects/${code}/phases`}>Phases</Link>
-        <Link href={`/projects/${code}/requirements`}>Requirements</Link>
-        <Link href={`/projects/${code}/scope-of-work`}>Scope of work</Link>
-        <Link href={`/projects/${code}/register`}>Register</Link>
-        <Link href={`/projects/${code}/documents`}>Documents</Link>
-        <Link href={`/projects/${code}/adrs`}>Decisions</Link>
-        <Link href={`/projects/${code}/risks`}>Risks</Link>
-        <Link href={`/projects/${code}/glossary`}>Glossary</Link>
-        <Link href={`/projects/${code}/audits`}>Audits</Link>
-        <Link href={`/projects/${code}/activity`}>Activity</Link>
-        <Link href={`/projects/${code}/drift`}>Drift</Link>
-      </nav>
+      <Stack gap="24">
+        <Grid minItemWidth="sm">
+          <StatCard
+            label="Uncovered requirements"
+            value={brief.drift.uncoveredRequirements}
+            tone={brief.drift.uncoveredRequirements === 0 ? 'success' : 'warning'}
+            detail={brief.drift.uncoveredRequirements === 0 ? 'Every Must is cited' : 'Musts with no task'}
+            {...(brief.drift.uncoveredRequirements === 0
+              ? {}
+              : { href: `/projects/${code}/requirements?uncovered=true` })}
+          />
+          <StatCard
+            label="Open criticals"
+            value={brief.openCriticals.length}
+            tone={brief.openCriticals.length === 0 ? 'success' : 'danger'}
+            detail={brief.openCriticals.length === 0 ? 'Nothing on fire' : 'Needs a decision'}
+            href={`/projects/${code}/audits`}
+          />
+          <StatCard
+            label="Drift"
+            value={brief.drift.total}
+            tone={brief.drift.total === 0 ? 'success' : 'warning'}
+            detail="Plan against reality"
+            href={`/projects/${code}/drift`}
+          />
+          <StatCard
+            label="Blocked"
+            value={brief.blocked.length}
+            tone={brief.blocked.length === 0 ? 'neutral' : 'warning'}
+            detail={brief.blocked.length === 0 ? 'Nothing waiting' : 'Cannot start'}
+          />
+        </Grid>
 
-      <Grid minItemWidth="md">
-        <Card>
-          <CardTitle>In flight</CardTitle>
-          {phase === null ? (
-            <EmptyState kind="empty" size="inline" heading="No phase is active">
-              Add a phase, or mark one active.
-            </EmptyState>
-          ) : (
-            <Stack gap="12">
-              <DescriptionList>
-                <DescriptionItem term="Phase">
-                  <Link href={`/projects/${code}/phases/${phase.humanId}`}>
-                    {phase.number} — {phase.name}
-                  </Link>
-                </DescriptionItem>
-                <DescriptionItem term="Tasks" numeric>
-                  {phase.tasks.done} of {phase.tasks.total} done
-                </DescriptionItem>
-                {phase.objective === null ? null : (
-                  <DescriptionItem term="Objective">{phase.objective}</DescriptionItem>
-                )}
-                {phase.exitDemo === null ? null : (
-                  <DescriptionItem term="Exit demo">{phase.exitDemo}</DescriptionItem>
-                )}
-              </DescriptionList>
-            </Stack>
-          )}
-        </Card>
-
-        <Card>
-          <CardTitle>State</CardTitle>
-          <DescriptionList>
-            <DescriptionItem term="CI">
-              <Ci ci={brief.ci} />
-            </DescriptionItem>
-            <DescriptionItem term="Uncovered requirements" numeric>
-              {brief.drift.uncoveredRequirements === 0 ? (
-                'none'
-              ) : (
-                // A count somebody has to go looking for is a count nobody acts on: the number
-                // is the link, and it lands on exactly those rows.
-                <Link href={`/projects/${code}/requirements?uncovered=true`}>
-                  {brief.drift.uncoveredRequirements}
-                </Link>
-              )}
-            </DescriptionItem>
-            {/* Named for what they are: proposals, not progress. */}
-            <DescriptionItem term="Attributions to review" numeric>
-              {brief.drift.unconfirmedAttributions === 0
-                ? 'none'
-                : `${String(brief.drift.unconfirmedAttributions)} awaiting confirmation`}
-            </DescriptionItem>
-            <DescriptionItem term="Fired tripwires" numeric>
-              {brief.drift.firedRisks === 0 ? 'none' : brief.drift.firedRisks}
-            </DescriptionItem>
-          </DescriptionList>
-        </Card>
-      </Grid>
-
-      <Grid minItemWidth="md">
-        <Card>
-          <CardTitle>Next up</CardTitle>
-          {brief.nextTasks.length === 0 ? (
-            <EmptyState kind="empty" size="inline" heading="Nothing ready to pick up">
-              {brief.blocked.length > 0
-                ? 'Everything open is blocked — see below.'
-                : 'Add a task to the active phase.'}
-            </EmptyState>
-          ) : (
-            <Stack gap="8" as="ul">
-              {brief.nextTasks.map((task) => (
-                <li key={task.humanId}>
-                  <Link href={`/tasks/${task.humanId}`}>{task.humanId}</Link> — {task.title}
-                </li>
-              ))}
-            </Stack>
-          )}
-        </Card>
-
-        {brief.blocked.length === 0 ? null : (
-          <Card>
-            {/* Blocked work is listed apart from next tasks on purpose: it is a thing to unblock,
-                not a thing to do. */}
-            <CardTitle>Blocked</CardTitle>
-            <Stack gap="8" as="ul">
-              {brief.blocked.map((task) => (
-                <li key={task.humanId}>
-                  <Link href={`/tasks/${task.humanId}`}>{task.humanId}</Link> — {task.title}
-                  <div className="fm-muted">{task.reason ?? 'no reason recorded'}</div>
-                </li>
-              ))}
-            </Stack>
-          </Card>
-        )}
-      </Grid>
-
-      {brief.openCriticals.length === 0 ? null : (
-        <Card>
-          <CardTitle>Open criticals</CardTitle>
-          <Stack gap="8" as="ul">
-            {brief.openCriticals.map((finding) => (
-              <li key={finding.humanId}>
-                <Badge tone="danger">{finding.severity}</Badge>{' '}
-                <Link href={`/findings/${finding.humanId}`}>{finding.humanId}</Link> — {finding.title}
-                {finding.location === null ? null : (
-                  <div className="fm-muted">
-                    <code>{finding.location}</code>
+        <Grid minItemWidth="md">
+          <Section title="In flight" surface="card">
+            {phase === null ? (
+              <EmptyState kind="empty" size="inline" heading="No phase is active">
+                Add a phase, or mark one active.
+              </EmptyState>
+            ) : (
+              <Stack gap="16">
+                <Cluster gap="20" align="center">
+                  <Donut
+                    size={104}
+                    segments={[
+                      { label: 'Done', value: done, color: SERIES.done },
+                      { label: 'Remaining', value: Math.max(0, total - done), color: SERIES.waiting },
+                    ]}
+                    label={total === 0 ? '—' : `${String(percent)}%`}
+                    caption={`${String(done)} of ${String(total)}`}
+                  />
+                  <Stack gap="6" className="fm-grow">
+                    <Link href={`/projects/${code}/phases/${phase.humanId}`}>
+                      <span className="fm-card__title">
+                        {phase.number} — {phase.name}
+                      </span>
+                    </Link>
+                    {phase.objective !== null && (
+                      <span className="fm-muted">{phase.objective}</span>
+                    )}
+                    <CiLine ci={brief.ci} />
+                  </Stack>
+                </Cluster>
+                {phase.exitDemo !== null && (
+                  <div className="fm-callout">
+                    <span className="fm-callout__label">Exit demo</span>
+                    {phase.exitDemo}
                   </div>
                 )}
-              </li>
-            ))}
-          </Stack>
-        </Card>
-      )}
+              </Stack>
+            )}
+          </Section>
+
+          <Section title="Next up" surface="card">
+            {brief.nextTasks.length === 0 ? (
+              <EmptyState kind="empty" size="inline" heading="Nothing ready to pick up">
+                {brief.blocked.length > 0
+                  ? 'Everything open is blocked.'
+                  : 'Add a task to the active phase.'}
+              </EmptyState>
+            ) : (
+              <Stack gap="6">
+                {brief.nextTasks.map((task) => (
+                  <a key={task.humanId} className="fm-item" href={`/tasks/${task.humanId}`}>
+                    <code className="fm-item__id">{task.humanId}</code>
+                    <span className="fm-item__title">{plainText(task.title)}</span>
+                    {task.size !== null && <Pill tone="neutral">{task.size}</Pill>}
+                  </a>
+                ))}
+              </Stack>
+            )}
+          </Section>
+        </Grid>
+
+        {brief.blocked.length > 0 && (
+          <Section title="Blocked" surface="card" description="Work to unblock, not work to do.">
+            <Stack gap="8">
+              {brief.blocked.map((task) => (
+                <a key={task.humanId} className="fm-item fm-item--stacked" href={`/tasks/${task.humanId}`}>
+                  <Cluster gap="8" align="center">
+                    <Pill tone="warning" dot>
+                      blocked
+                    </Pill>
+                    <code className="fm-item__id">{task.humanId}</code>
+                    <span className="fm-item__title">{plainText(task.title)}</span>
+                  </Cluster>
+                  <span className="fm-muted">{task.reason ?? 'no reason recorded'}</span>
+                </a>
+              ))}
+            </Stack>
+          </Section>
+        )}
+
+        {brief.openCriticals.length > 0 && (
+          <Section
+            title="Open criticals"
+            surface="card"
+            actions={<Link href="/findings">The inbox</Link>}
+          >
+            <Stack gap="8">
+              {brief.openCriticals.map((finding) => (
+                <Card key={finding.humanId} padding="sm" href={`/findings/${finding.humanId}`} interactive>
+                  <Stack gap="4">
+                    <Cluster gap="8" align="center">
+                      <Pill tone={severityTone(finding.severity)}>{finding.severity}</Pill>
+                      <code className="fm-card__code">{finding.humanId}</code>
+                    </Cluster>
+                    <span className="fm-finding__title">{plainText(finding.title)}</span>
+                    {finding.location !== null && (
+                      <code className="fm-muted">{finding.location}</code>
+                    )}
+                  </Stack>
+                </Card>
+              ))}
+            </Stack>
+          </Section>
+        )}
+
+        {/* Everything the project holds, as one strip — a map rather than eleven guesses about
+            which sidebar item has what you want. */}
+        <Section title="Sections" surface="card">
+          <SectionMap code={code} />
+        </Section>
+      </Stack>
     </Page>
+  );
+}
+
+/**
+ * Every section of the project, as a strip of tiles.
+ *
+ * A map, not a menu: the sidebar already lists these, and this is the version you can take in at
+ * once from the screen you land on.
+ *
+ * Deliberately without counts. There is no endpoint that answers "how many ADRs does BND have",
+ * and the alternatives were both wrong for a redesign pass — inventing one is API surface added
+ * from a screen, and fetching eight lists to read eight totals is eight requests to render a
+ * label. Worth adding to the brief later; not worth faking now.
+ */
+function SectionMap({ code }: { code: string }) {
+  return (
+    <Grid minItemWidth="sm">
+      {SECTIONS.map((section) => (
+        <a key={section.slug} className="fm-tile" href={`/projects/${code}/${section.slug}`}>
+          <span className="fm-tile__label">{section.label}</span>
+          <span className="fm-tile__group">{section.group}</span>
+        </a>
+      ))}
+    </Grid>
   );
 }

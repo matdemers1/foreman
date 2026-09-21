@@ -120,9 +120,11 @@ test.describe('the generated views (T-3.9)', () => {
     await signIn(page);
     await page.goto('/projects/EXMP');
 
-    const sections = page.getByRole('navigation', { name: 'Sections of this project' });
-    await expect(sections.getByRole('link', { name: 'Scope of work' })).toBeVisible();
-    await expect(sections.getByRole('link', { name: 'Register' })).toBeVisible();
-    await expect(sections.getByRole('link', { name: 'Requirements' })).toBeVisible();
+    // Both are reachable from the overview's section map and from the sidebar. The row of links
+    // that used to be the only route is gone: it lived on this screen alone, so following one was
+    // a one-way trip.
+    for (const name of ['Scope of work', 'Register', 'Requirements']) {
+      await expect(page.getByRole('link', { name }).first()).toBeVisible();
+    }
   });
 });

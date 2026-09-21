@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Badge,
+
   EmptyState,
   FilterBar,
   FormField,
@@ -8,12 +8,17 @@ import {
   Page,
   PageHeader,
   Select,
+  Grid,
   Skeleton,
+  Stack,
   Table,
   type TableColumn,
 } from '@d3cloud/ui';
 import { foreman, type FindingRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { plainText } from '../lib/text';
+import { Pill, SegmentBar, StatCard } from '../ui/viz';
+import { SERIES, severityTone } from '../ui/tone';
 
 /**
  * S-05 — every open finding, every project, ranked (FRM-REQ-120).
@@ -21,14 +26,12 @@ import { useAsync } from '../lib/useAsync';
  * The screen that justifies the phase. 127 findings lived four directory levels deep across two
  * vault folders, and "what is the worst thing outstanding anywhere" was not a question anybody
  * could ask without opening files one at a time.
+ *
+ * **Still a table, deliberately.** At this volume a card each would be a hundred cards, which is
+ * the list problem with more padding — and the question here really is comparative, which is what
+ * a table is for. What it gained is a summary that answers "how bad is it" before you read a row,
+ * and four counts that are also the filter: seeing `12 high` and clicking it is one gesture.
  */
-
-const SEVERITY_TONE: Record<string, 'danger' | 'attention' | 'neutral'> = {
-  critical: 'danger',
-  high: 'danger',
-  medium: 'attention',
-  low: 'neutral',
-};
 
 const LENSES = [
   'architecture',
@@ -61,9 +64,7 @@ export function Findings({ search }: { search: string }) {
       key: 'severity',
       header: 'Severity',
       width: '6.5rem',
-      cell: (row) => (
-        <Badge tone={SEVERITY_TONE[row.severity] ?? 'neutral'}>{row.severity}</Badge>
-      ),
+      cell: (row) => <Pill tone={severityTone(row.severity)}>{row.severity}</Pill>,
     },
     {
       key: 'project',
@@ -78,7 +79,7 @@ export function Findings({ search }: { search: string }) {
       width: '8rem',
       cell: (row) => <Link href={`/findings/${row.humanId}`}>{row.humanId}</Link>,
     },
-    { key: 'title', header: 'Finding', cell: (row) => row.title },
+    { key: 'title', header: 'Finding', cell: (row) => plainText(row.title) },
     {
       key: 'lenses',
       header: 'Lenses',
@@ -92,7 +93,7 @@ export function Findings({ search }: { search: string }) {
       width: '7rem',
       cell: (row) =>
         row.verified === 'confirmed' ? (
-          <Badge tone="neutral">confirmed</Badge>
+          <Pill tone="success">confirmed</Pill>
         ) : (
           // Said out loud rather than left blank: 123 of 127 real findings were never
           // independently verified, and a blank reads as "fine".
@@ -114,10 +115,19 @@ export function Findings({ search }: { search: string }) {
     },
   ];
 
-  const criticals =
-    findings.state.status === 'ready'
-      ? findings.state.value.items.filter((f) => f.severity === 'critical').length
-      : 0;
+  const items = findings.state.status === 'ready' ? findings.state.value.items : [];
+  const count = (level: string) => items.filter((f) => f.severity === level).length;
+  const criticals = count('critical');
+
+  // The counts describe what is on screen, so they follow the lens and status filters and change
+  // when those do. A summary computed over a different set than the table below it is a summary
+  // that lies quietly.
+  const severities = [
+    { key: 'critical', label: 'Critical', value: count('critical'), color: SERIES.blocked },
+    { key: 'high', label: 'High', value: count('high'), color: SERIES.blocked },
+    { key: 'medium', label: 'Medium', value: count('medium'), color: SERIES.warning },
+    { key: 'low', label: 'Low', value: count('low'), color: SERIES.waiting },
+  ];
 
   return (
     <Page>
@@ -132,13 +142,41 @@ export function Findings({ search }: { search: string }) {
           : {})}
       />
 
+      {findings.state.status === 'ready' && items.length > 0 && (
+        <Stack gap="16">
+          <Grid minItemWidth="sm">
+            {severities.map((level) => (
+              <StatCard
+                key={level.key}
+                label={level.label}
+                value={level.value}
+                tone={
+                  level.value === 0
+                    ? 'neutral'
+                    : level.key === 'critical' || level.key === 'high'
+                      ? 'danger'
+                      : level.key === 'medium'
+                        ? 'warning'
+                        : 'neutral'
+                }
+                detail={severity === level.key ? 'Filtering by this' : 'Show only these'}
+                selected={severity === level.key}
+                // A second click clears it: a filter you can turn on and not off is a trap.
+                onClick={() => { setSeverity(severity === level.key ? ANY : level.key); }}
+              />
+            ))}
+          </Grid>
+          <SegmentBar segments={severities} />
+        </Stack>
+      )}
+
       <FilterBar
         aria-label="Filter the findings"
         trailing={
           criticals > 0 ? (
-            <Badge tone="danger">
+            <Pill tone="danger">
               {criticals} critical{criticals === 1 ? '' : 's'} open
-            </Badge>
+            </Pill>
           ) : null
         }
       >

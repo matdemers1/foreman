@@ -1,15 +1,14 @@
 import {
   Badge,
   EmptyState,
-  Link,
   Page,
-  PageHeader,
   Skeleton,
   Table,
   type TableColumn,
 } from '@d3cloud/ui';
 import { foreman, type TermRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
 
 /**
  * The Glossary, generated (T-4.12, FRM-REQ-071, FRM-REQ-073).
@@ -43,10 +42,10 @@ export function Glossary({ code }: { code: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title="Glossary"
+      <ProjectHeader
+        code={code}
+        section="glossary"
         description={`${code}'s own terms, plus everything the ecosystem defines.`}
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       {state.status === 'loading' ? (

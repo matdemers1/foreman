@@ -1,18 +1,19 @@
 import {
   Alert,
-  Badge,
-  Card,
-  CardTitle,
   Cluster,
   EmptyState,
-  Link,
+  Grid,
   Page,
-  PageHeader,
+  Section,
   Skeleton,
   Stack,
 } from '@d3cloud/ui';
 import { foreman, type DriftItem } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
+import { plainText } from '../lib/text';
+import { SegmentBar, StatCard } from '../ui/viz';
+import { SERIES } from '../ui/tone';
 
 /**
  * S-23 — drift: where the plan and reality have come apart (FRM-REQ-126).
@@ -22,29 +23,39 @@ import { useAsync } from '../lib/useAsync';
  * usual accident when "no results" is written once for every table in an app.
  */
 
-const CATEGORIES: { key: DriftItem['category']; label: string; blurb: string }[] = [
+const CATEGORIES: {
+  key: DriftItem['category'];
+  label: string;
+  blurb: string;
+  color: string;
+}[] = [
   {
     key: 'coverage-hole',
+    color: SERIES.warning,
     label: 'Coverage holes',
     blurb: 'A Must with no task, or work citing no requirement.',
   },
   {
     key: 'stale-task',
+    color: SERIES.waiting,
     label: 'Stale tasks',
     blurb: 'In progress, with nothing touching it for a fortnight.',
   },
   {
     key: 'fired-tripwire',
+    color: SERIES.blocked,
     label: 'Fired tripwires',
     blurb: 'A risk whose named condition has been met.',
   },
   {
     key: 'failed-exit-gate',
+    color: SERIES.blocked,
     label: 'Exit gates',
     blurb: 'A phase marked complete that would not pass its gate today.',
   },
   {
     key: 'orphan-adr',
+    color: SERIES.info,
     label: 'Orphan ADRs',
     blurb: 'Accepted and uncited, or a chain that loops.',
   },
@@ -93,10 +104,10 @@ export function DriftView({ code }: { code: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title="Drift"
+      <ProjectHeader
+        code={code}
+        section="drift"
         description="Where the plan and what is actually true have come apart."
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       {drift.total === 0 ? (
@@ -105,40 +116,67 @@ export function DriftView({ code }: { code: string }) {
           would still pass its gate, and every accepted decision is cited.
         </Alert>
       ) : (
-        <Cluster gap="8">
-          {CATEGORIES.map((category) => (
-            <Badge
-              key={category.key}
-              tone={(drift.counts[category.key] ?? 0) > 0 ? 'attention' : 'neutral'}
-            >
-              {category.label}: {drift.counts[category.key] ?? 0}
-            </Badge>
-          ))}
-        </Cluster>
+        <Stack gap="24">
+          {/* The five kinds, as five figures. A count of zero is still drawn: "no stale tasks" is
+              a fact worth reading, and a card that disappears when it is good leaves you counting
+              which ones are missing. */}
+          <Grid minItemWidth="sm">
+            {CATEGORIES.map((category) => {
+              const value = drift.counts[category.key] ?? 0;
+              return (
+                <StatCard
+                  key={category.key}
+                  label={category.label}
+                  value={value}
+                  tone={value === 0 ? 'success' : 'warning'}
+                  detail={category.blurb}
+                />
+              );
+            })}
+          </Grid>
+
+          <Section title="The mix" surface="card">
+            <SegmentBar
+              segments={CATEGORIES.map((category) => ({
+                label: category.label,
+                value: drift.counts[category.key] ?? 0,
+                color: category.color,
+              }))}
+            />
+          </Section>
+
+          {CATEGORIES.map((category) => {
+            const items = drift.items.filter((item) => item.category === category.key);
+            if (items.length === 0) return null;
+
+            return (
+              <Section
+                key={category.key}
+                title={category.label}
+                surface="card"
+                description={category.blurb}
+              >
+                <Stack gap="4">
+                  {items.map((item) => (
+                    <a
+                      key={`${item.category}:${item.humanId}:${item.detail}`}
+                      className="fm-item fm-item--stacked"
+                      href={hrefFor(code, item)}
+                    >
+                      <Cluster gap="8" align="center">
+                        <code className="fm-item__id">{item.humanId}</code>
+                        <span className="fm-item__title">{plainText(item.title)}</span>
+                      </Cluster>
+                      {/* Named and explained: "there is drift" sends somebody looking. */}
+                      <span className="fm-muted">{plainText(item.detail)}</span>
+                    </a>
+                  ))}
+                </Stack>
+              </Section>
+            );
+          })}
+        </Stack>
       )}
-
-      {CATEGORIES.map((category) => {
-        const items = drift.items.filter((item) => item.category === category.key);
-        if (items.length === 0) return null;
-
-        return (
-          <Card key={category.key}>
-            <CardTitle>{category.label}</CardTitle>
-            <Stack gap="12">
-              <span className="fm-muted">{category.blurb}</span>
-              <Stack gap="8" as="ul" aria-label={category.label}>
-                {items.map((item) => (
-                  <li key={`${item.category}:${item.humanId}:${item.detail}`}>
-                    <Link href={hrefFor(code, item)}>{item.humanId}</Link> — {item.title}
-                    {/* Named and explained: "there is drift" sends somebody looking. */}
-                    <div className="fm-muted">{item.detail}</div>
-                  </li>
-                ))}
-              </Stack>
-            </Stack>
-          </Card>
-        );
-      })}
     </Page>
   );
 }

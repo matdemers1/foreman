@@ -28,7 +28,7 @@ test.describe('the console', () => {
     await signIn(page);
 
     await expect(page.getByRole('navigation')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Portfolio' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
     // The account menu names who is signed in, which is how you know the session is real.
     await expect(page.getByText(EMAIL)).toBeVisible();
   });
@@ -108,7 +108,7 @@ test.describe('the console', () => {
     const opener = page.getByRole('button', { name: /menu|navigation/i }).first();
     await expect(opener).toBeVisible();
     await opener.click();
-    await expect(page.getByRole('link', { name: 'Portfolio' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
   });
 });
 

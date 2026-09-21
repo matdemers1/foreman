@@ -68,7 +68,8 @@ export function usePath(): string {
 
 export interface Route {
   readonly screen:
-    | 'portfolio'
+    | 'dashboard'
+    | 'projects'
     | 'project'
     | 'phases'
     | 'phase'
@@ -97,7 +98,11 @@ export interface Route {
 export function routeFor(path: string): Route {
   const parts = path.split('/').filter((p) => p.length > 0);
 
-  if (parts.length === 0) return { screen: 'portfolio' };
+  if (parts.length === 0) return { screen: 'dashboard' };
+
+  // `/projects` is a screen now, not a path nothing matched. It was the one destination the
+  // sidebar offered and the router had never handled, so it rendered the not-found page.
+  if (parts[0] === 'projects' && parts[1] === undefined) return { screen: 'projects' };
 
   if (parts[0] === 'projects' && parts[1] !== undefined) {
     const code = parts[1];

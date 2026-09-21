@@ -6,12 +6,12 @@ import {
   EmptyState,
   Link,
   Page,
-  PageHeader,
   Skeleton,
   Stack,
 } from '@d3cloud/ui';
 import { foreman, type ScopeOfWorkTask } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { ProjectHeader } from '../components/ProjectHeader';
 
 /**
  * The Scope of Work, generated (T-3.9, FRM-REQ-074, ADR-006).
@@ -68,10 +68,10 @@ export function ScopeOfWorkView({ code }: { code: string }) {
 
   return (
     <Page>
-      <PageHeader
-        title="Scope of work"
+      <ProjectHeader
+        code={code}
+        section="scope-of-work"
         description={`Generated from ${sow.project.code}'s phases and tasks — not a document anybody maintains.`}
-        back={<Link href={`/projects/${code}`}>{code}</Link>}
       />
 
       {sow.phases.length === 0 ? (
