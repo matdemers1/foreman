@@ -45,6 +45,9 @@ pnpm e2e
 pnpm --filter foreman-server run import -- --path "../D3 Cloud Vault" --only "<Folder>" --write
 # Not writing is the default; `--write` is the flag. Used at the P10 cutover and for the fourteen
 # projects still only in the archive.
+pnpm --filter foreman-server run relint -- --write
+# Re-runs the EARS lint over requirements already stored. The importer did not lint until
+# 2026-09-20, so everything it wrote sat on the column defaults — unparsed, not ok, no note.
 ```
 
 ## Non-negotiables
