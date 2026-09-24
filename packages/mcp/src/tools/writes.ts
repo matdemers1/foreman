@@ -8,8 +8,12 @@ import {
   gateForPriority,
   gateForStatus,
   LinkInput,
+  IDEA_LIST_KEYS,
+  listItemId,
   parseAnyId,
   parseHumanId,
+  parseIdeaList,
+  type IdeaListKey,
   SetStatusInput,
   UpdateInput,
   type GateDecision,
@@ -87,6 +91,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
           return client.post('/api/project-ideas', {
             title: args.text,
             ...(args.pitch === undefined ? {} : { pitch: args.pitch }),
+            ...canvasBody(args.canvas),
           });
         case 'project':
           // The only kind that is not created *inside* a project, so it posts to a different
@@ -138,9 +143,13 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       const kind = kindOf(args.id);
       const body: Record<string, unknown> = {};
       if (kind === 'project-ideas') {
-        // `text` is the title unless a canvas section is named, in which case it is that section.
-        // `body` is the pitch. No project path, because a project idea has no project.
-        if (args.text !== undefined) body[args.section ?? 'title'] = args.text;
+        // `text` is the title unless a canvas field is named, in which case it is that field — a
+        // section's Markdown, or a list written one item per line. `body` is the pitch. No project
+        // path, because a project idea has no project.
+        if (args.text !== undefined) {
+          const field = args.section ?? 'title';
+          body[field] = isListKey(field) ? parseIdeaList(field, args.text) : args.text;
+        }
         if (args.body !== undefined) body['pitch'] = args.body;
         if (args.reason !== undefined) body['reason'] = args.reason;
         return client.patch(`/api/project-ideas/${args.id}`, body);
@@ -257,6 +266,29 @@ function reasonFor(
   if (reason === undefined) return {};
   if (parseAnyId(humanId)?.type === 'IDEA') return { reason };
   return status === 'blocked' ? { blockedReason: reason } : {};
+}
+
+const isListKey = (key: string): key is IdeaListKey =>
+  (IDEA_LIST_KEYS as readonly string[]).includes(key);
+
+/**
+ * A `canvas` argument into the API's shape. The shim's side of the contract is plain items, the
+ * API's is `{ id, text, done }` and `{ id, label, url }` — so the ids are made here, deterministically,
+ * and a model never has to invent one.
+ */
+function canvasBody(canvas: CreateInput['canvas']): Record<string, unknown> {
+  if (canvas === undefined) return {};
+  const { questions, nextSteps, links, ...rest } = canvas;
+  const checklist = (items: string[] | undefined) =>
+    items?.map((text, i) => ({ id: listItemId(i, text), text, done: false }));
+  return {
+    ...rest,
+    ...(questions === undefined ? {} : { questions: checklist(questions) }),
+    ...(nextSteps === undefined ? {} : { nextSteps: checklist(nextSteps) }),
+    ...(links === undefined
+      ? {}
+      : { links: links.map((l, i) => ({ id: listItemId(i, l.url), label: l.label, url: l.url })) }),
+  };
 }
 
 /** The path segment for an entity's kind, from its human ID. */

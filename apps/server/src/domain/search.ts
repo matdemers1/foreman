@@ -1,3 +1,4 @@
+import { SEARCHABLE_TYPES } from '@foreman/shared';
 import type { Db } from '../db.js';
 import type { EntityType } from '../generated/prisma/enums.js';
 
@@ -10,19 +11,14 @@ import type { EntityType } from '../generated/prisma/enums.js';
  * be a worse version of grep, which the vault already had.
  */
 
-export const SEARCHABLE = [
-  'requirement',
-  'task',
-  'adr',
-  'finding',
-  'document_section',
-  'term',
-  'phase',
-  'decision',
-  'risk',
-  'idea',
-  'project_idea',
-] as const;
+/**
+ * What search covers — the shared list, not a copy of it.
+ *
+ * There used to be a copy here, and it drifted: this one gained `project_idea` and the shared one
+ * did not, so the API could search project ideas while the MCP shim, whose enum is generated from
+ * the shared list, could not ask it to. One list, imported, cannot disagree with itself.
+ */
+export const SEARCHABLE = SEARCHABLE_TYPES;
 
 export type SearchableType = (typeof SEARCHABLE)[number];
 

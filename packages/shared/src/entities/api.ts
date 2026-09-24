@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { HumanId, ProjectCode } from '../ids.js';
+import { AnyId, HumanId, ProjectCode } from '../ids.js';
 
 /**
  * The request shapes the API and the MCP shim **both** use.
@@ -21,6 +21,9 @@ export const SEARCHABLE_TYPES = [
   'decision',
   'risk',
   'idea',
+  // Was missing here while the server's own list had it, so the API could search project ideas
+  // and the MCP shim, whose enum is generated from this one, could not ask it to.
+  'project_idea',
 ] as const;
 
 export const SearchableType = z.enum(SEARCHABLE_TYPES);
@@ -50,7 +53,9 @@ export type SearchInput = z.infer<typeof SearchInput>;
 
 /** `foreman_get` / `GET /api/entities/:humanId`. */
 export const GetInput = z.object({
-  id: HumanId.describe('A project-prefixed human ID, e.g. BND-REQ-021'),
+  // `AnyId`, not `HumanId`: a project idea's `PI-007` has no project code, and `foreman_get` used to
+  // refuse it outright — so a session could create a project idea and never read it back.
+  id: AnyId.describe('A human ID, e.g. BND-REQ-021 or PI-007'),
   backlinks: z
     .boolean()
     .default(true)

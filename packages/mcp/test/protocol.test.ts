@@ -530,6 +530,64 @@ describe('what the MCP surface deliberately cannot do', () => {
     expect(text(wrong).toLowerCase()).toContain('belongs to no project');
   });
 
+  it('creates a whole project idea, canvas and all, in one call', async () => {
+    const { client: api, calls } = fakeApi({ '/api/project-ideas': { humanId: 'PI-021' } });
+    const { client } = await connect(api);
+
+    await client.callTool({
+      name: 'foreman_create',
+      arguments: {
+        kind: 'project_idea',
+        text: 'A print notifier',
+        pitch: 'Texts you when a print finishes.',
+        canvas: {
+          problem: 'Prints fail silently.',
+          tags: ['home-lab'],
+          questions: ['LAN or cloud?'],
+          links: [{ label: 'HA integration', url: 'https://example.com/ha' }],
+          related: ['BND'],
+        },
+      },
+    });
+
+    // Plain items in, the API's shape out: the shim makes the ids so a model never has to.
+    const body = calls.find((c) => c.method === 'POST')?.body as Record<string, unknown>;
+    expect(body['problem']).toBe('Prints fail silently.');
+    expect(body['questions']).toEqual([
+      { id: expect.any(String) as string, text: 'LAN or cloud?', done: false },
+    ]);
+    expect(body['links']).toEqual([
+      { id: expect.any(String) as string, label: 'HA integration', url: 'https://example.com/ha' },
+    ]);
+    expect(body['related']).toEqual(['BND']);
+  });
+
+  it('writes a list on a project idea from one item per line', async () => {
+    const { client: api, calls } = fakeApi({ '/api/project-ideas/PI-021': { ok: true } });
+    const { client } = await connect(api);
+
+    await client.callTool({
+      name: 'foreman_update',
+      arguments: { id: 'PI-021', section: 'nextSteps', text: '- Capture a night of MQTT\n- Price SMS' },
+    });
+
+    const body = calls.find((c) => c.method === 'PATCH')?.body as { nextSteps: { text: string }[] };
+    expect(body.nextSteps.map((s) => s.text)).toEqual(['Capture a night of MQTT', 'Price SMS']);
+  });
+
+  it('reads a project idea back by its codeless ID', async () => {
+    const { client: api, calls } = fakeApi({
+      '/api/entities/PI-021': { type: 'project_idea', entity: { humanId: 'PI-021' } },
+    });
+    const { client } = await connect(api);
+
+    // It used to refuse `PI-021` outright, so a session could create a project idea and never
+    // read it back.
+    const result = await client.callTool({ name: 'foreman_get', arguments: { id: 'PI-021' } });
+    expect(result.isError).toBeFalsy();
+    expect(calls[0]?.path).toBe('/api/entities/PI-021');
+  });
+
   it('writes a named canvas section on a project idea, not its title', async () => {
     const { client: api, calls } = fakeApi({ '/api/project-ideas/PI-007': { ok: true } });
     const { client } = await connect(api);

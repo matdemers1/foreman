@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { Priority, Size } from '../enums.js';
 import { AnyId, HumanId, parseAnyId, ProjectCode } from '../ids.js';
-import { IdeaSectionKey } from './record.js';
+import { IdeaFieldKey } from './record.js';
 
 /**
  * The write surface, shared by the API and the MCP shim (FRM-REQ-089, FRM-REQ-090, FRM-REQ-091).
@@ -61,6 +61,28 @@ export const CreateInput = z.object({
   number: z.number().optional(),
   /** Requirements this task satisfies. */
   satisfies: z.array(HumanId).optional(),
+  /**
+   * Project idea only: its whole canvas, so one call records an idea rather than seven
+   * (FRM-ADR-017). Sections are Markdown; lists are plain items — the shim gives each checklist item
+   * and link the id the API wants. Excitement and the impact/effort rating are deliberately absent:
+   * both are the reader's own judgement, and a tool writing them would put words in their mouth.
+   */
+  canvas: z
+    .object({
+      problem: z.string().max(20_000).optional(),
+      audience: z.string().max(20_000).optional(),
+      approach: z.string().max(20_000).optional(),
+      whyNow: z.string().max(20_000).optional(),
+      risks: z.string().max(20_000).optional(),
+      notes: z.string().max(20_000).optional(),
+      tags: z.array(z.string().max(40)).max(12).optional(),
+      questions: z.array(z.string().max(500)).max(50).optional(),
+      nextSteps: z.array(z.string().max(500)).max(50).optional(),
+      links: z.array(z.object({ label: z.string().max(200), url: z.string().max(2000) })).max(30).optional(),
+      related: z.array(z.string().max(40)).max(20).optional(),
+    })
+    .optional()
+    .describe('Project idea only: sections in Markdown, lists as plain items'),
 }).superRefine((value, ctx) => {
   if (value.kind === 'project_idea') {
     if (value.project !== undefined) {
@@ -106,7 +128,9 @@ export const UpdateInput = z.object({
    * every turn's definitions. It is what lets a session say "write up the risks on PI-007" and
    * have it land in the right place on the canvas — the section list itself lives in shared.
    */
-  section: IdeaSectionKey.optional().describe('Project idea only: the canvas section text writes'),
+  section: IdeaFieldKey.optional().describe(
+    'Project idea only: the canvas field text writes. Lists take one item per line, replacing the list',
+  ),
   phase: HumanId.nullish().describe('Move to this phase, or null for the backlog'),
   /**
    * A finding's fixing commit, as a **SHA rather than a link** (FRM-REQ-117). Recorded here

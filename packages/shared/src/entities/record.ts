@@ -297,6 +297,67 @@ export const IdeaSectionKey = z.enum(
 );
 
 /**
+ * The canvas's lists, writable as plain text over MCP: one item per line.
+ *
+ * Lines rather than JSON because a model writes a list of open questions as a list, and a tool
+ * schema that demanded `[{ id, text, done }]` for each would cost its definition in every turn to
+ * save a parse that is ten lines long. `parseIdeaList` is the one parser; the shim and anything
+ * else that takes lines as text call it.
+ */
+export const IDEA_LIST_KEYS = ['tags', 'questions', 'nextSteps', 'links', 'related'] as const;
+export type IdeaListKey = (typeof IDEA_LIST_KEYS)[number];
+
+/** Any canvas field `foreman_update` can write by name: a section, or a list. */
+export const IdeaFieldKey = z.enum([
+  ...IdeaSectionKey.options,
+  ...IDEA_LIST_KEYS,
+]);
+export type IdeaFieldKey = z.infer<typeof IdeaFieldKey>;
+
+/** A short, stable id for a list item. Not shown anywhere; it only has to be unique in its list. */
+export function listItemId(index: number, text: string): string {
+  let hash = 0;
+  for (const ch of `${String(index)}:${text}`) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return hash.toString(36).padStart(7, '0').slice(0, 8);
+}
+
+/**
+ * Lines of text into one of the canvas's lists.
+ *
+ * Forgiving about the ways a list is written by hand — bullets, numbers, Markdown checkboxes,
+ * commas for tags, `[label](url)` or `label | url` or a bare URL for links — because the input is
+ * a person's or a model's list, and refusing `- ` in front of a question is refusing the most
+ * common way to write one. A `[x]` marks a checklist item done.
+ */
+export function parseIdeaList(key: IdeaListKey, text: string) {
+  const lines = text
+    .split(key === 'tags' || key === 'related' ? /[\n,]/ : /\n/)
+    .map((line) => line.trim().replace(/^(?:[-*+•]|\d+[.)])\s+/, '').trim())
+    .filter((line) => line.length > 0);
+
+  switch (key) {
+    case 'tags':
+      return lines.map((t) => t.toLowerCase().replace(/\s+/g, '-'));
+    case 'related':
+      return lines.map((r) => r.toUpperCase());
+    case 'links':
+      return lines.map((line, i) => {
+        const md = /^\[([^\]]+)\]\((\S+)\)$/.exec(line);
+        const piped = /^(.+?)\s*\|\s*(\S+)$/.exec(line);
+        const [label, url] = md !== null ? [md[1], md[2]] : piped !== null ? [piped[1], piped[2]] : [line, line];
+        return { id: listItemId(i, line), label: label ?? line, url: url ?? line };
+      });
+    default: {
+      return lines.map((line, i) => {
+        const box = /^\[([ xX])\]\s*(.*)$/.exec(line);
+        const text = box === null ? line : (box[2] ?? '');
+        return { id: listItemId(i, text), text, done: box !== null && box[1] !== ' ' };
+      });
+    }
+  }
+}
+
+/**
  * The sections that say an idea has been *thought through*, as opposed to written down.
  *
  * The pitch and the five questions. The scratchpad is deliberately not one: a full scratchpad is
