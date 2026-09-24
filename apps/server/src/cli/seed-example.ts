@@ -279,9 +279,25 @@ async function seed(db: Db, config: ReturnType<typeof loadConfig>): Promise<void
   await db.$executeRawUnsafe(`select setval('project_idea_seq', 1, false)`);
   for (const idea of [
     {
+      // A full canvas, so the idea page — and the axe sweep over it — sees every part in use:
+      // written sections, a Mermaid sketch, checklists, links, tags and a related project.
       title: 'A print notifier for the Bambu',
       pitch: 'Texts you when a print finishes. MQTT on the LAN, the cloud as a fallback.',
       status: 'new' as const,
+      problem: 'Long prints fail **silently**, and the failure is found hours later.',
+      audience: 'One printer, prints left overnight.',
+      approach: '```mermaid\ngraph LR\n  printer -- MQTT --> worker -- SMS --> phone\n```',
+      whyNow: 'The printer runs most nights now.',
+      risks: '- A firmware update could close the LAN MQTT port.',
+      excitement: 4,
+      tags: ['home-lab', 'hardware'],
+      questions: [
+        { id: 'q1', text: 'Does LAN mode expose print progress?', done: true },
+        { id: 'q2', text: 'Is SMS the right channel?', done: false },
+      ],
+      nextSteps: [{ id: 's1', text: 'Capture a night of MQTT messages', done: false }],
+      links: [{ id: 'l1', label: 'Bambu MQTT notes', url: 'https://example.com/bambu-mqtt' }],
+      related: ['EXMP'],
     },
     {
       title: 'An offline-first field notebook',

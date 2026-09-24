@@ -34,36 +34,35 @@ test.describe('project ideas (S-28)', () => {
     await expect(page.getByRole('heading', { name: 'Project ideas', level: 1 })).toBeVisible();
   });
 
-  test('takes one without asking for a code', async ({ page }) => {
-    await signIn(page);
-    await page.goto('/project-ideas');
+  /** Write one down; creating lands on its own page by design. Returns its title. */
+  async function create(page: import('@playwright/test').Page, pitch?: string): Promise<string> {
     const text = title();
-
+    await page.goto('/project-ideas');
     await page.getByRole('button', { name: 'New project idea' }).click();
     // A code is immutable and embedded in every ID the project will have (ADR-008). Asking for
     // one here would be asking a permanent question at the moment of least information.
     await expect(page.getByRole('textbox', { name: 'Code' })).toBeHidden();
-
     await page.getByRole('textbox', { name: 'Title' }).fill(text);
-    await page.getByRole('textbox', { name: 'Pitch' }).fill('What it is, and who it is for.');
+    if (pitch !== undefined) await page.getByRole('textbox', { name: 'Pitch' }).fill(pitch);
     await page.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByRole('heading', { name: text, level: 1 })).toBeVisible();
+    return text;
+  }
 
-    const card = page.getByRole('group', { name: new RegExp(`: ${text}$`) });
-    await expect(card).toBeVisible();
-    await expect(card.getByText('New', { exact: true })).toBeVisible();
+  test('takes one without asking for a code, and opens it', async ({ page }) => {
+    await signIn(page);
+    await create(page, 'What it is, and who it is for.');
+
+    await expect(page).toHaveURL(/\/project-ideas\/PI-\d+$/);
+    // It lands as `new`: nobody has judged it, and the create form offered no status at all.
+    await expect(page.getByText('New', { exact: true }).first()).toBeVisible();
   });
 
   test('will not park one that does not say why', async ({ page }) => {
     await signIn(page);
-    await page.goto('/project-ideas');
-    const text = title();
+    await create(page);
 
-    await page.getByRole('button', { name: 'New project idea' }).click();
-    await page.getByRole('textbox', { name: 'Title' }).fill(text);
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    const card = page.getByRole('group', { name: new RegExp(`: ${text}$`) });
-    await card.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
     await page.getByRole('combobox', { name: 'Status' }).click();
     await page.getByRole('option', { name: 'Parked' }).click();
     await page.getByRole('button', { name: 'Save' }).click();
@@ -71,22 +70,18 @@ test.describe('project ideas (S-28)', () => {
     await expect(page.getByText('A project idea that is parked has to say why.')).toBeVisible();
     await page.getByRole('textbox', { name: 'Why' }).fill('Not before Someday Vault ships.');
     await page.getByRole('button', { name: 'Save' }).click();
-    await expect(card.getByText('Not before Someday Vault ships.')).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeHidden();
+
+    // The reason leads the page — it changes how everything under it reads.
+    await expect(page.getByText('Parked — deliberately not now')).toBeVisible();
+    await expect(page.getByText('Not before Someday Vault ships.')).toBeVisible();
   });
 
   test('offers no way to mark one built by hand', async ({ page }) => {
     await signIn(page);
-    await page.goto('/project-ideas');
-    const text = title();
+    await create(page);
 
-    await page.getByRole('button', { name: 'New project idea' }).click();
-    await page.getByRole('textbox', { name: 'Title' }).fill(text);
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    await page
-      .getByRole('group', { name: new RegExp(`: ${text}$`) })
-      .getByRole('button', { name: 'Edit' })
-      .click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).first().click();
     await page.getByRole('combobox', { name: 'Status' }).click();
 
     // `Built` means a project exists. Offering it here would let somebody record that an idea
@@ -99,17 +94,11 @@ test.describe('project ideas (S-28)', () => {
     page,
   }) => {
     await signIn(page);
-    await page.goto('/project-ideas');
-    const text = title();
+    const text = await create(page, 'The pitch that should carry across.');
+    const ideaUrl = page.url();
     const projectCode = code();
 
-    await page.getByRole('button', { name: 'New project idea' }).click();
-    await page.getByRole('textbox', { name: 'Title' }).fill(text);
-    await page.getByRole('textbox', { name: 'Pitch' }).fill('The pitch that should carry across.');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    const card = page.getByRole('group', { name: new RegExp(`: ${text}$`) });
-    await card.getByRole('button', { name: 'Convert' }).click();
+    await page.getByRole('button', { name: 'Convert' }).click();
     await page.getByRole('textbox', { name: 'Code' }).fill(projectCode);
     await page.getByRole('button', { name: 'Convert to project' }).click();
 
@@ -117,13 +106,12 @@ test.describe('project ideas (S-28)', () => {
     await expect(page).toHaveURL(new RegExp(`/projects/${projectCode}$`));
     await expect(page.getByText('The pitch that should carry across.')).toBeVisible();
 
-    // And back on the list the idea is still there, saying what it became.
-    await page.goto('/project-ideas');
-    const after = page.getByRole('group', { name: new RegExp(`: ${text}$`) });
-    await expect(after.getByText('Built', { exact: true })).toBeVisible();
-    await expect(after.getByRole('link', { name: new RegExp(projectCode) })).toBeVisible();
-    // Frozen: a project now says what this says, so there is nothing here left to edit.
-    await expect(after.getByRole('button', { name: 'Edit' })).toBeHidden();
-    await expect(after.getByRole('button', { name: 'Convert' })).toBeHidden();
+    // And the idea is still there, saying what it became — frozen, because a project now says
+    // what it says.
+    await page.goto(ideaUrl);
+    await expect(page.getByRole('heading', { name: text, level: 1 })).toBeVisible();
+    await expect(page.getByText(new RegExp(`Became ${projectCode}`))).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Convert' })).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeHidden();
   });
 });

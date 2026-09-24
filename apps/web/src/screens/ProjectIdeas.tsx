@@ -12,6 +12,7 @@ import {
   Modal,
   Page,
   PageHeader,
+  SegmentedControl,
   Select,
   Skeleton,
   Stack,
@@ -19,10 +20,10 @@ import {
 } from '@d3cloud/ui';
 import { foreman, ApiError, type ProjectIdeaRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
-import { useMode, useMoney, useReviews, useSession } from '../lib/session';
+import { useMode, useMoney, useReviews } from '../lib/session';
 import { Pill, SegmentBar, StatCard } from '../ui/viz';
 import { relativeDay, SERIES, type Tone } from '../ui/tone';
-import { IdeaDiscussion, FundIdea, ScoreIdea } from './BoardControls';
+import { IdeaMatrix, MaturityBar, Stars } from '../ui/ideas';
 
 /**
  * Project ideas — something that might become a project, before it is one
@@ -38,7 +39,7 @@ import { IdeaDiscussion, FundIdea, ScoreIdea } from './BoardControls';
  * information to answer it. `PI-007` costs nothing.
  */
 
-const ALL = [
+export const ALL = [
   { value: 'new', label: 'New' },
   { value: 'considering', label: 'Considering' },
   { value: 'shortlisted', label: 'Shortlisted' },
@@ -48,7 +49,7 @@ const ALL = [
   { value: 'converted', label: 'Built' },
 ] as const;
 
-type Status = (typeof ALL)[number]['value'];
+export type Status = (typeof ALL)[number]['value'];
 
 /**
  * Which statuses a deployment offers (FRM-ADR-016).
@@ -57,17 +58,17 @@ type Status = (typeof ALL)[number]['value'];
  * it can end up. A solo instance converts an idea into a Foreman project; a fund board funds it.
  * Showing the other mode's endings would offer a button that cannot be pressed.
  */
-const FOR_MODE: Record<'solo' | 'board', readonly Status[]> = {
+export const FOR_MODE: Record<'solo' | 'board', readonly Status[]> = {
   solo: ['new', 'considering', 'parked', 'rejected', 'converted'],
   board: ['new', 'considering', 'shortlisted', 'funded', 'parked', 'rejected'],
 };
 
 /** Reached by converting or funding, never by hand — so neither is on the edit form. */
-const DECIDED_ELSEWHERE: readonly Status[] = ['converted', 'funded'];
+export const DECIDED_ELSEWHERE: readonly Status[] = ['converted', 'funded'];
 
-const NEEDS_REASON: readonly string[] = ['parked', 'rejected'];
+export const NEEDS_REASON: readonly string[] = ['parked', 'rejected'];
 
-function ideaTone(status: string): Tone {
+export function ideaTone(status: string): Tone {
   switch (status) {
     case 'converted':
     case 'funded':
@@ -84,7 +85,7 @@ function ideaTone(status: string): Tone {
   }
 }
 
-const SERIES_FOR: Record<Status, string> = {
+export const SERIES_FOR: Record<Status, string> = {
   new: SERIES.waiting,
   considering: SERIES.active,
   shortlisted: SERIES.info,
@@ -94,7 +95,7 @@ const SERIES_FOR: Record<Status, string> = {
   converted: SERIES.done,
 };
 
-const MEANING: Record<Status, string> = {
+export const MEANING: Record<Status, string> = {
   new: 'Written down, not yet weighed',
   considering: 'Actively being thought about',
   shortlisted: 'In front of the board',
@@ -104,11 +105,47 @@ const MEANING: Record<Status, string> = {
   converted: 'Became a project',
 };
 
+type View = 'cards' | 'matrix';
+type Sort = 'recent' | 'excitement' | 'maturity' | 'ratio';
+
+const SORTS: { value: Sort; label: string }[] = [
+  { value: 'recent', label: 'Newest first' },
+  { value: 'excitement', label: 'Most wanted' },
+  { value: 'maturity', label: 'Most thought through' },
+  { value: 'ratio', label: 'Best impact for effort' },
+];
+
+/**
+ * How the list is ordered.
+ *
+ * The server's order — untriaged first, then newest — stays the default, because the list exists
+ * to be worked through. The others answer the three questions somebody actually brings to a list
+ * of ideas: which do I want most, which could I start tomorrow, and which pays back best.
+ */
+function sorted(items: readonly ProjectIdeaRow[], sort: Sort): ProjectIdeaRow[] {
+  const list = [...items];
+  const ratio = (i: ProjectIdeaRow) => i.score?.ratio ?? -1;
+  switch (sort) {
+    case 'excitement':
+      return list.sort((a, b) => (b.excitement ?? 0) - (a.excitement ?? 0));
+    case 'maturity':
+      return list.sort((a, b) => b.maturity.filled - a.maturity.filled);
+    case 'ratio':
+      return list.sort((a, b) => ratio(b) - ratio(a));
+    default:
+      return list;
+  }
+}
+
 export function ProjectIdeas() {
   const mode = useMode();
   const board = mode === 'board';
+  const reviews = useReviews();
   const [nonce, setNonce] = useState(0);
   const [filter, setFilter] = useState<Status | null>(null);
+  const [tag, setTag] = useState<string | null>(null);
+  const [view, setView] = useState<View>('cards');
+  const [sort, setSort] = useState<Sort>('recent');
   const refresh = useCallback(() => { setNonce((n) => n + 1); }, []);
 
   const statuses = useMemo(
@@ -117,7 +154,7 @@ export function ProjectIdeas() {
   );
 
   const { state } = useAsync(() => foreman.projectIdeas(), [nonce]);
-  const items = state.status === 'ready' ? state.value.items : [];
+  const items = useMemo(() => (state.status === 'ready' ? state.value.items : []), [state]);
 
   const counts = useMemo(() => {
     const by: Record<string, number> = {};
@@ -126,7 +163,21 @@ export function ProjectIdeas() {
     return by;
   }, [items]);
 
-  const shown = filter === null ? items : items.filter((item) => item.status === filter);
+  // Every tag in use, most used first: the tags worth offering as filters are the ones that
+  // actually group something.
+  const tags = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const item of items) for (const t of item.tags) seen.set(t, (seen.get(t) ?? 0) + 1);
+    return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
+  }, [items]);
+
+  const shown = sorted(
+    items.filter(
+      (item) =>
+        (filter === null || item.status === filter) && (tag === null || item.tags.includes(tag)),
+    ),
+    sort,
+  );
 
   return (
     <Page>
@@ -135,7 +186,7 @@ export function ProjectIdeas() {
         description={
           board
             ? 'Anyone can submit. The board scores, discusses and decides — and says why.'
-            : 'Things that might become projects. A code is chosen when one does, not before.'
+            : 'Things that might become projects. Open one to think it through.'
         }
         count={items.length}
         countNoun={board ? { one: 'submission', other: 'submissions' } : { one: 'idea', other: 'ideas' }}
@@ -176,27 +227,71 @@ export function ProjectIdeas() {
             />
           )}
 
+          {items.length > 0 && (
+            <Cluster gap="12" align="center" justify="between">
+              <Cluster gap="8" align="center">
+                {tags.length > 0 && <span className="fm-muted">Tags</span>}
+                {tags.map((t) => (
+                  // Buttons, not links: a tag filters this list, it does not go anywhere.
+                  <button
+                    key={t}
+                    type="button"
+                    className={tag === t ? 'fm-tag fm-tag--on' : 'fm-tag'}
+                    aria-pressed={tag === t}
+                    onClick={() => { setTag((current) => (current === t ? null : t)); }}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </Cluster>
+              <Cluster gap="8" align="center">
+                {view === 'cards' && (
+                  <div className="fm-sort">
+                  <Select
+                    aria-label="Sort ideas"
+                    options={SORTS.filter((o) => o.value !== 'ratio' || reviews)}
+                    value={sort}
+                    onValueChange={(v) => { setSort(v as Sort); }}
+                  />
+                  </div>
+                )}
+                <SegmentedControl
+                  aria-label="View"
+                  items={[
+                    { value: 'cards', label: 'Cards' },
+                    // The matrix plots scores, so it is offered only to people who can see them.
+                    ...(reviews ? [{ value: 'matrix', label: 'Impact × effort' }] : []),
+                  ]}
+                  value={view}
+                  onValueChange={(v) => { setView(v as View); }}
+                />
+              </Cluster>
+            </Cluster>
+          )}
+
           {shown.length === 0 ? (
             <EmptyState
               kind="empty"
               heading={
-                filter === null
+                filter === null && tag === null
                   ? board
                     ? 'Nothing has been submitted yet'
                     : 'No project ideas yet'
-                  : `Nothing is ${filter}`
+                  : 'Nothing matches'
               }
             >
-              {filter === null
+              {filter === null && tag === null
                 ? board
                   ? 'Anyone signed in can submit one from here.'
                   : 'Write one down from here, or from a session with foreman_create.'
-                : 'Press the card again to see them all.'}
+                : 'Press the card or the tag again to see them all.'}
             </EmptyState>
+          ) : view === 'matrix' ? (
+            <IdeaMatrix items={shown} tone={SERIES_FOR} labels={ALL} />
           ) : (
             <Grid minItemWidth="md">
               {shown.map((idea) => (
-                <ProjectIdeaCard key={idea.id} idea={idea} onChanged={refresh} />
+                <ProjectIdeaCard key={idea.id} idea={idea} />
               ))}
             </Grid>
           )}
@@ -206,25 +301,27 @@ export function ProjectIdeas() {
   );
 }
 
-function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged: () => void }) {
+/**
+ * One idea, as a summary that opens its page.
+ *
+ * **Wholly clickable, and so it holds no actions.** The design system's rule is that a card is
+ * either one control or a container of controls, never both — a button inside a link is
+ * unreachable in some screen-reader modes and swallows clicks meant for the card. Deciding,
+ * scoring and converting all moved to the idea's page, where there is room to do them properly.
+ */
+function ProjectIdeaCard({ idea }: { idea: ProjectIdeaRow }) {
   const board = useMode() === 'board';
-  const reviews = useReviews();
   const money = useMoney();
-  const { user } = useSession();
-  const settled = DECIDED_ELSEWHERE.includes(idea.status);
-  // A submitter may reword their own and nothing else; a reviewer may do everything.
-  const mine = idea.submittedBy?.id === user.id;
-  const canEdit = !settled && (reviews || mine);
 
   return (
-    <Card padding="md" role="group" aria-label={`${idea.humanId}: ${idea.title}`}>
+    <Card padding="md" href={`/project-ideas/${idea.humanId}`} interactive>
       <Stack gap="12">
         <Cluster gap="8" align="center" justify="between">
           <span className="fm-item__id">{idea.humanId}</span>
           <Cluster gap="8" align="center">
             {/* Only a reviewer sees this, because the API only sends it to one (FRM-REQ-168). */}
             {idea.score !== null && idea.score.count > 0 && (
-              <span className="fm-item__score" title={`${String(idea.score.count)} reviewer(s)`}>
+              <span className="fm-item__score">
                 {idea.score.impact}↑ / {idea.score.effort}↓
               </span>
             )}
@@ -239,13 +336,6 @@ function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged:
           <p className="fm-item__body">{idea.pitch}</p>
         )}
 
-        {idea.reason !== null && idea.reason.length > 0 && (
-          <p className="fm-item__reason">
-            <span className="fm-muted">Because </span>
-            {idea.reason}
-          </p>
-        )}
-
         {idea.status === 'funded' && idea.fundedAmountCents !== null && (
           <p className="fm-item__reason">
             <span className="fm-muted">Funded </span>
@@ -253,21 +343,22 @@ function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged:
           </p>
         )}
 
-        {idea.project !== null && (
-          // The whole point of keeping a converted idea: it is the record of where a project came
-          // from, so it has to lead there.
-          <p className="fm-item__reason">
-            <span className="fm-muted">Became </span>
-            <a href={`/projects/${idea.project.code}`}>
-              {idea.project.code} — {idea.project.name}
-            </a>
-          </p>
+        {idea.tags.length > 0 && (
+          <Cluster gap="4">
+            {idea.tags.map((t) => (
+              <span key={t} className="fm-tag fm-tag--static">
+                {t}
+              </span>
+            ))}
+          </Cluster>
         )}
 
-        <Cluster gap="8" align="center" justify="between">
+        {/* The idea at a glance: how far it has been thought through, how much it is wanted, and
+            what is still open. Each is the question a list of ideas is scanned to answer. */}
+        <MaturityBar maturity={idea.maturity} />
+
+        <Cluster gap="12" align="center" justify="between">
           <span className="fm-muted">
-            {/* Who, as well as when. A board needs the name on the card; a solo instance has
-                nobody else's submissions to tell apart, so it only ever shows the date. */}
             {board && idea.submittedBy !== null ? `${idea.submittedBy.displayName} · ` : ''}
             {idea.status === 'converted'
               ? `Built ${relativeDay(idea.convertedAt)}`
@@ -276,16 +367,15 @@ function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged:
                 : `Decided ${relativeDay(idea.decidedAt)}`}
           </span>
           <Cluster gap="8" align="center">
-            {board && <IdeaDiscussion idea={idea} onChanged={onChanged} />}
-            {board && reviews && !settled && <ScoreIdea idea={idea} onScored={onChanged} />}
-            {board && reviews && !settled && <FundIdea idea={idea} onFunded={onChanged} />}
-            {/* Converting is a solo instance's ending: a fund board funds things, it does not
-                turn them into entries in somebody's personal project ledger. */}
-            {!board && !settled && reviews && (
-              <ConvertIdea idea={idea} onConverted={onChanged} />
+            {idea.excitement !== null && <Stars value={idea.excitement} />}
+            {(idea.openQuestions ?? 0) > 0 && (
+              <span className="fm-muted">{idea.openQuestions} open ?</span>
             )}
-            {canEdit && <ProjectIdeaForm idea={idea} onSaved={onChanged} />}
-            {canEdit && <DeleteProjectIdea idea={idea} onDeleted={onChanged} />}
+            {idea._count.comments > 0 && (
+              <span className="fm-muted">
+                {idea._count.comments} {idea._count.comments === 1 ? 'thought' : 'thoughts'}
+              </span>
+            )}
           </Cluster>
         </Cluster>
       </Stack>
@@ -293,7 +383,7 @@ function ProjectIdeaCard({ idea, onChanged }: { idea: ProjectIdeaRow; onChanged:
   );
 }
 
-function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: () => void }) {
+export function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: () => void }) {
   const mode = useMode();
   const reviews = useReviews();
   const editing = idea !== undefined;
@@ -345,9 +435,12 @@ function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: ()
         });
 
     void request
-      .then(() => {
+      .then((saved) => {
         setOpen(false);
         onSaved();
+        // A new idea opens on its own page. Writing one down is the moment somebody is thinking
+        // about it, and landing back on the list would ask them to go and find it again.
+        if (!editing) window.location.assign(`/project-ideas/${saved.humanId}`);
       })
       .catch((caught: unknown) => {
         setError(caught instanceof ApiError ? caught.message : 'That did not save.');
@@ -454,7 +547,7 @@ function ProjectIdeaForm({ idea, onSaved }: { idea?: ProjectIdeaRow; onSaved: ()
  * The form says the code is permanent, because it is: it is embedded in every requirement, task,
  * ADR and citation the project will ever have, and there is no rename (ADR-008).
  */
-function ConvertIdea({ idea, onConverted }: { idea: ProjectIdeaRow; onConverted: () => void }) {
+export function ConvertIdea({ idea, onConverted }: { idea: ProjectIdeaRow; onConverted: () => void }) {
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
   const [name, setName] = useState(idea.title);
@@ -495,7 +588,7 @@ function ConvertIdea({ idea, onConverted }: { idea: ProjectIdeaRow; onConverted:
       }}
       trigger={<Button variant="primary">Convert</Button>}
       title={`Make ${idea.humanId} a project`}
-      description="The pitch comes across. The idea stays, as the record of where this began."
+      description="Its canvas becomes the project's discovery document. The idea stays, as the record of where this began."
     >
       <form onSubmit={submit}>
         <Stack gap="16">
@@ -545,7 +638,7 @@ function ConvertIdea({ idea, onConverted }: { idea: ProjectIdeaRow; onConverted:
   );
 }
 
-function DeleteProjectIdea({
+export function DeleteProjectIdea({
   idea,
   onDeleted,
 }: {

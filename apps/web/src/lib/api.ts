@@ -424,6 +424,12 @@ export interface ProjectIdeaRow {
   score: ScoreSummary | null;
   submittedBy: { id: string; displayName: string } | null;
   _count: { comments: number };
+  excitement: number | null;
+  tags: string[];
+  /** How much of the thinking is written down: the pitch and the five canvas questions. */
+  maturity: { filled: number; total: number };
+  /** On the list only — the detail page has the questions themselves. */
+  openQuestions?: number;
   reason: string | null;
   decidedAt: string | null;
   convertedAt: string | null;
@@ -431,6 +437,52 @@ export interface ProjectIdeaRow {
   updatedAt: string;
   project: { code: string; name: string; lifecycle: string } | null;
 }
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface IdeaLinkRow {
+  id: string;
+  label: string;
+  url: string;
+}
+
+/** Everything on an idea's page (FRM-ADR-017). */
+export interface ProjectIdeaDetail extends ProjectIdeaRow {
+  problem: string | null;
+  audience: string | null;
+  approach: string | null;
+  whyNow: string | null;
+  risks: string | null;
+  notes: string | null;
+  questions: ChecklistItem[];
+  nextSteps: ChecklistItem[];
+  links: IdeaLinkRow[];
+  related: string[];
+}
+
+/** A patch to an idea. Any subset; absent means unchanged. */
+export type ProjectIdeaPatch = Partial<{
+  title: string;
+  pitch: string;
+  status: string;
+  reason: string;
+  problem: string;
+  audience: string;
+  approach: string;
+  whyNow: string;
+  risks: string;
+  notes: string;
+  excitement: number | null;
+  tags: string[];
+  questions: ChecklistItem[];
+  nextSteps: ChecklistItem[];
+  links: IdeaLinkRow[];
+  related: string[];
+}>;
 
 export interface MemberRow {
   id: string;
@@ -779,15 +831,19 @@ export const foreman = {
     ),
   updateMember: (id: string, body: { role?: string; suspended?: boolean }) =>
     api.patch<MemberRow>(`/api/board/members/${id}`, body),
+  // Scoring and thoughts live on the idea itself, in both modes (FRM-ADR-017).
   scores: (humanId: string) =>
-    api.get<{ summary: ScoreSummary; scores: ScoreRow[] }>(`/api/board/ideas/${humanId}/scores`),
+    api.get<{ summary: ScoreSummary; scores: ScoreRow[] }>(`/api/project-ideas/${humanId}/scores`),
   setScore: (humanId: string, body: { impact: number; effort: number; note?: string }) =>
-    api.put<ScoreRow>(`/api/board/ideas/${humanId}/scores`, body),
+    api.put<ScoreRow>(`/api/project-ideas/${humanId}/scores`, body),
   comments: (humanId: string) =>
-    api.get<Page<CommentRow>>(`/api/board/ideas/${humanId}/comments`),
+    api.get<Page<CommentRow>>(`/api/project-ideas/${humanId}/comments`),
   addComment: (humanId: string, body: { body: string; internal: boolean }) =>
-    api.post<CommentRow>(`/api/board/ideas/${humanId}/comments`, body),
-  deleteComment: (id: string) => api.del(`/api/board/comments/${id}`),
+    api.post<CommentRow>(`/api/project-ideas/${humanId}/comments`, body),
+  editComment: (humanId: string, id: string, body: string) =>
+    api.patch<CommentRow>(`/api/project-ideas/${humanId}/comments/${id}`, { body }),
+  deleteComment: (humanId: string, id: string) =>
+    api.del(`/api/project-ideas/${humanId}/comments/${id}`),
   fundIdea: (humanId: string, body: { amountCents: number; reason: string }) =>
     api.post<ProjectIdeaRow>(`/api/board/ideas/${humanId}/fund`, body),
   acceptInvite: (body: { token: string; password: string }) =>
@@ -801,13 +857,16 @@ export const foreman = {
     ),
   createProjectIdea: (body: { title: string; pitch?: string }) =>
     api.post<ProjectIdeaRow>('/api/project-ideas', body),
-  updateProjectIdea: (
-    humanId: string,
-    body: { title?: string; pitch?: string; status?: string; reason?: string },
-  ) => api.patch<ProjectIdeaRow>(`/api/project-ideas/${humanId}`, body),
+  projectIdea: (humanId: string) => api.get<ProjectIdeaDetail>(`/api/project-ideas/${humanId}`),
+  updateProjectIdea: (humanId: string, body: ProjectIdeaPatch) =>
+    api.patch<ProjectIdeaDetail>(`/api/project-ideas/${humanId}`, body),
   deleteProjectIdea: (humanId: string) => api.del(`/api/project-ideas/${humanId}`),
   convertProjectIdea: (humanId: string, body: { code: string; name?: string }) =>
-    api.post<{ idea: ProjectIdeaRow; project: { code: string; name: string } }>(
+    api.post<{
+      idea: ProjectIdeaRow;
+      project: { code: string; name: string };
+      brief: { id: string; title: string } | null;
+    }>(
       `/api/project-ideas/${humanId}/convert`,
       body,
     ),

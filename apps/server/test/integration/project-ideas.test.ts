@@ -250,6 +250,7 @@ describe.skipIf(url === undefined)('project ideas', () => {
 
   describe('the canvas', () => {
     interface Detail extends Idea {
+      related: string[];
       problem: string | null;
       approach: string | null;
       risks: string | null;
@@ -284,11 +285,17 @@ describe.skipIf(url === undefined)('project ideas', () => {
       });
       expect((await detail(idea.humanId)).maturity).toEqual({ filled: 3, total: 6 });
 
+      // A write answers in the same shape as a read. The console swaps its copy for this one, so
+      // a patch response without maturity is a page that breaks on its first save.
+      const patched = (await (await patch(idea.humanId, { risks: 'Scope creep.' })).json()) as Detail;
+      expect(patched.maturity).toEqual({ filled: 4, total: 6 });
+
       const list = (await (await api('/project-ideas')).json()) as {
         items: (Idea & { maturity: { filled: number }; problem?: string })[];
       };
       const row = list.items.find((i) => i.humanId === idea.humanId);
-      expect(row?.maturity.filled).toBe(3);
+      // Four now: the list agrees with the patch that just added the risks.
+      expect(row?.maturity.filled).toBe(4);
       // The list knows *whether* each section is written, not what it says. Forty ideas each
       // carrying six essays is a payload for nothing.
       expect(row && 'problem' in row).toBe(false);
@@ -319,6 +326,13 @@ describe.skipIf(url === undefined)('project ideas', () => {
         links: [{ id: 'l2', label: 'nope', url: 'not a url' }],
       });
       expect(bad.status).toBe(400);
+    });
+
+    it('relates to a project, a requirement or another idea — and nothing else', async () => {
+      const idea = await create({ title: 'PIT related', related: ['BND', 'BND-REQ-012', 'PI-003'] });
+      expect((await detail(idea.humanId)).related).toEqual(['BND', 'BND-REQ-012', 'PI-003']);
+      // Something that is none of those is a typo, and storing it would render as a dead link.
+      expect((await patch(idea.humanId, { related: ['not an id'] })).status).toBe(400);
     });
 
     it('refuses an excitement outside one to five', async () => {

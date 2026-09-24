@@ -356,8 +356,14 @@ export const ProjectIdeaCreate = z.object({
   questions: z.array(IdeaChecklistItem).max(50).optional(),
   nextSteps: z.array(IdeaChecklistItem).max(50).optional(),
   links: z.array(IdeaLink).max(30).optional(),
-  /** Other ideas or projects this one builds on, competes with, or would replace. */
-  related: z.array(AnyId).max(20).optional(),
+  /**
+   * Other ideas or projects this one builds on, competes with, or would replace.
+   *
+   * A project code on its own is allowed as well as a human ID, because "this would replace BND"
+   * names a project, not any one thing inside it — and relating an idea to an existing project is
+   * the most common reason to relate it at all.
+   */
+  related: z.array(z.union([AnyId, ProjectCode])).max(20).optional(),
 });
 export type ProjectIdeaCreate = z.infer<typeof ProjectIdeaCreate>;
 

@@ -56,6 +56,7 @@ import { Findings } from './screens/Findings';
 import { Glossary } from './screens/Glossary';
 import { Ideas } from './screens/Ideas';
 import { ProjectIdeas } from './screens/ProjectIdeas';
+import { ProjectIdeaDetail } from './screens/ProjectIdeaDetail';
 import { Members } from './screens/Members';
 import { AcceptInvite } from './screens/AcceptInvite';
 import { Health } from './screens/Health';
@@ -167,7 +168,7 @@ export function App() {
               href="/project-ideas"
               icon={<Lightbulb />}
               label={board ? 'Submissions' : 'Project ideas'}
-              current={path === '/project-ideas'}
+              current={path.startsWith('/project-ideas')}
             />
             {board && user.role === 'admin' && (
               <SideNavItem
@@ -303,6 +304,10 @@ function Screen({ path, search }: { path: string; search: string }) {
       return <Projects />;
     case 'project-ideas':
       return <ProjectIdeas />;
+    case 'project-idea':
+      // Keyed by the ID so moving from one idea to a related one resets every section's editing
+      // state, instead of carrying half an edit from the last idea into the next.
+      return <ProjectIdeaDetail key={route.humanId} humanId={route.humanId ?? ''} />;
     case 'members':
       return <Members />;
     case 'project':

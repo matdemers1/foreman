@@ -270,7 +270,9 @@ export async function updateProjectIdea(
       before,
       after: idea,
     });
-    return idea;
+    // The same shape as a read, maturity included: the console replaces its copy with this, and a
+    // response missing a field the page renders is a page that breaks on its first save.
+    return { ...idea, maturity: maturity(idea) };
   });
 }
 

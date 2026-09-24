@@ -71,6 +71,7 @@ export interface Route {
     | 'dashboard'
     | 'projects'
     | 'project-ideas'
+    | 'project-idea'
     | 'members'
     | 'project'
     | 'phases'
@@ -109,8 +110,12 @@ export function routeFor(path: string): Route {
   if (parts[0] === 'projects' && parts[1] === undefined) return { screen: 'projects' };
   // Before the `/projects/:code` branch would ever see it, and a separate path entirely: a
   // project idea is not a project, which is the whole distinction.
-  if (parts[0] === 'project-ideas' && parts[1] === undefined) {
-    return { screen: 'project-ideas' };
+  if (parts[0] === 'project-ideas') {
+    // An idea's own page, addressed by its codeless ID — `PI-007` belongs to no project, so its
+    // page sits under the list rather than under `/projects/…` (ADR-015).
+    return parts[1] === undefined
+      ? { screen: 'project-ideas' }
+      : { screen: 'project-idea', humanId: parts[1] };
   }
   if (parts[0] === 'members' && parts[1] === undefined) return { screen: 'members' };
 

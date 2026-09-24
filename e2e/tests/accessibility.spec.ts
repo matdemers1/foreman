@@ -25,6 +25,7 @@ const SCREENS: { name: string; path: string }[] = [
   { name: 'dashboard', path: '/' },
   { name: 'projects', path: '/projects' },
   { name: 'project ideas', path: '/project-ideas' },
+  { name: 'project idea', path: '/project-ideas/PI-001' },
   { name: 'project overview', path: '/projects/EXMP' },
   { name: 'phases', path: '/projects/EXMP/phases' },
   { name: 'phase detail', path: '/projects/EXMP/phases/EXMP-P-1' },
