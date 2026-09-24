@@ -4,7 +4,7 @@ Plan-vs-reality ledger for the D3 Cloud ecosystem. Replaces the Obsidian vault a
 
 ## Where the plan lives
 
-Foreman tracks itself as project **`FRM`** — 164 requirements, 11 phases, 15 ADRs. It has since the
+Foreman tracks itself as project **`FRM`** — 172 requirements, 11 phases, 16 ADRs. It has since the
 P10 cutover on 2026-09-20, which is the point: the tool holds its own remaining work.
 
 - `foreman_brief FRM` — the active phase, what is next, what is blocked, drift.
