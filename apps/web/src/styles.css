@@ -152,13 +152,29 @@ dd a {
    edge was pale text on a pale plate.
 
    Set from tokens rather than from Mermaid's theme variables, so it follows the console's own
-   light and dark palettes rather than a second theme that has to be kept in step. */
+   light and dark palettes rather than a second theme that has to be kept in step.
+
+   `!important`, because nothing else wins. Mermaid scopes every rule it emits under the SVG's id —
+   `#fm-mermaid-3 .edgeLabel { background-color: … }` — and no class selector outranks an id. The
+   first version of this rule had no `!important`, so only half of it applied: the text colour was
+   ours and the plate behind it was Mermaid's, and when the theme flipped the two came from
+   different palettes. Measured, not assumed: the dark plate was Mermaid's own mid-grey, not the
+   surface token.
+
+   HTML labels (the default) are a `div.labelBkg > span.edgeLabel > p` inside a foreignObject;
+   SVG-text labels are a `rect` and a `text`. `fill` goes on those two only — set on the group, it
+   is inherited by the label's text and paints it the colour of its own plate. */
 .fm-markdown .edgeLabel,
 .fm-markdown .edgeLabel p,
+.fm-markdown .labelBkg {
+  background-color: var(--color-surface) !important;
+  color: var(--color-fg) !important;
+}
 .fm-markdown .edgeLabel rect {
-  background: var(--color-surface);
-  fill: var(--color-surface);
-  color: var(--color-fg);
+  fill: var(--color-surface) !important;
+}
+.fm-markdown .edgeLabel text {
+  fill: var(--color-fg) !important;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

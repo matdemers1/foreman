@@ -89,6 +89,88 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+/**
+ * A Mermaid diagram follows a theme change made *after* it was drawn.
+ *
+ * The sweep above emulates the colour scheme before the page loads, so every diagram it sees was
+ * drawn in the right theme — and it passed while the console had a diagram that kept its first
+ * palette forever. Flip the ThemeSwitch on the page and the node boxes stayed light, and the edge
+ * labels ("MQTT", "SMS" on the seeded Bambu idea) became dark-theme text on a light-theme plate.
+ */
+test.describe('a Mermaid diagram follows the theme', () => {
+  const diagram = '[data-mermaid] svg';
+
+  async function drawn(page: Page): Promise<string> {
+    await page.locator(diagram).first().waitFor();
+    return (await page.locator(diagram).first().getAttribute('id')) ?? '';
+  }
+
+  /** Every redraw gets a new id, so a changed id is the diagram having been drawn again. */
+  async function redrawn(page: Page, before: string): Promise<void> {
+    await expect(page.locator(diagram).first()).not.toHaveAttribute('id', before);
+  }
+
+  async function choose(page: Page, mode: 'System' | 'Light' | 'Dark'): Promise<void> {
+    await page.getByRole('button', { name: new RegExp(EMAIL) }).click();
+    await page.getByRole('menuitemradio', { name: mode }).click();
+    await page.keyboard.press('Escape');
+  }
+
+  /** Contrast inside the diagram, and the label plate is the surface token rather than Mermaid's. */
+  async function legible(page: Page, theme: string): Promise<void> {
+    const results = await new AxeBuilder({ page })
+      .include('[data-mermaid]')
+      .withRules(['color-contrast'])
+      .analyze();
+    const failures = results.violations.flatMap((v) => v.nodes.map((n) => n.target.join(' ')));
+    expect(failures, `contrast in the diagram (${theme})`).toEqual([]);
+
+    // axe passes Mermaid's own grey plate too, so assert the rule in styles.css actually won:
+    // Mermaid scopes its rules under the SVG's id, which out-ranks a class selector.
+    const [plate, surface] = await page.evaluate(() => {
+      const label = document.querySelector('[data-mermaid] .edgeLabel p');
+      const probe = document.createElement('div');
+      probe.style.background = 'var(--color-surface)';
+      document.body.append(probe);
+      const pair = [
+        label === null ? 'no edge label' : getComputedStyle(label).backgroundColor,
+        getComputedStyle(probe).backgroundColor,
+      ];
+      probe.remove();
+      return pair;
+    });
+    expect(plate, `edge label plate (${theme})`).toBe(surface);
+  }
+
+  for (const start of ['light', 'dark'] as const) {
+    const other = start === 'light' ? 'dark' : 'light';
+
+    test(`from ${start}, through the ThemeSwitch and the OS`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: start });
+      await signIn(page);
+      await page.goto('/project-ideas/PI-001');
+      let id = await drawn(page);
+      await legible(page, start);
+
+      await choose(page, other === 'dark' ? 'Dark' : 'Light');
+      await redrawn(page, id);
+      id = await drawn(page);
+      await legible(page, `${start} → ${other}`);
+
+      await choose(page, start === 'dark' ? 'Dark' : 'Light');
+      await redrawn(page, id);
+      id = await drawn(page);
+      await legible(page, `${other} → ${start}`);
+
+      // Following the OS, which flips underneath the page with no click at all.
+      await choose(page, 'System');
+      await page.emulateMedia({ colorScheme: other });
+      await redrawn(page, id);
+      await legible(page, `system, OS → ${other}`);
+    });
+  }
+});
+
 test.describe('the defect classes from Bindery’s own audit', () => {
   test('every modal is a dialog, is labelled, and closes on Escape', async ({ page }) => {
     await signIn(page);
