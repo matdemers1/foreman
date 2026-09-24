@@ -12,6 +12,7 @@ import {
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Db } from '../db.js';
+import { Invalid } from '../domain/errors.js';
 import { softDelete } from '../domain/undo.js';
 import {
   createPhase,
@@ -36,6 +37,60 @@ import {
   parseBody,
   parseQuery,
 } from './helpers.js';
+
+/**
+ * What `foreman_create` addresses by human ID, resolved to the row IDs the create shapes take.
+ *
+ * The shim sends `?phase=FRM-P-3&satisfies=FRM-REQ-001,FRM-REQ-002` — Claude knows human IDs, not
+ * UUIDs — and until 2026-09-24 nothing on this side read them: every task created over MCP landed
+ * in the backlog citing nothing, and the response said so only to a reader who checked. An ID that
+ * does not resolve is refused by name, because dropping it is the silence that hid this.
+ *
+ * A body that already names `phaseId` or `requirementIds` wins; the query only fills what is unset.
+ */
+export const CreateRefsQuery = z.object({
+  phase: z.string().min(1).optional(),
+  satisfies: z.string().min(1).optional(),
+});
+
+async function refsFromQuery(
+  db: Db,
+  code: string,
+  query: z.infer<typeof CreateRefsQuery>,
+): Promise<{ phaseId?: string; requirementIds?: string[] }> {
+  const refs: { phaseId?: string; requirementIds?: string[] } = {};
+  if (query.phase === undefined && query.satisfies === undefined) return refs;
+  const project = await findProject(db, code);
+
+  if (query.phase !== undefined) {
+    const phase = await db.phase.findFirst({
+      where: { projectId: project.id, humanId: query.phase, deletedAt: null },
+      select: { id: true },
+    });
+    if (phase === null) {
+      throw new Invalid(`${query.phase} is not a phase of ${code}`, [
+        { path: 'phase', message: `no phase ${query.phase} in ${code}` },
+      ]);
+    }
+    refs.phaseId = phase.id;
+  }
+
+  if (query.satisfies !== undefined) {
+    const wanted = [...new Set(query.satisfies.split(',').map((id) => id.trim()).filter(Boolean))];
+    const found = await db.requirement.findMany({
+      where: { projectId: project.id, humanId: { in: wanted }, deletedAt: null },
+      select: { id: true, humanId: true },
+    });
+    const missing = wanted.filter((id) => !found.some((r) => r.humanId === id));
+    if (missing.length > 0) {
+      throw new Invalid(`not requirements of ${code}: ${missing.join(', ')}`, [
+        { path: 'satisfies', message: `no requirement ${missing.join(', ')} in ${code}` },
+      ]);
+    }
+    refs.requirementIds = found.map((r) => r.id);
+  }
+  return refs;
+}
 
 /**
  * The spine over HTTP: projects, phases, requirements, tasks.
@@ -243,8 +298,19 @@ export function projectRoutes(db: Db): Router {
     handler(async (req, res) => {
       const body = parseBody(RequirementCreate, req, res);
       if (body === null) return;
+      const query = parseQuery(CreateRefsQuery.pick({ phase: true }), req, res);
+      if (query === null) return;
+      const code = param(req, 'code');
+      const { phaseId } = await refsFromQuery(db, code, query);
       // The EARS lint runs inside, and warns rather than rejecting.
-      res.status(201).json(await createRequirement(db, actorOf(req), param(req, 'code'), body));
+      res
+        .status(201)
+        .json(
+          await createRequirement(db, actorOf(req), code, {
+            ...body,
+            ...(body.phaseId === undefined && phaseId !== undefined ? { phaseId } : {}),
+          }),
+        );
     }),
   );
 
@@ -315,7 +381,19 @@ export function projectRoutes(db: Db): Router {
     handler(async (req, res) => {
       const body = parseBody(TaskCreate, req, res);
       if (body === null) return;
-      res.status(201).json(await createTask(db, actorOf(req), param(req, 'code'), body));
+      const query = parseQuery(CreateRefsQuery, req, res);
+      if (query === null) return;
+      const code = param(req, 'code');
+      const { phaseId, requirementIds } = await refsFromQuery(db, code, query);
+      res.status(201).json(
+        await createTask(db, actorOf(req), code, {
+          ...body,
+          ...(body.phaseId === undefined && phaseId !== undefined ? { phaseId } : {}),
+          ...(body.requirementIds === undefined && requirementIds !== undefined
+            ? { requirementIds }
+            : {}),
+        }),
+      );
     }),
   );
 

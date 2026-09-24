@@ -13,7 +13,7 @@ import type { Db } from '../db.js';
 import { record, type Actor } from './audit.js';
 import { Conflict, Invalid, NotFound } from './errors.js';
 import { exitGate, GateRefused } from './coverage.js';
-import { allocate, phaseHumanId, taskHumanId } from './humanId.js';
+import { allocate, nextTaskPosition, phaseHumanId, taskHumanId } from './humanId.js';
 
 /**
  * The spine's write paths.
@@ -302,13 +302,23 @@ export async function createTask(db: Db, actor: Actor, code: string, input: Task
 
   return db.$transaction(async (tx) => {
     // The task ID carries its phase and its position within it, so it is not drawn from a counter.
+    // The position is the phase's high-water mark, not the sibling count: tasks move between phases
+    // and keep their IDs, so the count says nothing about which numbers are free.
     const siblings = await tx.task.count({
       where: { projectId: project.id, phaseId: phase?.id ?? null },
     });
     const humanId =
       phase === null
         ? (await allocate(tx, project, 'task')).humanId
-        : taskHumanId(project.code, phase.number.toString(), siblings + 1);
+        : taskHumanId(
+            project.code,
+            phase.number.toString(),
+            await nextTaskPosition(tx, project.id, {
+              id: phase.id,
+              code: project.code,
+              number: phase.number.toString(),
+            }),
+          );
 
     const task = await tx.task.create({
       data: {

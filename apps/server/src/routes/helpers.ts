@@ -1,5 +1,6 @@
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { z } from 'zod';
+import { Prisma } from '../db.js';
 import type { Actor } from '../domain/audit.js';
 import { Conflict, Invalid, NotFound } from '../domain/errors.js';
 import { ImmutableHumanIdError } from '../domain/humanId.js';
@@ -73,6 +74,13 @@ function respondToError(error: unknown, res: Response, next: NextFunction): void
   if (error instanceof ImmutableHumanIdError) {
     // 409, not 422: the request is well-formed and the state forbids it.
     res.status(409).json({ error: error.message });
+    return;
+  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    // A unique index refused the write: the state forbids it, the request is fine. Still a bug
+    // somewhere upstream — an allocator should never hand out a taken ID — but a 500 said nothing
+    // and sent somebody to the logs. The value is not echoed: it came from the row that failed.
+    res.status(409).json({ error: 'that would duplicate an existing record' });
     return;
   }
   // Anything else is a bug. The error handler logs it and says nothing specific.

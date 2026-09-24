@@ -127,6 +127,36 @@ export function taskHumanId(code: string, phaseNumber: number | string, position
   return `${code}-${HUMAN_ID_TYPE.task}-${String(phaseNumber)}.${String(position)}`;
 }
 
+/**
+ * The next position for a task in a phase — one past the highest `CODE-T-<phase>.<n>` the project
+ * has ever issued, inside the caller's transaction.
+ *
+ * **Not a count of the tasks in the phase.** An ID stays with its task when the task moves, so
+ * `DI-P-0` holding 36 tasks said nothing about whether `DI-T-0.37` was free — it belonged to a
+ * task moved to `DI-P-1`, and the create failed on the unique index as a bare 500. The prefix is
+ * read across the whole project, deleted rows included: a soft delete does not free a number
+ * (ADR-008).
+ *
+ * The phase row is locked first, so two creates in one phase cannot read the same high mark.
+ */
+export async function nextTaskPosition(
+  tx: TransactionClient,
+  projectId: string,
+  phase: { id: string; code: string; number: string },
+): Promise<number> {
+  await tx.$queryRaw`select 1 from phase where id = ${phase.id}::uuid for update`;
+
+  const prefix = `${phase.code}-${HUMAN_ID_TYPE.task}-${phase.number}.`;
+  const rows = await tx.$queryRaw<{ high: number | null }[]>`
+    select max(substring(human_id from ${prefix.length + 1}::int)::int) as high
+      from task
+     where project_id = ${projectId}::uuid
+       and starts_with(human_id, ${prefix})
+       and substring(human_id from ${prefix.length + 1}::int) ~ '^[0-9]+$'
+  `;
+  return (rows[0]?.high ?? 0) + 1;
+}
+
 /** A phase's ID is its number: `BND-P-8.5`. */
 export function phaseHumanId(code: string, phaseNumber: number | string): string {
   return `${code}-${HUMAN_ID_TYPE.phase}-${String(phaseNumber)}`;

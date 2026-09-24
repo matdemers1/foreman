@@ -194,4 +194,126 @@ describe.skipIf(url === undefined)('allocating a human ID', () => {
 
     expect(loose.humanId).toBe(`${CODE}-T-001`);
   });
+
+  describe('a task in a phase', () => {
+    const phase = (number: number) =>
+      post<{ id: string; humanId: string }>(`/projects/${CODE}/phases`, {
+        name: `Phase ${String(number)}`,
+        number,
+      });
+    const task = (title: string, phaseId: string) =>
+      post<{ humanId: string }>(`/projects/${CODE}/tasks`, { title, phaseId });
+
+    it('gets a fresh ID after a task has moved out of the phase', async () => {
+      // DI on 2026-09-24: P-0 held 36 tasks, so the next was given `DI-T-0.37` — which belonged to a
+      // task already moved to P-1. The unique index refused it and the API said `internal error`.
+      const p0 = await phase(0);
+      const p1 = await phase(1);
+      await task('One', p0.id);
+      const moving = await task('Two', p0.id);
+      await task('Three', p0.id);
+
+      const moved = await api(`/projects/${CODE}/tasks/${moving.humanId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ phaseId: p1.id }),
+      });
+      expect(moved.status).toBe(200);
+
+      // Two tasks left in P-0, so a count says 3 — which is taken.
+      const next = await task('Four', p0.id);
+      expect(next.humanId).toBe(`${CODE}-T-0.4`);
+    });
+
+    it('never reuses the number of a deleted task in the phase', async () => {
+      const p0 = await phase(0);
+      await task('One', p0.id);
+      const doomed = await task('Two', p0.id);
+      const gone = await api(`/projects/${CODE}/tasks/${doomed.humanId}`, { method: 'DELETE' });
+      expect(gone.status).toBe(204);
+
+      const next = await task('Three', p0.id);
+      expect(next.humanId).toBe(`${CODE}-T-0.3`);
+    });
+
+    it('does not count phase 1.5 as phase 1', async () => {
+      const p1 = await phase(1);
+      const p15 = await phase(1.5);
+      await task('In 1.5', p15.id);
+      await task('Also in 1.5', p15.id);
+
+      expect((await task('In 1', p1.id)).humanId).toBe(`${CODE}-T-1.1`);
+    });
+
+    it('takes distinct IDs when created at the same moment', async () => {
+      const p0 = await phase(0);
+      const ids = await Promise.all(
+        Array.from({ length: 6 }, (_, i) => task(`Concurrent ${String(i)}`, p0.id)),
+      );
+      expect(new Set(ids.map((t) => t.humanId)).size).toBe(6);
+    });
+
+    it('answers a unique violation with 409, not 500', async () => {
+      // An allocator should never hand out a taken ID, but when one does, the answer is a conflict
+      // the caller can read, not `internal error`. A soft-deleted phase still holds `HID-P-0`
+      // (ADR-008), and the up-front clash check only looks at live ones — so this reaches the index.
+      const p0 = await phase(0);
+      await db.phase.update({ where: { id: p0.id }, data: { deletedAt: new Date() } });
+
+      const dup = await api(`/projects/${CODE}/phases`, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Same ID as a deleted phase', number: 0 }),
+      });
+      expect(dup.status).toBe(409);
+      expect(await dup.json()).toEqual({ error: 'that would duplicate an existing record' });
+    });
+  });
+
+  describe('what foreman_create addresses by human ID', () => {
+    it('files a task under ?phase= and cites ?satisfies=', async () => {
+      const p3 = await post<{ humanId: string }>(`/projects/${CODE}/phases`, {
+        name: 'Phase three',
+        number: 3,
+      });
+      const a = await post<{ humanId: string }>(`/projects/${CODE}/requirements`, {
+        statement: 'Foreman shall do a thing.',
+      });
+      const b = await post<{ humanId: string }>(`/projects/${CODE}/requirements`, {
+        statement: 'Foreman shall do another thing.',
+      });
+
+      const created = await post<{ humanId: string; requirements: unknown[] }>(
+        `/projects/${CODE}/tasks?phase=${p3.humanId}&satisfies=${a.humanId},${b.humanId}`,
+        { title: 'From MCP' },
+      );
+      expect(created.humanId).toBe(`${CODE}-T-3.1`);
+      expect(created.requirements).toHaveLength(2);
+    });
+
+    it('files a requirement under ?phase=', async () => {
+      const p3 = await post<{ id: string; humanId: string }>(`/projects/${CODE}/phases`, {
+        name: 'Phase three',
+        number: 3,
+      });
+      const created = await post<{ phaseId: string | null }>(
+        `/projects/${CODE}/requirements?phase=${p3.humanId}`,
+        { statement: 'Foreman shall be filed.' },
+      );
+      expect(created.phaseId).toBe(p3.id);
+    });
+
+    it('refuses an ID it cannot resolve, by name, rather than dropping it', async () => {
+      const res = await api(`/projects/${CODE}/tasks?satisfies=${CODE}-REQ-404`, {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Cites nothing real' }),
+      });
+      expect(res.status).toBe(422);
+      expect(JSON.stringify(await res.json())).toContain(`${CODE}-REQ-404`);
+
+      const noPhase = await api(`/projects/${CODE}/tasks?phase=${CODE}-P-9`, {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Nowhere' }),
+      });
+      expect(noPhase.status).toBe(422);
+    });
+  });
 });
