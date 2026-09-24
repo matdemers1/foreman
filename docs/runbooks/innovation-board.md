@@ -39,13 +39,30 @@ openssl rand -base64 32   # COOKIE_KEYS
 # 3. server.env, with the two lines that make it a board:
 #      FOREMAN_MODE=board
 #      CURRENCY=USD
-#    and the one that seeds the first account:
-#      OPERATOR_EMAIL=you@work.example
 ```
 
-Migrations run on boot, before the server serves. The first boot seeds `OPERATOR_EMAIL` as an
-account; **the migration promotes every pre-existing account to `admin`**, so on a fresh database
-the operator is the admin and everyone else arrives by invitation.
+The live one is `/DATA/foreman-board` on the Zima, at `board.d3cloud.io`, with its own Postgres
+container, its own volume, its own tunnel and its own secrets — sharing nothing with
+`/DATA/foreman`. Its compose project name is `foreman-board`, so every command needs
+`-p foreman-board`.
+
+Migrations run on boot, before the server serves.
+
+**A fresh board database has no accounts at all**, and inviting somebody requires an admin — so
+there is one command to break the circle:
+
+```bash
+docker compose exec server node dist/cli/bootstrap-admin.js you@example.com
+# prints a generated password once, or takes BOOTSTRAP_PASSWORD from the environment
+```
+
+Everyone else arrives by invitation from there. (The command is also the answer to "the only admin
+is locked out": run it again for that address and it sets a new password.)
+
+On a database that already had accounts — the solo instance being upgraded, not a new board — the
+migration promotes every pre-existing account to `admin` instead, because they had unrestricted
+access before roles existed and defaulting them to `submitter` would be locking the owner out
+rather than tightening anything.
 
 ## Inviting people
 
