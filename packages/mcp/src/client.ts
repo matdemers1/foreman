@@ -22,7 +22,7 @@ export type QueryValue = string | number | boolean | readonly string[] | undefin
 export interface ForemanClient {
   get<T>(path: string, query?: Record<string, QueryValue>): Promise<T>;
   post<T>(path: string, body: unknown, query?: Record<string, QueryValue>): Promise<T>;
-  patch<T>(path: string, body: unknown): Promise<T>;
+  patch<T>(path: string, body: unknown, query?: Record<string, QueryValue>): Promise<T>;
   del<T>(path: string): Promise<T>;
 }
 
@@ -101,7 +101,8 @@ export function createClient(options: ClientOptions): ForemanClient {
       request<T>('GET', path, undefined, query),
     post: <T>(path: string, body: unknown, query?: Record<string, QueryValue>) =>
       request<T>('POST', path, body, query),
-    patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
+    patch: <T>(path: string, body: unknown, query?: Record<string, QueryValue>) =>
+      request<T>('PATCH', path, body, query),
     del: <T>(path: string) => request<T>('DELETE', path),
   };
 }

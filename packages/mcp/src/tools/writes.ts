@@ -161,7 +161,21 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       if (args.body !== undefined) body['body'] = args.body;
       if (args.reason !== undefined) body['reason'] = args.reason;
       if (args.fixedCommitSha !== undefined) body['fixedCommitSha'] = args.fixedCommitSha;
-      return client.patch(`/api/projects/${projectOf(args.id)}/${kind}/${args.id}`, body);
+
+      // Advertised from the start and never sent until 2026-09-24: a move reported success and
+      // left the task where it was. Only a task or a requirement has a phase, so anything else is
+      // refused by name rather than silently ignored. The backlog needs no lookup; a phase is sent
+      // as its human ID and resolved by the server, as `foreman_create` does.
+      const query: Record<string, string> = {};
+      if (args.phase !== undefined) {
+        if (kind !== 'tasks' && kind !== 'requirements') {
+          throw new Error(`${args.id} has no phase to move; only a task or a requirement does`);
+        }
+        if (args.phase === null) body['phaseId'] = null;
+        else query['phase'] = args.phase;
+      }
+      const path = `/api/projects/${projectOf(args.id)}/${kind}/${args.id}`;
+      return 'phase' in query ? client.patch(path, body, query) : client.patch(path, body);
     },
   },
   {

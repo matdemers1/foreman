@@ -47,6 +47,7 @@ import {
  * does not resolve is refused by name, because dropping it is the silence that hid this.
  *
  * A body that already names `phaseId` or `requirementIds` wins; the query only fills what is unset.
+ * `foreman_update` moves a task or requirement the same way, with `?phase=` on the PATCH.
  */
 export const CreateRefsQuery = z.object({
   phase: z.string().min(1).optional(),
@@ -320,12 +321,19 @@ export function projectRoutes(db: Db): Router {
     handler(async (req, res) => {
       const body = parseBody(RequirementUpdate, req, res);
       if (body === null) return;
+      // `foreman_update` moves by human ID, as `foreman_create` files by one.
+      const query = parseQuery(CreateRefsQuery.pick({ phase: true }), req, res);
+      if (query === null) return;
+      const { phaseId } = await refsFromQuery(db, param(req, 'code'), query);
 
       const humanId = param(req, 'humanId');
       const current = await db.requirement.findFirst({ where: { humanId, deletedAt: null } });
       if (current !== null) assertFresh(req, current);
 
-      const updated = await updateRequirement(db, actorOf(req), humanId, body);
+      const updated = await updateRequirement(db, actorOf(req), humanId, {
+        ...body,
+        ...(body.phaseId === undefined && phaseId !== undefined ? { phaseId } : {}),
+      });
       setEtag(res, updated);
       res.json(updated);
     }),
@@ -403,12 +411,19 @@ export function projectRoutes(db: Db): Router {
     handler(async (req, res) => {
       const body = parseBody(TaskUpdate, req, res);
       if (body === null) return;
+      // `foreman_update` moves by human ID, as `foreman_create` files by one.
+      const query = parseQuery(CreateRefsQuery.pick({ phase: true }), req, res);
+      if (query === null) return;
+      const { phaseId } = await refsFromQuery(db, param(req, 'code'), query);
 
       const humanId = param(req, 'humanId');
       const current = await db.task.findFirst({ where: { humanId, deletedAt: null } });
       if (current !== null) assertFresh(req, current);
 
-      const updated = await updateTask(db, actorOf(req), humanId, body);
+      const updated = await updateTask(db, actorOf(req), humanId, {
+        ...body,
+        ...(body.phaseId === undefined && phaseId !== undefined ? { phaseId } : {}),
+      });
       setEtag(res, updated);
       res.json(updated);
     }),

@@ -293,6 +293,46 @@ describe.skipIf(url === undefined)('the MCP shim, end to end', () => {
       expect(entity.requirements.map((r) => r.humanId)).toEqual([requirement.humanId]);
     });
 
+    it('moves a task to a phase and back to the backlog, keeping its ID', async () => {
+      // Repairing FRM-T-003 found the same silence one tool over: foreman_update advertised
+      // `phase`, never sent it, and answered with the unmoved task as if that were success.
+      await post(`/projects/${CODE}/phases`, { number: 9, name: 'Phase nine' });
+      const loose = (await (
+        await post(`/projects/${CODE}/tasks`, { title: 'Filed late' })
+      ).json()) as { humanId: string };
+
+      const client = await connect(writeToken);
+      const moved = await client.callTool({
+        name: 'foreman_update',
+        arguments: { id: loose.humanId, phase: `${CODE}-P-9` },
+      });
+      expect(moved.isError, text(moved)).toBeFalsy();
+      const inPhase = await db.task.findFirstOrThrow({
+        where: { humanId: loose.humanId },
+        include: { phase: true },
+      });
+      expect(inPhase.phase?.humanId).toBe(`${CODE}-P-9`);
+
+      const back = await client.callTool({
+        name: 'foreman_update',
+        arguments: { id: loose.humanId, phase: null },
+      });
+      expect(back.isError, text(back)).toBeFalsy();
+      expect(
+        (await db.task.findFirstOrThrow({ where: { humanId: loose.humanId } })).phaseId,
+      ).toBeNull();
+    });
+
+    it('refuses a move to a phase that is not there', async () => {
+      const client = await connect(writeToken);
+      const result = await client.callTool({
+        name: 'foreman_update',
+        arguments: { id: taskId, phase: `${CODE}-P-77` },
+      });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain(`${CODE}-P-77`);
+    });
+
     it('refuses a create citing a requirement that is not there, rather than dropping it', async () => {
       const client = await connect(writeToken);
       const result = await client.callTool({
