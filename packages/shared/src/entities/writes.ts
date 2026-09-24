@@ -37,6 +37,23 @@ export const CreatableKind = z.enum([
 ]);
 export type CreatableKind = z.infer<typeof CreatableKind>;
 
+/**
+ * An object argument that arrived as its own JSON text, parsed back into the object.
+ *
+ * A client holding a tool list from before a field existed does not know the field is an object,
+ * so it sends what it was given as a string — which is how the first ten project ideas bounced off
+ * `canvas` on 2026-09-24, the day it shipped. Anything that is not a JSON object is passed through
+ * untouched, so the error the schema then gives is the one it would have given anyway.
+ */
+function fromJsonText(value: unknown): unknown {
+  if (typeof value !== 'string' || !value.trimStart().startsWith('{')) return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
+}
+
 export const CreateInput = z.object({
   /**
    * Optional only because of `project_idea`, which is the one kind that belongs to no project —
@@ -68,7 +85,7 @@ export const CreateInput = z.object({
    * both are the reader's own judgement, and a tool writing them would put words in their mouth.
    */
   canvas: z
-    .object({
+    .preprocess(fromJsonText, z.object({
       problem: z.string().max(20_000).optional(),
       audience: z.string().max(20_000).optional(),
       approach: z.string().max(20_000).optional(),
@@ -80,7 +97,7 @@ export const CreateInput = z.object({
       nextSteps: z.array(z.string().max(500)).max(50).optional(),
       links: z.array(z.object({ label: z.string().max(200), url: z.string().max(2000) })).max(30).optional(),
       related: z.array(z.string().max(40)).max(20).optional(),
-    })
+    }))
     .optional()
     .describe('Project idea only: sections in Markdown, lists as plain items'),
 }).superRefine((value, ctx) => {

@@ -120,6 +120,18 @@ describe('tools/list over the protocol', () => {
     expect(tools.every((t) => t.name.startsWith('foreman_'))).toBe(true);
   });
 
+  it('publishes a project idea canvas as an object, with its fields', async () => {
+    const { client } = await connect(fakeApi().client);
+    const { tools } = await client.listTools();
+    const create = tools.find((t) => t.name === 'foreman_create');
+    const canvas = (create?.inputSchema.properties as Record<string, Record<string, unknown>>)['canvas'];
+
+    // Accepting JSON text as well must not cost a client that is up to date the object's shape —
+    // a canvas published as "anything" is a field a model has to guess at.
+    expect(canvas?.['type']).toBe('object');
+    expect(Object.keys(canvas?.['properties'] as object)).toContain('problem');
+  });
+
   it('gives every tool a usable JSON Schema, not an empty object', async () => {
     const { client } = await connect(fakeApi().client);
     const { tools } = await client.listTools();
@@ -560,6 +572,27 @@ describe('what the MCP surface deliberately cannot do', () => {
       { id: expect.any(String) as string, label: 'HA integration', url: 'https://example.com/ha' },
     ]);
     expect(body['related']).toEqual(['BND']);
+  });
+
+  it('takes a canvas sent as JSON text by a client with an old tool list', async () => {
+    const { client: api, calls } = fakeApi({ '/api/project-ideas': { humanId: 'PI-022' } });
+    const { client } = await connect(api);
+
+    // A client that cached the tool list before `canvas` existed does not know it is an object,
+    // and sends the object as a string. That bounced the first real canvas, the day it shipped.
+    const made = await client.callTool({
+      name: 'foreman_create',
+      arguments: {
+        kind: 'project_idea',
+        text: 'A print notifier',
+        canvas: JSON.stringify({ problem: 'Prints fail silently.', tags: ['home-lab'] }),
+      },
+    });
+
+    expect(made.isError).toBeFalsy();
+    const body = calls.find((c) => c.method === 'POST')?.body as Record<string, unknown>;
+    expect(body['problem']).toBe('Prints fail silently.');
+    expect(body['tags']).toEqual(['home-lab']);
   });
 
   it('writes a list on a project idea from one item per line', async () => {
