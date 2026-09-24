@@ -1,4 +1,4 @@
-import type { Db } from '../db.js';
+import type { Db, Prisma } from '../db.js';
 import { driftFor, type DriftCategory } from './drift.js';
 import { NotFound } from './errors.js';
 import { phaseInFlight } from './wherewestand.js';
@@ -24,6 +24,18 @@ const NEXT_TASKS = 5;
 const CRITICAL_FINDINGS = 5;
 const RECENT_COMMITS = 3;
 
+/**
+ * A `todo` task is ready when nothing it depends on is still unfinished (FRM-REQ-179). Done and
+ * cancelled both release it — a cancelled prerequisite is one nobody is going to do, and holding
+ * its dependents forever would hide them. A deleted one releases it for the same reason.
+ *
+ * `in_progress` is deliberately not held back: someone started it, and the brief saying so is the
+ * truth even when they started early.
+ */
+const READY = {
+  dependsOn: { none: { dependsOn: { deletedAt: null, status: { notIn: ['done', 'cancelled'] } } } },
+} as const satisfies Prisma.TaskWhereInput;
+
 export interface Brief {
   readonly project: {
     readonly code: string;
@@ -39,7 +51,7 @@ export interface Brief {
     readonly exitDemo: string | null;
     readonly tasks: { readonly done: number; readonly total: number };
   } | null;
-  /** Ready to pick up: never blocked, never done. */
+  /** Ready to pick up: never blocked, never done, never waiting on an unfinished dependency. */
   readonly nextTasks: readonly {
     readonly humanId: string;
     readonly title: string;
@@ -48,6 +60,11 @@ export interface Brief {
     readonly doneWhen: string | null;
     readonly requirements: readonly string[];
   }[];
+  /**
+   * `todo` tasks in the active phase held back because something they depend on is unfinished. A
+   * count, not a list: they are not actionable, and `foreman_get` on the phase shows the graph.
+   */
+  readonly waitingOnDependencies: number;
   /** Named separately, because a blocked task is a thing to unblock, not a thing to do. */
   readonly blocked: readonly {
     readonly humanId: string;
@@ -107,19 +124,29 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
   // One definition, shared with the portfolio. See `wherewestand.ts` for why it is not inline.
   const activePhase = await phaseInFlight(db, project.id);
 
-  const [nextTasks, blocked, criticals, latestCheck, unconfirmed, drift, commits] =
+  const [nextTasks, waiting, blocked, criticals, latestCheck, unconfirmed, drift, commits] =
     await Promise.all([
       db.task.findMany({
         where: {
           projectId: project.id,
           deletedAt: null,
-          // Never blocked. This is the requirement, expressed where it is enforced.
-          status: { in: ['todo', 'in_progress'] },
+          // Never blocked, and never waiting on unfinished work. This is the requirement,
+          // expressed where it is enforced.
+          OR: [{ status: 'in_progress' }, { status: 'todo', ...READY }],
           ...(activePhase === null ? {} : { phaseId: activePhase.id }),
         },
         orderBy: [{ status: 'desc' }, { sortOrder: 'asc' }],
         take: NEXT_TASKS,
         include: { requirements: { select: { requirement: { select: { humanId: true } } } } },
+      }),
+      db.task.count({
+        where: {
+          projectId: project.id,
+          deletedAt: null,
+          status: 'todo',
+          NOT: READY,
+          ...(activePhase === null ? {} : { phaseId: activePhase.id }),
+        },
       }),
       db.task.findMany({
         where: { projectId: project.id, deletedAt: null, status: 'blocked' },
@@ -200,6 +227,7 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
       doneWhen: task.doneWhen,
       requirements: task.requirements.map((r) => r.requirement.humanId),
     })),
+    waitingOnDependencies: waiting,
     blocked: blocked.map((task) => ({
       humanId: task.humanId,
       title: task.title,

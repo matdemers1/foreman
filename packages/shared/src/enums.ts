@@ -200,7 +200,14 @@ export type ImportStatus = z.infer<typeof ImportStatus>;
 export const JobStatus = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']);
 export type JobStatus = z.infer<typeof JobStatus>;
 
-export const ReferenceKind = z.enum(['cites', 'satisfies', 'violates', 'relates', 'supersedes']);
+export const ReferenceKind = z.enum([
+  'cites',
+  'satisfies',
+  'violates',
+  'relates',
+  'supersedes',
+  'depends_on',
+]);
 export type ReferenceKind = z.infer<typeof ReferenceKind>;
 
 /** The entity types addressable by a reference, an audit event or an import record. */

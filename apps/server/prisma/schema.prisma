@@ -218,6 +218,9 @@ enum ReferenceKind {
   violates
   relates
   supersedes
+  /// A task that cannot start until another has finished. Kept in `task_dependency` as well, which
+  /// is what the brief reads; this row is what makes the edge a backlink like any other.
+  depends_on
 }
 
 /// The four states the real idea documents already use. Taken from them rather than invented:
@@ -412,6 +415,27 @@ model PhaseDependency {
   @@map("phase_dependency")
 }
 
+/// One task that cannot start until another has finished (FRM-REQ-179, FRM-REQ-180).
+///
+/// Phases have had this from the schema's first day; tasks had only `sort_order`, so "next" meant
+/// "not blocked, sorted" and the brief offered a server skeleton beside the scaffold it needs. That
+/// is harmless to one session reading the list top-down and wrong for several agents taking the top
+/// five at once. Edges stay inside one project and never form a cycle — both enforced in the domain
+/// layer, where the refusal can name the path.
+model TaskDependency {
+  taskId      String @map("task_id") @db.Uuid
+  dependsOnId String @map("depends_on_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  task      Task @relation("task_depends_on", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("task_depended_on_by", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, dependsOnId])
+  @@index([dependsOnId])
+  @@map("task_dependency")
+}
+
 model Requirement {
   id        String @id @default(uuid(7)) @db.Uuid
   projectId String @map("project_id") @db.Uuid
@@ -477,6 +501,8 @@ model Task {
   files        TaskFile[]
   requirements TaskRequirement[]
   commits      CommitTask[]
+  dependsOn    TaskDependency[] @relation("task_depends_on")
+  dependedOnBy TaskDependency[] @relation("task_depended_on_by")
 
   @@index([projectId, status])
   @@index([phaseId, sortOrder])

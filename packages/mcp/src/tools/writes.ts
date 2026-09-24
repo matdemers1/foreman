@@ -238,7 +238,8 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
     title: 'Link',
     description:
       'Cite one entity from another: a task satisfies a requirement, a finding violates one, an ' +
-      'ADR supersedes another. Unlinking is confirmed first.',
+      'ADR supersedes another, a task depends_on a task it cannot start before. Unlinking is ' +
+      'confirmed first.',
     inputSchema: LinkInput,
     gate: (_client, input) => Promise.resolve(gateForLink(LinkInput.parse(input).remove)),
     run: async (client, input) => {

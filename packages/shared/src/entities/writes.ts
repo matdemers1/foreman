@@ -207,7 +207,13 @@ export type DeleteInput = z.infer<typeof DeleteInput>;
 export const LinkInput = z.object({
   from: HumanId,
   to: HumanId,
-  kind: z.enum(['satisfies', 'violates', 'relates', 'supersedes', 'extends']).default('relates'),
+  /**
+   * `depends_on` is task to task: `from` cannot start until `to` is done or cancelled, and the brief
+   * holds it back until then (FRM-REQ-179). Same project only, never a cycle (FRM-REQ-180).
+   */
+  kind: z
+    .enum(['satisfies', 'violates', 'relates', 'supersedes', 'extends', 'depends_on'])
+    .default('relates'),
   /** Remove the link instead of adding it. Always gated: unlinking loses a citation. */
   remove: z.boolean().default(false),
 });

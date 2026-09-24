@@ -3,6 +3,9 @@ import type { Db } from '../db.js';
 import type { EntityType } from '../generated/prisma/enums.js';
 import { NotFound } from './errors.js';
 
+/** How a dependency edge names the task at its other end. */
+const EDGE = { humanId: true, title: true, status: true } as const;
+
 /**
  * One entity by human ID, with what cites it.
  *
@@ -106,6 +109,8 @@ async function findOne(
           requirements: {
             select: { requirement: { select: { humanId: true, statement: true } } },
           },
+          dependsOn: { where: { dependsOn: { deletedAt: null } }, select: { dependsOn: { select: EDGE } } },
+          dependedOnBy: { where: { task: { deletedAt: null } }, select: { task: { select: EDGE } } },
         },
       });
       return row === null
@@ -116,15 +121,50 @@ async function findOne(
               ...row,
               files: row.files.map((f) => f.path),
               requirements: row.requirements.map((r) => r.requirement),
+              // Both directions (FRM-REQ-181): what this waits on, and what waits on it.
+              dependsOn: row.dependsOn.map((d) => d.dependsOn),
+              dependedOnBy: row.dependedOnBy.map((d) => d.task),
             },
           };
     }
     case 'phase': {
       const row = await db.phase.findFirst({
         where,
-        include: { tasks: { select: { humanId: true, title: true, status: true } } },
+        include: {
+          // The phase's whole dependency graph in one call (FRM-REQ-181): enough for a planner to
+          // order the work into waves and keep two parallel tasks off the same file.
+          tasks: {
+            where: { deletedAt: null },
+            orderBy: { sortOrder: 'asc' },
+            select: {
+              humanId: true,
+              title: true,
+              status: true,
+              size: true,
+              doneWhen: true,
+              files: { select: { path: true } },
+              dependsOn: {
+                where: { dependsOn: { deletedAt: null } },
+                select: { dependsOn: { select: { humanId: true } } },
+              },
+            },
+          },
+        },
       });
-      return row === null ? null : { id: row.id, entity: { ...row, number: row.number.toString() } };
+      return row === null
+        ? null
+        : {
+            id: row.id,
+            entity: {
+              ...row,
+              number: row.number.toString(),
+              tasks: row.tasks.map((task) => ({
+                ...task,
+                files: task.files.map((f) => f.path),
+                dependsOn: task.dependsOn.map((d) => d.dependsOn.humanId),
+              })),
+            },
+          };
     }
     case 'adr': {
       const row = await db.adr.findFirst({

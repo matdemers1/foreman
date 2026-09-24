@@ -1,7 +1,7 @@
 import { parseHumanId } from '@foreman/shared';
 import type { Db } from '../db.js';
 import type { EntityType, ReferenceKind } from '../generated/prisma/enums.js';
-import { record, type Actor } from './audit.js';
+import { record, type Actor, type TransactionClient } from './audit.js';
 import { getByHumanId } from './entities.js';
 import { Invalid } from './errors.js';
 
@@ -13,6 +13,11 @@ import { Invalid } from './errors.js';
  * `task_requirement` row (it is how coverage is counted), and ADR↔ADR is an `adr_relation` (it is
  * how a superseded decision knows what replaced it). The `reference` row is written either way, so
  * the backlinks are uniform.
+ *
+ * A third is task→task `depends_on`, kept in `task_dependency` because that is what the brief reads
+ * to decide a task is ready (FRM-REQ-179). It is the one link that can be *refused* on its shape
+ * rather than its existence: an edge to itself, to another project, or one that closes a cycle
+ * would leave a task that can never be offered, and nothing would say why (FRM-REQ-180).
  */
 
 /** The entity a human ID's type segment names. */
@@ -36,6 +41,46 @@ function typeOf(humanId: string): EntityType {
   const type = map[parsed.type];
   if (type === undefined) throw new Invalid(`${humanId} names no kind of entity Foreman knows`);
   return type;
+}
+
+/**
+ * The chain of dependencies from `startId` to `goalId`, as human IDs from start to goal inclusive,
+ * or null when there is none. Adding `goal depends_on start` closes
+ * a cycle exactly when this finds a path, and the path is what the refusal shows, because "would
+ * create a cycle" without the cycle leaves the reader to go and find it.
+ */
+async function pathBetween(
+  tx: TransactionClient,
+  startId: string,
+  goalId: string,
+): Promise<string[] | null> {
+  const cameFrom = new Map<string, string | null>([[startId, null]]);
+  let frontier = [startId];
+
+  while (frontier.length > 0) {
+    const edges = await tx.taskDependency.findMany({
+      where: { taskId: { in: frontier } },
+      select: { taskId: true, dependsOnId: true },
+    });
+    const next: string[] = [];
+    for (const edge of edges) {
+      if (cameFrom.has(edge.dependsOnId)) continue;
+      cameFrom.set(edge.dependsOnId, edge.taskId);
+      next.push(edge.dependsOnId);
+    }
+    if (cameFrom.has(goalId)) {
+      const ids: string[] = [];
+      for (let at: string | null = goalId; at !== null; at = cameFrom.get(at) ?? null) ids.unshift(at);
+      const tasks = await tx.task.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, humanId: true },
+      });
+      const humanIds = new Map(tasks.map((t) => [t.id, t.humanId]));
+      return ids.map((id) => humanIds.get(id) ?? id);
+    }
+    frontier = next;
+  }
+  return null;
 }
 
 export interface LinkResult {
@@ -63,10 +108,39 @@ export async function link(
   const fromId = String(source.entity['id']);
   const toId = String(target.entity['id']);
 
+  if (kind === 'depends_on') {
+    if (fromType !== 'task' || toType !== 'task') {
+      throw new Invalid(`depends_on links a task to a task; ${from} → ${to} is not that`);
+    }
+    if (fromId === toId) throw new Invalid(`${from} cannot depend on itself`);
+    if (source.entity['projectId'] !== target.entity['projectId']) {
+      throw new Invalid(
+        `${from} and ${to} are in different projects; a dependency stays inside one, because ` +
+          'the brief that honours it is per project',
+      );
+    }
+  }
+
   // `extends` is an ADR relation and not a reference kind; every other kind is both.
   const referenceKind: ReferenceKind = kind === 'extends' ? 'relates' : kind;
 
   return db.$transaction(async (tx) => {
+    if (kind === 'depends_on') {
+      // Inside the transaction, so two edges written at once cannot each pass the check and
+      // together close a loop the check was there to refuse.
+      const loop = await pathBetween(tx, toId, fromId);
+      if (loop !== null) {
+        throw new Invalid(
+          `${from} depends_on ${to} would close a cycle: ${[from, ...loop].join(' → ')}`,
+        );
+      }
+      await tx.taskDependency.upsert({
+        where: { taskId_dependsOnId: { taskId: fromId, dependsOnId: toId } },
+        create: { taskId: fromId, dependsOnId: toId },
+        update: {},
+      });
+    }
+
     const existing = await tx.reference.findUnique({
       where: {
         fromType_fromId_toType_toId_kind: {
@@ -155,6 +229,9 @@ export async function unlink(
     }
     if (fromType === 'adr' && toType === 'adr') {
       await tx.adrRelation.deleteMany({ where: { adrId: fromId, relatedAdrId: toId } });
+    }
+    if (kind === 'depends_on') {
+      await tx.taskDependency.deleteMany({ where: { taskId: fromId, dependsOnId: toId } });
     }
 
     await record(tx, {

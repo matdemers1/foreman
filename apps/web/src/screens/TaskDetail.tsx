@@ -33,7 +33,35 @@ interface TaskEntity {
   completedAt: string | null;
   files: string[];
   requirements: { humanId: string; statement: string }[];
+  dependsOn: DependencyEdge[];
+  dependedOnBy: DependencyEdge[];
   phase: { humanId: string; name: string } | null;
+}
+
+interface DependencyEdge {
+  humanId: string;
+  title: string;
+  status: string;
+}
+
+/** A task waits on unfinished work until every task it depends on is done or cancelled. */
+function isUnfinished(edge: DependencyEdge): boolean {
+  return edge.status !== 'done' && edge.status !== 'cancelled';
+}
+
+function DependencyList({ edges }: { edges: DependencyEdge[] }) {
+  return (
+    <Stack gap="8" as="ul">
+      {edges.map((edge) => (
+        <li key={edge.humanId}>
+          <Link href={`/tasks/${edge.humanId}`}>
+            <code>{edge.humanId}</code>
+          </Link>{' '}
+          — {edge.title} <span className="fm-muted">({edge.status.replace('_', ' ')})</span>
+        </li>
+      ))}
+    </Stack>
+  );
 }
 
 export function TaskDetail({ humanId }: { humanId: string }) {
@@ -168,6 +196,30 @@ export function TaskDetail({ humanId }: { humanId: string }) {
           </Stack>
         )}
       </Card>
+
+      {task.dependsOn.length === 0 && task.dependedOnBy.length === 0 ? null : (
+        <Card>
+          <CardTitle>Dependencies</CardTitle>
+          <Stack gap="12">
+            {task.dependsOn.length === 0 ? null : (
+              <div>
+                <p>
+                  {task.dependsOn.some(isUnfinished)
+                    ? 'Waits on unfinished work, so the brief holds it back:'
+                    : 'Depends on, all finished:'}
+                </p>
+                <DependencyList edges={task.dependsOn} />
+              </div>
+            )}
+            {task.dependedOnBy.length === 0 ? null : (
+              <div>
+                <p>Needed before:</p>
+                <DependencyList edges={task.dependedOnBy} />
+              </div>
+            )}
+          </Stack>
+        </Card>
+      )}
 
       <Card>
         <CardTitle>Declared files</CardTitle>
