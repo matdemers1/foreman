@@ -29,7 +29,10 @@ export interface Coverage {
   };
   /** Musts with no task citing them. The number that decides whether a phase can close. */
   readonly uncoveredMusts: readonly CoverageHole[];
-  /** Any priority, uncovered. Worth seeing, but not blocking. */
+  /**
+   * Any priority but Won't, uncovered. Worth seeing, but not blocking. A Won't has nothing to
+   * build, so no task citing it is the correct state, not a hole.
+   */
   readonly uncovered: readonly CoverageHole[];
   /** Requirements nothing can be checked against, which is a different kind of hole. */
   readonly withoutAcceptanceTest: readonly CoverageHole[];
@@ -40,6 +43,7 @@ export interface Coverage {
 }
 
 const MUST = 'M';
+const WONT = 'W';
 
 export async function coverageFor(db: Db, code: string): Promise<Coverage> {
   const project = await db.project.findFirst({ where: { code, deletedAt: null } });
@@ -80,7 +84,7 @@ export async function coverageFor(db: Db, code: string): Promise<Coverage> {
     if (isMust) musts += 1;
     if (isMust && isCovered) mustsCovered += 1;
 
-    if (!isCovered) {
+    if (!isCovered && requirement.priority !== WONT) {
       uncovered.push(hole(requirement, 'uncovered'));
       if (isMust) uncoveredMusts.push(hole(requirement, 'uncovered'));
     }

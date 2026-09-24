@@ -110,13 +110,17 @@ export function ProjectOverview({ code }: { code: string }) {
       <Stack gap="24">
         <Grid minItemWidth="sm">
           <StatCard
-            label="Uncovered requirements"
-            value={brief.drift.uncoveredRequirements}
-            tone={brief.drift.uncoveredRequirements === 0 ? 'success' : 'warning'}
-            detail={brief.drift.uncoveredRequirements === 0 ? 'Every Must is cited' : 'Musts with no task'}
-            {...(brief.drift.uncoveredRequirements === 0
+            label="Coverage holes"
+            value={brief.drift.counts['coverage-hole']}
+            tone={brief.drift.counts['coverage-hole'] === 0 ? 'success' : 'warning'}
+            detail={
+              brief.drift.counts['coverage-hole'] === 0
+                ? 'Every Must has a task, every task a reason'
+                : 'Musts with no task, or tasks citing nothing'
+            }
+            {...(brief.drift.counts['coverage-hole'] === 0
               ? {}
-              : { href: `/projects/${code}/requirements?uncovered=true` })}
+              : { href: `/projects/${code}/drift` })}
           />
           <StatCard
             label="Open criticals"

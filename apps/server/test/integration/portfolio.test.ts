@@ -183,7 +183,15 @@ describe.skipIf(url === undefined)('portfolio and search', () => {
       expect(alpha?.tasks).toEqual({ open: 1, blocked: 1, done: 1 });
       expect(alpha?.openCriticals).toBe(1);
       expect(alpha?.ci).toEqual({ conclusion: 'failure', unknown: false });
-      expect(alpha?.drift.uncoveredRequirements).toBe(2);
+      // The badge's breakdown is the drift screen's, part for part, and sums to the badge.
+      const screen = await get<{ counts: Record<string, number>; total: number }>(
+        '/projects/PFA/drift',
+      );
+      expect(alpha?.drift).toEqual({ counts: screen.counts, total: screen.total });
+      expect(alpha?.drift.counts['coverage-hole']).toBeGreaterThanOrEqual(2);
+      expect(Object.values(alpha?.drift.counts ?? {}).reduce((a, b) => a + b, 0)).toBe(
+        alpha?.drift.total,
+      );
       expect(alpha?.lastActivityAt).not.toBeNull();
     });
 

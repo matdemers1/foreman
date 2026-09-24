@@ -1,6 +1,6 @@
 import type { Db } from '../db.js';
 import { phaseInFlight } from './wherewestand.js';
-import { driftFor } from './drift.js';
+import { driftFor, type DriftCategory } from './drift.js';
 
 /**
  * The portfolio — one row per project, answering "where is everything" at a glance
@@ -20,9 +20,11 @@ export interface PortfolioRow {
   readonly tasks: { readonly open: number; readonly blocked: number; readonly done: number };
   readonly openCriticals: number;
   readonly ci: { readonly conclusion: string | null; readonly unknown: boolean };
+  /** Proposals awaiting review (ADR-005). Not drift, so not inside it — see `Brief`. */
+  readonly unconfirmedAttributions: number;
   readonly drift: {
-    readonly uncoveredRequirements: number;
-    readonly unconfirmedAttributions: number;
+    /** The drift engine's own per-category counts; they sum to `total`. */
+    readonly counts: Readonly<Record<DriftCategory, number>>;
     /** The badge (FRM-REQ-127). The same engine the drift screen reads, so they cannot disagree. */
     readonly total: number;
   };
@@ -39,7 +41,7 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
   // thousand — and it keeps each column's meaning legible. If that ever changes, this is one query.
   return Promise.all(
     projects.map(async (project): Promise<PortfolioRow> => {
-      const [phase, open, blocked, done, criticals, check, uncovered, unconfirmed, lastCommit] =
+      const [phase, open, blocked, done, criticals, check, unconfirmed, drift, lastCommit] =
         await Promise.all([
           // The same definition the brief uses. Taking `status: 'active'` alone said `null` for
           // every one of the nine projects imported at the cutover, while the brief beside it
@@ -67,9 +69,6 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
             orderBy: { completedAt: 'desc' },
             select: { conclusion: true },
           }),
-          db.requirement.count({
-            where: { projectId: project.id, deletedAt: null, tasks: { none: {} } },
-          }),
           // Unconfirmed only — a proposal is not progress (ADR-005).
           db.commitTask.count({
             where: {
@@ -78,6 +77,7 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
               task: { projectId: project.id, deletedAt: null },
             },
           }),
+          driftFor(db, project.code),
           db.commit.findFirst({
             where: { repo: { projectId: project.id } },
             orderBy: { committedAt: 'desc' },
@@ -100,11 +100,8 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
           // Grey, not green: never ingested is not the same as passing.
           unknown: check === null,
         },
-        drift: {
-          uncoveredRequirements: uncovered,
-          unconfirmedAttributions: unconfirmed,
-          total: (await driftFor(db, project.code)).total,
-        },
+        unconfirmedAttributions: unconfirmed,
+        drift: { counts: drift.counts, total: drift.total },
         lastActivityAt: lastCommit?.committedAt.toISOString() ?? null,
       };
     }),

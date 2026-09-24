@@ -34,6 +34,12 @@ describe.skipIf(url === undefined)('the session brief', () => {
     return { brief: (await res.json()) as Brief, tokensHeader: res.headers.get('x-foreman-approx-tokens') };
   };
 
+  const get = async <T>(path: string): Promise<T> => {
+    const res = await fetch(`${origin}/api${path}`, { headers: { cookie } });
+    expect(res.status).toBe(200);
+    return (await res.json()) as T;
+  };
+
   beforeAll(async () => {
     config = loadConfig({
       NODE_ENV: 'test',
@@ -214,7 +220,7 @@ describe.skipIf(url === undefined)('the session brief', () => {
     // The task is still work to do: a file-path coincidence has not completed it.
     expect(brief.nextTasks.map((t) => t.humanId)).toEqual([`${CODE}-T-1.1`]);
     // And the proposal is surfaced as something awaiting a decision.
-    expect(brief.drift.unconfirmedAttributions).toBe(1);
+    expect(brief.unconfirmedAttributions).toBe(1);
   });
 
   it('reports CI as unknown rather than as failing when nothing has been ingested', async () => {
@@ -316,8 +322,53 @@ describe.skipIf(url === undefined)('the session brief', () => {
     });
 
     const { brief } = await getBrief();
-    expect(brief.drift.uncoveredRequirements).toBe(1);
-    expect(brief.drift.firedRisks).toBe(1);
+    expect(brief.drift.counts['coverage-hole']).toBe(1);
+    expect(brief.drift.counts['fired-tripwire']).toBe(1);
+  });
+
+  it('breaks drift down the way the drift engine does, so the parts sum to the total', async () => {
+    // DI on 2026-09-24: a breakdown of 0 / 0 / 0 beside a total of 204, then 5 beside a total of 0.
+    // Each shape below is one the old breakdown could not see or miscounted.
+    await db.requirement.createMany({
+      data: [
+        { projectId, humanId: `${CODE}-REQ-001`, seq: 1, statement: 'An uncovered Must.' },
+        // A Won't has nothing to build: no task citing it is correct, not a hole.
+        { projectId, humanId: `${CODE}-REQ-002`, seq: 2, statement: 'A Won’t.', priority: 'W' },
+      ],
+    });
+    // Work citing nothing — the category the old breakdown had no field for.
+    await addTask(`${CODE}-T-1.1`);
+    await addTask(`${CODE}-T-1.2`);
+    // An accepted ADR nothing cites.
+    await db.adr.create({
+      data: { projectId, humanId: `${CODE}-ADR-001`, number: 1, title: 'Uncited', status: 'accepted' },
+    });
+
+    const { brief } = await getBrief();
+    const screen = await get<{ counts: Record<string, number>; total: number }>(
+      `/projects/${CODE}/drift`,
+    );
+    const { items } = await get<{ items: { code: string; drift: Brief['drift'] }[] }>(
+      '/portfolio',
+    );
+    const badge = items.find((row) => row.code === CODE)?.drift;
+
+    expect(brief.drift.counts).toEqual({
+      'coverage-hole': 3,
+      'stale-task': 0,
+      'fired-tripwire': 0,
+      'failed-exit-gate': 0,
+      'orphan-adr': 1,
+    });
+    const sum = Object.values(brief.drift.counts).reduce((a, b) => a + b, 0);
+    expect(sum).toBe(brief.drift.total);
+    // The three surfaces, part for part and not only in total.
+    expect(brief.drift).toEqual({ counts: screen.counts, total: screen.total });
+    expect(badge).toEqual(brief.drift);
+
+    // And coverage agrees about the Won't.
+    const coverage = await get<{ uncovered: { humanId: string }[] }>(`/projects/${CODE}/coverage`);
+    expect(coverage.uncovered.map((r) => r.humanId)).toEqual([`${CODE}-REQ-001`]);
   });
 
   it('stays inside its token budget with a realistic amount of everything', async () => {

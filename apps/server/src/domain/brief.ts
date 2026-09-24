@@ -1,5 +1,5 @@
 import type { Db } from '../db.js';
-import { driftFor } from './drift.js';
+import { driftFor, type DriftCategory } from './drift.js';
 import { NotFound } from './errors.js';
 import { phaseInFlight } from './wherewestand.js';
 
@@ -67,15 +67,25 @@ export interface Brief {
     /** True when nothing has been ingested — "unknown" is an honest answer, not a failure. */
     readonly unknown: boolean;
   };
+  /**
+   * Attributions waiting to be confirmed or rejected. Proposals, not facts (ADR-005) — and not
+   * drift, which is why it sits beside the breakdown rather than inside it: a number inside
+   * `drift` that the total does not include is exactly the disagreement below exists to prevent.
+   */
+  readonly unconfirmedAttributions: number;
   readonly drift: {
-    /** Requirements no task covers. The register's whole purpose. */
-    readonly uncoveredRequirements: number;
-    /** Attributions waiting to be confirmed or rejected. Proposals, not facts. */
-    readonly unconfirmedAttributions: number;
-    /** Risks whose tripwire has fired. */
-    readonly firedRisks: number;
     /**
-     * Everything the drift engine finds, as one number (FRM-REQ-128).
+     * The drift engine's own count per category — the same `counts` the drift screen shows.
+     *
+     * Until 2026-09-24 this was three counts the brief computed for itself beside a total it read
+     * from the engine: DI reported `0 / 0 / 0` over a total of 204 (199 tasks citing nothing, five
+     * uncited ADRs), and once those were fixed, five uncovered requirements over a total of 0 — all
+     * five Won'ts, which drift rightly does not count. A breakdown that does not sum to its total is
+     * two answers to one question.
+     */
+    readonly counts: Readonly<Record<DriftCategory, number>>;
+    /**
+     * Everything the drift engine finds, as one number (FRM-REQ-128). The sum of `counts`.
      *
      * Read from the same engine the drift screen and the portfolio badge use, so the three can
      * never disagree — and two of Foreman's own numbers disagreeing is the fastest way for it to
@@ -97,7 +107,7 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
   // One definition, shared with the portfolio. See `wherewestand.ts` for why it is not inline.
   const activePhase = await phaseInFlight(db, project.id);
 
-  const [nextTasks, blocked, criticals, latestCheck, uncovered, unconfirmed, firedRisks, commits] =
+  const [nextTasks, blocked, criticals, latestCheck, unconfirmed, drift, commits] =
     await Promise.all([
       db.task.findMany({
         where: {
@@ -138,9 +148,6 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
         orderBy: { completedAt: 'desc' },
         select: { conclusion: true, commitSha: true, completedAt: true },
       }),
-      db.requirement.count({
-        where: { projectId: project.id, deletedAt: null, tasks: { none: {} } },
-      }),
       db.commitTask.count({
         where: {
           confirmed: false,
@@ -148,7 +155,7 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
           task: { projectId: project.id, deletedAt: null },
         },
       }),
-      db.risk.count({ where: { projectId: project.id, deletedAt: null, status: 'fired' } }),
+      driftFor(db, project.code),
       db.commit.findMany({
         where: { repo: { projectId: project.id } },
         orderBy: { committedAt: 'desc' },
@@ -213,12 +220,8 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
       // Grey, not red: nothing ingested is not the same as a failing build.
       unknown: latestCheck === null,
     },
-    drift: {
-      uncoveredRequirements: uncovered,
-      unconfirmedAttributions: unconfirmed,
-      firedRisks,
-      total: (await driftFor(db, project.code)).total,
-    },
+    unconfirmedAttributions: unconfirmed,
+    drift: { counts: drift.counts, total: drift.total },
     recentCommits: commits.map((commit) => ({
       sha: commit.sha.slice(0, 7),
       message: commit.message.split('\n')[0] ?? '',

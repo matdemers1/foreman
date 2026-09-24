@@ -176,24 +176,24 @@ describe.skipIf(url === undefined)('an unconfirmed attribution is never truth', 
   it('shows the task as outstanding in the brief', async () => {
     const brief = await get<{
       nextTasks: { humanId: string }[];
-      drift: { unconfirmedAttributions: number };
+      unconfirmedAttributions: number;
     }>(`/brief/${CODE}`);
 
     expect(brief.nextTasks.map((t) => t.humanId)).toContain(taskHumanId);
-    // And the proposal is surfaced as drift — visible, and counted as work to review rather than
-    // as work that happened.
-    expect(brief.drift.unconfirmedAttributions).toBe(1);
+    // And the proposal is surfaced — visible, and counted as work to review rather than as work
+    // that happened.
+    expect(brief.unconfirmedAttributions).toBe(1);
   });
 
   it('counts it as drift on the portfolio, never as progress', async () => {
     const portfolio = await get<{
-      items: { code: string; tasks: { done: number; open: number }; drift: { unconfirmedAttributions: number } }[];
+      items: { code: string; tasks: { done: number; open: number }; unconfirmedAttributions: number }[];
     }>('/portfolio');
 
     const row = portfolio.items.find((p) => p.code === CODE);
     expect(row?.tasks.done).toBe(0);
     expect(row?.tasks.open).toBe(1);
-    expect(row?.drift.unconfirmedAttributions).toBe(1);
+    expect(row?.unconfirmedAttributions).toBe(1);
   });
 
   it('changes every one of those answers the moment it is confirmed and the task is marked done', async () => {
@@ -204,8 +204,8 @@ describe.skipIf(url === undefined)('an unconfirmed attribution is never truth', 
       body: JSON.stringify({ status: 'done' }),
     });
 
-    const brief = await get<{ drift: { unconfirmedAttributions: number } }>(`/brief/${CODE}`);
-    expect(brief.drift.unconfirmedAttributions).toBe(0);
+    const brief = await get<{ unconfirmedAttributions: number }>(`/brief/${CODE}`);
+    expect(brief.unconfirmedAttributions).toBe(0);
 
     const res = await api(`/projects/${CODE}/phases/${phaseHumanId}`, {
       method: 'PATCH',

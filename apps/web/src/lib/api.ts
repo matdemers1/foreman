@@ -161,7 +161,10 @@ export interface PortfolioRow {
   openCriticals: number;
   /** `unknown` is a third state, and renders grey rather than green (S-04). */
   ci: { conclusion: string | null; unknown: boolean };
-  drift: { uncoveredRequirements: number; unconfirmedAttributions: number; total: number };
+  /** Proposals awaiting review — not drift, so not inside it. */
+  unconfirmedAttributions: number;
+  /** `counts` is the drift engine's own breakdown and sums to `total`. */
+  drift: { counts: Record<DriftItem['category'], number>; total: number };
   lastActivityAt: string | null;
 }
 
@@ -239,12 +242,8 @@ export interface Brief {
   blocked: { humanId: string; title: string; reason: string | null }[];
   openCriticals: { humanId: string; severity: string; title: string; location: string | null }[];
   ci: { conclusion: string | null; commitSha: string | null; at: string | null; unknown: boolean };
-  drift: {
-    uncoveredRequirements: number;
-    unconfirmedAttributions: number;
-    firedRisks: number;
-    total: number;
-  };
+  unconfirmedAttributions: number;
+  drift: { counts: Record<DriftItem['category'], number>; total: number };
   recentCommits: { sha: string; message: string; at: string }[];
 }
 
