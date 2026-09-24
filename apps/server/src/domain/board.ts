@@ -4,12 +4,13 @@ import { record, type Actor } from './audit.js';
 import { Conflict, Invalid, NotFound } from './errors.js';
 
 /**
- * The innovation-fund board: scoring, discussion and funding (FRM-ADR-016).
+ * Scoring, discussion and funding on project ideas (FRM-ADR-016, FRM-ADR-017).
  *
- * Everything here is inert unless `FOREMAN_MODE=board`. The routes are mounted either way — a
- * feature that exists only in one build is a feature only one build has ever tested — but the
- * guards in front of them answer 404 in `solo`, so a personal instance is unchanged and its
- * console never offers any of it.
+ * Built for the innovation board and then found to be just as useful alone. **Scoring and
+ * discussion work in both modes**: on a solo instance they are your own impact/effort read on an
+ * idea and your thoughts log about it, which is the same record with one author instead of five.
+ * Only **funding** is the board's, along with members and invitations, and those routes still
+ * answer 404 in `solo`.
  *
  * **Three rules carry the weight, and all three are about who sees what.**
  *
@@ -156,6 +157,40 @@ export async function comment(
       entityId: saved.id,
       entityHumanId: humanId,
       after: { internal: saved.internal },
+    });
+    return saved;
+  });
+}
+
+/**
+ * Reword a thought you wrote (FRM-REQ-175).
+ *
+ * Your own only, and not even an admin's override: withdrawing somebody's comment removes it from
+ * view, which a moderator may need to do, but rewording it puts words in their mouth. The audit
+ * event keeps the original, so the thread's history is still there for anybody who asks.
+ */
+export async function editComment(db: Db, actor: Actor, userId: string, id: string, body: string) {
+  const before = await db.ideaComment.findFirst({ where: { id, deletedAt: null } });
+  if (before === null) throw new NotFound(id);
+  if (before.userId !== userId) {
+    throw new Invalid('you can only reword your own', [
+      { path: 'id', message: 'this was written by somebody else' },
+    ]);
+  }
+
+  return db.$transaction(async (tx) => {
+    const saved = await tx.ideaComment.update({
+      where: { id },
+      data: { body },
+      include: { user: { select: { id: true, displayName: true, role: true } } },
+    });
+    await record(tx, {
+      ...actor,
+      action: 'update',
+      entityType: 'idea_comment',
+      entityId: id,
+      before: { body: before.body },
+      after: { body },
     });
     return saved;
   });

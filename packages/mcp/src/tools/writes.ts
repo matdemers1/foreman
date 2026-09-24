@@ -138,8 +138,9 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       const kind = kindOf(args.id);
       const body: Record<string, unknown> = {};
       if (kind === 'project-ideas') {
-        // Its `pitch` is the field `text` and `body` both mean here, and it has no project path.
-        if (args.text !== undefined) body['title'] = args.text;
+        // `text` is the title unless a canvas section is named, in which case it is that section.
+        // `body` is the pitch. No project path, because a project idea has no project.
+        if (args.text !== undefined) body[args.section ?? 'title'] = args.text;
         if (args.body !== undefined) body['pitch'] = args.body;
         if (args.reason !== undefined) body['reason'] = args.reason;
         return client.patch(`/api/project-ideas/${args.id}`, body);

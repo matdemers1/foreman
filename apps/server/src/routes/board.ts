@@ -1,28 +1,19 @@
-import {
-  IdeaCommentCreate,
-  IdeaScoreInput,
-  InviteCreate,
-  MemberUpdate,
-  ProjectIdeaFund,
-} from '@foreman/shared';
+import { InviteCreate, MemberUpdate, ProjectIdeaFund } from '@foreman/shared';
 import { Router } from 'express';
-import { requireAuth, requireRole, requireScope, reviews } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import type { Config } from '../config.js';
 import type { Db } from '../db.js';
-import {
-  comment,
-  commentsFor,
-  deleteComment,
-  fund,
-  score,
-  scoresFor,
-} from '../domain/board.js';
+import { fund } from '../domain/board.js';
 import { invite, listMembers, setRole, suspend } from '../domain/members.js';
 import { notifyDecision } from '../adapters/mail.js';
 import { actorOf, handler, param, parseBody } from './helpers.js';
 
 /**
- * The innovation-fund board's own surface (FRM-ADR-016): members, scoring, discussion, funding.
+ * The innovation-fund board's own surface (FRM-ADR-016): members, invitations and funding.
+ *
+ * Scoring and discussion used to live here too, and moved to `/api/project-ideas/:id/…` when it
+ * turned out a solo instance wanted them as much as a board did (FRM-ADR-017). What is left is the
+ * part that only makes sense with more than one person: who is on the board, and money.
  *
  * **Mounted in both modes and guarded in one.** A route that exists only in the board build is a
  * route only the board build has ever run, and the difference would surface as a 404 in
@@ -100,88 +91,6 @@ export function boardRoutes(db: Db, config: Config): Router {
         member = await suspend(db, actorOf(req), id, body.suspended);
       }
       res.json(member ?? { unchanged: true });
-    }),
-  );
-
-  // ── Scoring ────────────────────────────────────────────────────────────────
-  router.get(
-    '/ideas/:humanId/scores',
-    boardOnly,
-    requireRole(config, 'admin', 'reviewer'),
-    handler(async (req, res) => {
-      res.json(await scoresFor(db, param(req, 'humanId')));
-    }),
-  );
-
-  router.put(
-    '/ideas/:humanId/scores',
-    boardOnly,
-    canWrite,
-    requireRole(config, 'admin', 'reviewer'),
-    handler(async (req, res) => {
-      const body = parseBody(IdeaScoreInput, req, res);
-      if (body === null) return;
-      const userId = req.auth?.userId;
-      if (userId === null || userId === undefined) {
-        // A token has scopes, not seniority. Scoring is a person's judgement and is recorded
-        // against a person, so there is nobody here to record it against.
-        res.status(403).json({ error: 'a token cannot score a submission' });
-        return;
-      }
-      res.json(await score(db, actorOf(req), userId, param(req, 'humanId'), body));
-    }),
-  );
-
-  // ── Discussion ─────────────────────────────────────────────────────────────
-  router.get(
-    '/ideas/:humanId/comments',
-    boardOnly,
-    handler(async (req, res) => {
-      const items = await commentsFor(db, param(req, 'humanId'), reviews(config, req.auth));
-      res.json({ items });
-    }),
-  );
-
-  router.post(
-    '/ideas/:humanId/comments',
-    boardOnly,
-    canWrite,
-    handler(async (req, res) => {
-      const body = parseBody(IdeaCommentCreate, req, res);
-      if (body === null) return;
-      const userId = req.auth?.userId;
-      if (userId === null || userId === undefined) {
-        res.status(403).json({ error: 'a token cannot comment' });
-        return;
-      }
-      res
-        .status(201)
-        .json(
-          await comment(
-            db,
-            actorOf(req),
-            userId,
-            param(req, 'humanId'),
-            body,
-            reviews(config, req.auth),
-          ),
-        );
-    }),
-  );
-
-  router.delete(
-    '/comments/:id',
-    boardOnly,
-    canWrite,
-    handler(async (req, res) => {
-      const userId = req.auth?.userId;
-      if (userId === null || userId === undefined) {
-        res.status(403).json({ error: 'a token cannot withdraw a comment' });
-        return;
-      }
-      res.json(
-        await deleteComment(db, actorOf(req), userId, param(req, 'id'), req.auth?.role === 'admin'),
-      );
     }),
   );
 

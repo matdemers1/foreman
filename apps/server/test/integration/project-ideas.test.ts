@@ -245,4 +245,152 @@ describe.skipIf(url === undefined)('project ideas', () => {
     expect(undone.status, await undone.clone().text()).toBe(200);
     expect((await api(`/project-ideas/${idea.humanId}`)).status).toBe(200);
   });
+
+  // ── The canvas (FRM-ADR-017) ────────────────────────────────────────────────
+
+  describe('the canvas', () => {
+    interface Detail extends Idea {
+      problem: string | null;
+      approach: string | null;
+      risks: string | null;
+      notes: string | null;
+      excitement: number | null;
+      tags: string[];
+      questions: { id: string; text: string; done: boolean }[];
+      links: { id: string; label: string; url: string }[];
+      maturity: { filled: number; total: number };
+    }
+    const detail = async (humanId: string): Promise<Detail> =>
+      (await (await api(`/project-ideas/${humanId}`)).json()) as Detail;
+
+    it('holds named sections, and an empty one clears rather than counting as written', async () => {
+      const idea = await create({ title: 'PIT a canvas', problem: 'Invoices are keyed twice.' });
+      expect((await detail(idea.humanId)).problem).toBe('Invoices are keyed twice.');
+
+      // The console sends '' when somebody deletes a section's text. Stored as '', it would count
+      // as written to anything that checked for null — and the maturity bar would lie.
+      await patch(idea.humanId, { problem: '   ' });
+      expect((await detail(idea.humanId)).problem).toBeNull();
+    });
+
+    it('counts how much of the thinking is written down', async () => {
+      const idea = await create({
+        title: 'PIT maturing',
+        pitch: 'A line.',
+        problem: 'A problem.',
+        approach: 'A sketch.',
+        // The scratchpad is not counted: a full scratchpad is activity, not understanding.
+        notes: 'Pasted a great deal of text here.',
+      });
+      expect((await detail(idea.humanId)).maturity).toEqual({ filled: 3, total: 6 });
+
+      const list = (await (await api('/project-ideas')).json()) as {
+        items: (Idea & { maturity: { filled: number }; problem?: string })[];
+      };
+      const row = list.items.find((i) => i.humanId === idea.humanId);
+      expect(row?.maturity.filled).toBe(3);
+      // The list knows *whether* each section is written, not what it says. Forty ideas each
+      // carrying six essays is a payload for nothing.
+      expect(row && 'problem' in row).toBe(false);
+    });
+
+    it('normalises tags, so one tag does not become three', async () => {
+      const idea = await create({
+        title: 'PIT tagged',
+        tags: ['Hardware', 'hardware', ' home lab '],
+      });
+      expect((await detail(idea.humanId)).tags).toEqual(['hardware', 'home-lab']);
+    });
+
+    it('keeps checklists and links, and refuses a link that is not a URL', async () => {
+      const idea = await create({
+        title: 'PIT listed',
+        questions: [
+          { id: 'q1', text: 'Does the printer expose MQTT locally?', done: true },
+          { id: 'q2', text: 'Is Twilio the cheapest SMS route?', done: false },
+        ],
+        links: [{ id: 'l1', label: 'Bambu MQTT notes', url: 'https://example.com/mqtt' }],
+      });
+      const d = await detail(idea.humanId);
+      expect(d.questions.map((q) => q.done)).toEqual([true, false]);
+      expect(d.links[0]?.label).toBe('Bambu MQTT notes');
+
+      const bad = await patch(idea.humanId, {
+        links: [{ id: 'l2', label: 'nope', url: 'not a url' }],
+      });
+      expect(bad.status).toBe(400);
+    });
+
+    it('refuses an excitement outside one to five', async () => {
+      const idea = await create({ title: 'PIT keen' });
+      expect((await patch(idea.humanId, { excitement: 6 })).status).toBe(400);
+      expect((await patch(idea.humanId, { excitement: 4 })).status).toBe(200);
+      // And clears with null, which is "I have not decided how I feel", not zero.
+      expect((await patch(idea.humanId, { excitement: null })).status).toBe(200);
+      expect((await detail(idea.humanId)).excitement).toBeNull();
+    });
+
+    it('is found by what is written on it, not only by its title', async () => {
+      const idea = await create({ title: 'PIT unmemorable', risks: 'The zeppelin quota may run out.' });
+      const found = await api('/search?q=zeppelin&types=project_idea');
+      const hits = ((await found.json()) as { items: { humanId: string; snippet: string }[] }).items;
+      const hit = hits.find((h) => h.humanId === idea.humanId);
+      // And the snippet shows the risk — why it matched — rather than the empty pitch.
+      expect(hit?.snippet.toLowerCase()).toContain('zeppelin');
+    });
+
+    it('keeps a thoughts log you can reword', async () => {
+      const idea = await create({ title: 'PIT thought about' });
+      const made = await api(`/project-ideas/${idea.humanId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ body: 'First pass at the shape.' }),
+      });
+      expect(made.status).toBe(201);
+      const { id } = (await made.json()) as { id: string };
+
+      const edited = await api(`/project-ideas/${idea.humanId}/comments/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ body: 'Second pass: it is really two products.' }),
+      });
+      expect(edited.status).toBe(200);
+
+      const log = (await (await api(`/project-ideas/${idea.humanId}/comments`)).json()) as {
+        items: { body: string }[];
+      };
+      expect(log.items.map((t) => t.body)).toEqual(['Second pass: it is really two products.']);
+    });
+
+    it('hands the canvas to the new project as its discovery document', async () => {
+      const idea = await create({
+        title: 'PIT a print notifier',
+        pitch: 'Texts you when a print finishes.',
+        problem: 'You come back to a failed print an hour later.',
+        approach: '```mermaid\ngraph LR\n  printer --> mqtt --> sms\n```',
+        questions: [{ id: 'q1', text: 'Local MQTT or cloud?', done: false }],
+      });
+      await api(`/project-ideas/${idea.humanId}/comments`, {
+        method: 'POST',
+        body: JSON.stringify({ body: 'Start with LAN only.' }),
+      });
+
+      const res = await convert(idea.humanId, { code: 'PITA' });
+      expect(res.status, await res.clone().text()).toBe(201);
+      const { brief } = (await res.json()) as { brief: { id: string; title: string } | null };
+      // Without this the thinking stays on a frozen record beside the project instead of inside
+      // it, and the first planning session starts from a title.
+      expect(brief?.title).toBe('Idea brief — PIT a print notifier');
+
+      const docs = (await (await api('/projects/PITA/documents')).json()) as {
+        items: { kind: string; sections: { heading: string }[] }[];
+      };
+      const doc = docs.items.find((d) => d.kind === 'discovery');
+      expect(doc?.sections.map((x) => x.heading)).toEqual([
+        'Pitch',
+        'The problem',
+        'How it might work',
+        'Open questions',
+        'Thoughts',
+      ]);
+    });
+  });
 });

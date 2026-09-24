@@ -181,7 +181,7 @@ describe.skipIf(url === undefined)('the innovation board', () => {
   describe('scoring', () => {
     it('is reviewers-only, and is not shown to the submitter', async () => {
       const idea = await submit();
-      const scored = await as(REVIEWER, `/board/ideas/${idea.humanId}/scores`, {
+      const scored = await as(REVIEWER, `/project-ideas/${idea.humanId}/scores`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ impact: 5, effort: 2, note: 'Cheap, and it removes a whole job.' }),
@@ -204,13 +204,13 @@ describe.skipIf(url === undefined)('the innovation board', () => {
       );
       expect(submitterRow?.score).toBeNull();
 
-      expect((await as(SUBMITTER, `/board/ideas/${idea.humanId}/scores`)).status).toBe(403);
+      expect((await as(SUBMITTER, `/project-ideas/${idea.humanId}/scores`)).status).toBe(403);
     });
 
     it('treats a second score from the same reviewer as a change of mind', async () => {
       const idea = await submit();
       const put = (impact: number) =>
-        as(REVIEWER, `/board/ideas/${idea.humanId}/scores`, {
+        as(REVIEWER, `/project-ideas/${idea.humanId}/scores`, {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ impact, effort: 2 }),
@@ -219,7 +219,7 @@ describe.skipIf(url === undefined)('the innovation board', () => {
       await put(3);
 
       const { summary } = (await (
-        await as(REVIEWER, `/board/ideas/${idea.humanId}/scores`)
+        await as(REVIEWER, `/project-ideas/${idea.humanId}/scores`)
       ).json()) as { summary: { count: number; impact: number } };
       expect(summary.count).toBe(1);
       expect(summary.impact).toBe(3);
@@ -232,7 +232,7 @@ describe.skipIf(url === undefined)('the innovation board', () => {
         reason: 'Clear payback inside a quarter.',
       });
 
-      const res = await as(REVIEWER, `/board/ideas/${idea.humanId}/scores`, {
+      const res = await as(REVIEWER, `/project-ideas/${idea.humanId}/scores`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ impact: 1, effort: 5 }),
@@ -246,22 +246,22 @@ describe.skipIf(url === undefined)('the innovation board', () => {
   describe('discussion', () => {
     it('keeps an internal note away from the submitter', async () => {
       const idea = await submit();
-      await post(REVIEWER, `/board/ideas/${idea.humanId}/comments`, {
+      await post(REVIEWER, `/project-ideas/${idea.humanId}/comments`, {
         body: 'BRD internal: is the sponsor actually committed?',
         internal: true,
       });
-      await post(REVIEWER, `/board/ideas/${idea.humanId}/comments`, {
+      await post(REVIEWER, `/project-ideas/${idea.humanId}/comments`, {
         body: 'BRD public: what is the integration cost?',
         internal: false,
       });
 
       const seenByReviewer = (await (
-        await as(REVIEWER, `/board/ideas/${idea.humanId}/comments`)
+        await as(REVIEWER, `/project-ideas/${idea.humanId}/comments`)
       ).json()) as { items: { body: string }[] };
       expect(seenByReviewer.items).toHaveLength(2);
 
       const seenBySubmitter = (await (
-        await as(SUBMITTER, `/board/ideas/${idea.humanId}/comments`)
+        await as(SUBMITTER, `/project-ideas/${idea.humanId}/comments`)
       ).json()) as { items: { body: string }[] };
       expect(seenBySubmitter.items).toHaveLength(1);
       expect(seenBySubmitter.items[0]?.body).toContain('public');
@@ -269,7 +269,7 @@ describe.skipIf(url === undefined)('the innovation board', () => {
 
     it('will not let a submitter write one they could not read back', async () => {
       const idea = await submit();
-      const res = await post(SUBMITTER, `/board/ideas/${idea.humanId}/comments`, {
+      const res = await post(SUBMITTER, `/project-ideas/${idea.humanId}/comments`, {
         body: 'BRD sneaky',
         internal: true,
       });
@@ -279,13 +279,13 @@ describe.skipIf(url === undefined)('the innovation board', () => {
     it('lets a person withdraw their own comment and nobody else’s', async () => {
       const idea = await submit();
       const made = (await (
-        await post(SUBMITTER, `/board/ideas/${idea.humanId}/comments`, { body: 'BRD mine' })
+        await post(SUBMITTER, `/project-ideas/${idea.humanId}/comments`, { body: 'BRD mine' })
       ).json()) as { id: string };
 
-      expect((await as(REVIEWER, `/board/comments/${made.id}`, { method: 'DELETE' })).status).toBe(
+      expect((await as(REVIEWER, `/project-ideas/${idea.humanId}/comments/${made.id}`, { method: 'DELETE' })).status).toBe(
         422,
       );
-      expect((await as(SUBMITTER, `/board/comments/${made.id}`, { method: 'DELETE' })).status).toBe(
+      expect((await as(SUBMITTER, `/project-ideas/${idea.humanId}/comments/${made.id}`, { method: 'DELETE' })).status).toBe(
         200,
       );
     });
@@ -428,11 +428,47 @@ describe.skipIf(url === undefined)('a solo Foreman is untouched by any of it', (
   });
 
   it('offers no board surface at all', async () => {
-    for (const path of ['/api/board/members', '/api/board/ideas/PI-001/comments']) {
-      const res = await fetch(`${origin}${path}`, { headers: { cookie } });
-      // 404, not 403: there is no board here, which is a different statement from "not for you".
-      expect(res.status, path).toBe(404);
-    }
+    // Members and money: the two things that only mean something with more than one person.
+    const members = await fetch(`${origin}/api/board/members`, { headers: { cookie } });
+    const fund = await fetch(`${origin}/api/board/ideas/PI-001/fund`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ amountCents: 100, reason: 'anything' }),
+    });
+    // 404, not 403: there is no board here, which is a different statement from "not for you".
+    expect(members.status).toBe(404);
+    expect(fund.status).toBe(404);
+  });
+
+  it('keeps a thoughts log and a self-rating, which are not board features', async () => {
+    // FRM-ADR-017: scoring and discussion moved out of the board because they turned out to be
+    // just as useful to one person. On a solo instance they are your impact/effort read on an idea
+    // and your running notes on it — and the operator's `submitter` row must not get in the way.
+    const made = await fetch(`${origin}/api/project-ideas`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'SOLO worth rating' }),
+    });
+    const idea = (await made.json()) as { humanId: string };
+
+    const thought = await fetch(`${origin}/api/project-ideas/${idea.humanId}/comments`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ body: 'Could reuse the Bindery ingest pipeline for this.' }),
+    });
+    expect(thought.status, await thought.clone().text()).toBe(201);
+
+    const rated = await fetch(`${origin}/api/project-ideas/${idea.humanId}/scores`, {
+      method: 'PUT',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ impact: 4, effort: 2 }),
+    });
+    expect(rated.status, await rated.clone().text()).toBe(200);
+
+    const list = await fetch(`${origin}/api/project-ideas`, { headers: { cookie } });
+    const row = ((await list.json()) as { items: { humanId: string; score: { ratio: number } | null }[] })
+      .items.find((i) => i.humanId === idea.humanId);
+    expect(row?.score?.ratio).toBe(2);
   });
 
   it('ignores roles entirely, so the one operator can still do everything', async () => {

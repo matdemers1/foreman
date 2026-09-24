@@ -10,7 +10,7 @@ import {
   IdeaStatus,
   RiskStatus,
 } from '../enums.js';
-import { ProjectCode } from '../ids.js';
+import { AnyId, ProjectCode } from '../ids.js';
 import { Instant, Timestamps, Uuid } from './common.js';
 
 /**
@@ -245,9 +245,119 @@ export type IdeaUpdate = z.infer<typeof IdeaUpdate>;
  * it into the project's `pitch`, so this is the one field in the ideas feature where writing a
  * paragraph is the point rather than a warning sign.
  */
+/**
+ * The canvas: the named sections a project idea grows into (FRM-ADR-017).
+ *
+ * **Named and prompted, not a blank page.** Foreman's anti-features include "no freeform wiki or
+ * note-taking" — the guardrail that stops it decaying back into the vault it replaced. A blank
+ * page per idea would be exactly that, one idea at a time. A handful of sections that each ask a
+ * specific question is the opposite: the structure is what makes an idea comparable to the next
+ * one, and what lets converting it hand the project a brief rather than a dump.
+ *
+ * Declared here, once, because four things read it and must agree: the console renders the
+ * sections in this order with these prompts, the API validates the keys, the MCP shim offers them
+ * as `section`, and converting writes them as the new project's discovery document.
+ */
+export const IDEA_SECTIONS = [
+  {
+    key: 'problem',
+    heading: 'The problem',
+    prompt: 'What is broken, and for whom? What do they do about it today?',
+  },
+  {
+    key: 'audience',
+    heading: 'Who it is for',
+    prompt: 'The one person this is for first. Not "everyone".',
+  },
+  {
+    key: 'approach',
+    heading: 'How it might work',
+    prompt: 'The rough shape — a sketch, a flow, a Mermaid diagram. Not a plan.',
+  },
+  {
+    key: 'whyNow',
+    heading: 'Why now',
+    prompt: 'What changed that makes this worth doing now, rather than never?',
+  },
+  {
+    key: 'risks',
+    heading: 'What would kill it',
+    prompt: 'The reasons it might not work, written before you are attached to it.',
+  },
+  {
+    key: 'notes',
+    heading: 'Scratchpad',
+    prompt: 'Anything that does not fit above. Half-thoughts, fragments, things to look up.',
+  },
+] as const;
+
+export type IdeaSectionKey = (typeof IDEA_SECTIONS)[number]['key'];
+export const IdeaSectionKey = z.enum(
+  IDEA_SECTIONS.map((s) => s.key) as [IdeaSectionKey, ...IdeaSectionKey[]],
+);
+
+/**
+ * The sections that say an idea has been *thought through*, as opposed to written down.
+ *
+ * The pitch and the five questions. The scratchpad is deliberately not one: a full scratchpad is
+ * evidence of activity, not of an idea being understood, and counting it would let the maturity
+ * figure be gamed by pasting.
+ */
+export const MATURITY_FIELDS = ['pitch', 'problem', 'audience', 'approach', 'whyNow', 'risks'] as const;
+
+/** A canvas section's body. Room for a diagram and some prose; not room for a spec. */
+const Section = z.string().max(20_000);
+
+/** One line of a checklist — an open question, or a next step. */
+export const IdeaChecklistItem = z.object({
+  /** Client-generated so an edit can name the item it changes without a round trip. */
+  id: z.string().min(1).max(40),
+  text: z.string().min(1).max(500),
+  done: z.boolean().default(false),
+});
+export type IdeaChecklistItem = z.infer<typeof IdeaChecklistItem>;
+
+export const IdeaLink = z.object({
+  id: z.string().min(1).max(40),
+  label: z.string().min(1).max(200),
+  url: z.url().max(2000),
+});
+export type IdeaLink = z.infer<typeof IdeaLink>;
+
+/**
+ * A tag: lower-case words joined by hyphens.
+ *
+ * Normalised on the way in rather than validated strictly, because the failure worth preventing
+ * is `Hardware`, `hardware` and `hardware ` being three tags that each hold a third of the ideas.
+ */
+const Tag = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .transform((t) => t.replace(/\s+/g, '-'))
+  .pipe(z.string().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/, 'letters, digits and hyphens'));
+
 export const ProjectIdeaCreate = z.object({
   title: z.string().min(1).max(300),
   pitch: z.string().max(4000).optional(),
+  problem: Section.optional(),
+  audience: Section.optional(),
+  approach: Section.optional(),
+  whyNow: Section.optional(),
+  risks: Section.optional(),
+  notes: Section.optional(),
+  /**
+   * How much you *want* to do this, 1–5 — separate from how good it is. The two disagree more
+   * often than anybody admits, and an idea list sorted only by merit is a list of things you will
+   * never start.
+   */
+  excitement: z.number().int().min(1).max(5).nullish(),
+  tags: z.array(Tag).max(12).optional(),
+  questions: z.array(IdeaChecklistItem).max(50).optional(),
+  nextSteps: z.array(IdeaChecklistItem).max(50).optional(),
+  links: z.array(IdeaLink).max(30).optional(),
+  /** Other ideas or projects this one builds on, competes with, or would replace. */
+  related: z.array(AnyId).max(20).optional(),
 });
 export type ProjectIdeaCreate = z.infer<typeof ProjectIdeaCreate>;
 
@@ -298,6 +408,12 @@ export const IdeaScoreInput = z.object({
   note: z.string().max(1000).optional(),
 });
 export type IdeaScoreInput = z.infer<typeof IdeaScoreInput>;
+
+/** Rewording a thought you wrote. Only ever your own — nobody edits somebody else's words. */
+export const IdeaCommentUpdate = z.object({
+  body: z.string().min(1).max(4000),
+});
+export type IdeaCommentUpdate = z.infer<typeof IdeaCommentUpdate>;
 
 export const IdeaCommentCreate = z.object({
   body: z.string().min(1).max(4000),

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Priority, Size } from '../enums.js';
 import { AnyId, HumanId, parseAnyId, ProjectCode } from '../ids.js';
+import { IdeaSectionKey } from './record.js';
 
 /**
  * The write surface, shared by the API and the MCP shim (FRM-REQ-089, FRM-REQ-090, FRM-REQ-091).
@@ -98,6 +99,14 @@ export const UpdateInput = z.object({
    * somebody who cannot tell it was already considered.
    */
   reason: z.string().max(1000).optional(),
+  /**
+   * For a project idea: which canvas section `text` writes, instead of its title (FRM-ADR-017).
+   *
+   * One field rather than six, because the tool ceiling is full and every field is paid for in
+   * every turn's definitions. It is what lets a session say "write up the risks on PI-007" and
+   * have it land in the right place on the canvas — the section list itself lives in shared.
+   */
+  section: IdeaSectionKey.optional().describe('Project idea only: the canvas section text writes'),
   phase: HumanId.nullish().describe('Move to this phase, or null for the backlog'),
   /**
    * A finding's fixing commit, as a **SHA rather than a link** (FRM-REQ-117). Recorded here

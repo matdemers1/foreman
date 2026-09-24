@@ -1,4 +1,7 @@
 import {
+  IdeaCommentCreate,
+  IdeaCommentUpdate,
+  IdeaScoreInput,
   ProjectIdeaConvert,
   ProjectIdeaCreate,
   ProjectIdeaStatus,
@@ -16,6 +19,14 @@ import {
   findProjectIdea,
   updateProjectIdea,
 } from '../domain/projectIdeas.js';
+import {
+  comment,
+  commentsFor,
+  deleteComment,
+  editComment,
+  score,
+  scoresFor,
+} from '../domain/board.js';
 import { softDelete } from '../domain/undo.js';
 import { actorOf, handler, param, parseBody, parseQuery } from './helpers.js';
 
@@ -121,6 +132,107 @@ export function projectIdeaRoutes(db: Db, config: Config): Router {
       }
       await softDelete(db, actorOf(req), 'project_idea', humanId);
       res.status(204).end();
+    }),
+  );
+
+  // ── Scoring (FRM-ADR-017) ────────────────────────────────────────────────
+  // Both modes. On a board, each reviewer's read and the board's mean; on a solo instance, your
+  // own impact/effort read on an idea — the same record with one author.
+
+  router.get(
+    '/:humanId/scores',
+    requireRole(config, 'admin', 'reviewer'),
+    handler(async (req, res) => {
+      res.json(await scoresFor(db, param(req, 'humanId')));
+    }),
+  );
+
+  router.put(
+    '/:humanId/scores',
+    canWrite,
+    requireRole(config, 'admin', 'reviewer'),
+    handler(async (req, res) => {
+      const body = parseBody(IdeaScoreInput, req, res);
+      if (body === null) return;
+      const userId = req.auth?.userId;
+      if (userId === null || userId === undefined) {
+        // A token has scopes, not judgement. A score is recorded against a person, so there is
+        // nobody here to record it against.
+        res.status(403).json({ error: 'a token cannot score an idea' });
+        return;
+      }
+      res.json(await score(db, actorOf(req), userId, param(req, 'humanId'), body));
+    }),
+  );
+
+  // ── Thoughts and discussion (FRM-ADR-017) ────────────────────────────────
+  // One table, two readings: a solo instance's running log of what you thought and when, and a
+  // board's discussion with its board-only half.
+
+  router.get(
+    '/:humanId/comments',
+    handler(async (req, res) => {
+      const items = await commentsFor(db, param(req, 'humanId'), reviews(config, req.auth));
+      res.json({ items, nextCursor: null, total: items.length });
+    }),
+  );
+
+  router.post(
+    '/:humanId/comments',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(IdeaCommentCreate, req, res);
+      if (body === null) return;
+      const userId = req.auth?.userId;
+      if (userId === null || userId === undefined) {
+        res.status(403).json({ error: 'a token cannot write a thought — it has nobody to sign it' });
+        return;
+      }
+      const saved = await comment(
+        db,
+        actorOf(req),
+        userId,
+        param(req, 'humanId'),
+        body,
+        reviews(config, req.auth),
+      );
+      res.status(201).json(saved);
+    }),
+  );
+
+  router.patch(
+    '/:humanId/comments/:commentId',
+    canWrite,
+    handler(async (req, res) => {
+      const body = parseBody(IdeaCommentUpdate, req, res);
+      if (body === null) return;
+      const userId = req.auth?.userId;
+      if (userId === null || userId === undefined) {
+        res.status(403).json({ error: 'a token cannot reword a thought' });
+        return;
+      }
+      res.json(await editComment(db, actorOf(req), userId, param(req, 'commentId'), body.body));
+    }),
+  );
+
+  router.delete(
+    '/:humanId/comments/:commentId',
+    canWrite,
+    handler(async (req, res) => {
+      const userId = req.auth?.userId;
+      if (userId === null || userId === undefined) {
+        res.status(403).json({ error: 'a token cannot withdraw a thought' });
+        return;
+      }
+      res.json(
+        await deleteComment(
+          db,
+          actorOf(req),
+          userId,
+          param(req, 'commentId'),
+          req.auth?.role === 'admin',
+        ),
+      );
     }),
   );
 

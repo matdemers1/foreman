@@ -687,6 +687,30 @@ model ProjectIdea {
   /// serialised: money in cents is the one representation that cannot quietly lose a penny.
   fundedAmountCents Int? @map("funded_amount_cents")
 
+  // ── The canvas (FRM-ADR-017) ──────────────────────────────────────────────
+  // Named, prompted sections rather than one blank page: the structure is what keeps an idea
+  // from becoming the freeform wiki Foreman's anti-features rule out, and what lets converting
+  // hand the new project a brief instead of a dump. Markdown, Mermaid allowed.
+  problem  String?
+  audience String?
+  approach String?
+  whyNow   String? @map("why_now")
+  risks    String?
+  /// The one freeform area, and deliberately small in the console. Not counted towards maturity.
+  notes    String?
+
+  /// How much you want to do this, 1–5. Separate from how good it is, on purpose.
+  excitement Int?
+  tags       String[] @default([])
+  /// `[{ id, text, done }]`. JSON rather than child tables: always read with the idea, never
+  /// queried on their own, and small enough that a whole-list write is the natural edit.
+  questions  Json     @default("[]")
+  nextSteps  Json     @default("[]") @map("next_steps")
+  /// `[{ id, label, url }]`
+  links      Json     @default("[]")
+  /// Human IDs of the ideas and projects this one builds on, competes with, or would replace.
+  related    String[] @default([])
+
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -702,6 +726,7 @@ model ProjectIdea {
 
   @@index([status])
   @@index([submittedById])
+  @@index([tags], type: Gin)
   @@map("project_idea")
 }
 

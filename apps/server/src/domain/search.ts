@@ -295,18 +295,36 @@ export async function search(db: Db, query: string, options: SearchOptions = {})
         // has no project until it becomes one, so a search scoped to BND turns up the idea BND
         // grew out of and no others. "Where did this come from" is a question worth answering.
         ...project,
-        OR: [{ title: contains }, { humanId: contains }, { pitch: contains }],
+        // The canvas too, and tags by exact match: an idea found only by its title is an idea
+        // you have to remember the name of, which is the one thing a search is for not needing.
+        OR: [
+          { title: contains },
+          { humanId: contains },
+          { pitch: contains },
+          { problem: contains },
+          { audience: contains },
+          { approach: contains },
+          { whyNow: contains },
+          { risks: contains },
+          { notes: contains },
+          { tags: { has: q.trim().toLowerCase() } },
+        ],
       },
       take: perType,
       include: { project: { select: { code: true } } },
     });
     for (const row of rows) {
+      // The snippet comes from whichever field actually matched, so the result shows why it is a
+      // result — a hit on the risks section should show the risk, not the pitch.
+      const needle = q.trim().toLowerCase();
+      const matched = [row.reason, row.pitch, row.problem, row.audience, row.approach, row.whyNow, row.risks, row.notes]
+        .find((text) => text?.toLowerCase().includes(needle));
       hits.push({
         type: 'project_idea',
         humanId: row.humanId,
         projectCode: row.project?.code ?? null,
         title: row.title,
-        snippet: snippet(row.reason ?? row.pitch ?? '', q),
+        snippet: snippet(matched ?? row.pitch ?? '', q),
       });
     }
   }

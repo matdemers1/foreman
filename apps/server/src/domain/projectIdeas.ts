@@ -1,14 +1,20 @@
 import {
   formatProjectIdeaId,
+  IDEA_SECTIONS,
+  MATURITY_FIELDS,
   PROJECT_IDEA_NEEDS_REASON,
+  type IdeaChecklistItem,
+  type IdeaLink,
   type ProjectIdeaConvert,
   type ProjectIdeaCreate,
   type ProjectIdeaStatus,
   type ProjectIdeaUpdate,
 } from '@foreman/shared';
 import type { Db } from '../db.js';
+import { logger } from '../logger.js';
 import { summarise } from './board.js';
 import { record, type Actor, type TransactionClient } from './audit.js';
+import { createDocument } from './documents.js';
 import { Conflict, Invalid, NotFound } from './errors.js';
 import { createProject } from './projects.js';
 
@@ -46,6 +52,59 @@ const SELECT = {
   _count: { select: { comments: { where: { deletedAt: null, internal: false } } } },
 } as const;
 
+/** Everything the canvas holds (FRM-ADR-017). Read on the detail page; summarised on the list. */
+const CANVAS = {
+  problem: true,
+  audience: true,
+  approach: true,
+  whyNow: true,
+  risks: true,
+  notes: true,
+  excitement: true,
+  tags: true,
+  questions: true,
+  nextSteps: true,
+  links: true,
+  related: true,
+} as const;
+
+const DETAIL = { ...SELECT, ...CANVAS } as const;
+
+const filled = (value: unknown): boolean => typeof value === 'string' && value.trim().length > 0;
+
+/**
+ * How much of the thinking is written down: the pitch and the five canvas questions.
+ *
+ * A count, not a score, and shown as one. It says nothing about whether the idea is *good* — that
+ * is what excitement and the impact/effort rating are for. It says whether anybody could pick this
+ * up and understand it without asking you, which is the thing converting depends on.
+ */
+export function maturity(row: Record<string, unknown>): { filled: number; total: number } {
+  return {
+    filled: MATURITY_FIELDS.filter((field) => filled(row[field])).length,
+    total: MATURITY_FIELDS.length,
+  };
+}
+
+/** The canvas fields present in an input, as a Prisma `data` fragment. Absent means unchanged. */
+function canvasData(input: ProjectIdeaCreate | ProjectIdeaUpdate) {
+  const data: Record<string, unknown> = {};
+  for (const key of ['problem', 'audience', 'approach', 'whyNow', 'risks', 'notes'] as const) {
+    // An empty string clears a section: the console sends one when somebody deletes the text,
+    // and storing '' would count as "written" to anything that checked for null.
+    if (input[key] !== undefined) data[key] = input[key].trim().length === 0 ? null : input[key];
+  }
+  if (input.excitement !== undefined) data['excitement'] = input.excitement;
+  // Tags are de-duplicated after normalising: `Hardware` and `hardware` are the same tag, and
+  // storing both would split the ideas under it into two piles nobody would think to merge.
+  if (input.tags !== undefined) data['tags'] = [...new Set(input.tags)];
+  if (input.questions !== undefined) data['questions'] = input.questions;
+  if (input.nextSteps !== undefined) data['nextSteps'] = input.nextSteps;
+  if (input.links !== undefined) data['links'] = input.links;
+  if (input.related !== undefined) data['related'] = [...new Set(input.related)];
+  return data;
+}
+
 /**
  * The next `PI-` number, from a Postgres sequence.
  *
@@ -80,14 +139,30 @@ export async function allProjectIdeas(
     // Untriaged first — the list exists to be worked through — then newest. The enum is ordered
     // so open work sorts above decided work, which is why this is one `orderBy` and not a case.
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-    select: { ...SELECT, scores: { select: { impact: true, effort: true } } },
+    select: {
+      ...SELECT,
+      problem: true,
+      audience: true,
+      approach: true,
+      whyNow: true,
+      risks: true,
+      excitement: true,
+      tags: true,
+      questions: true,
+      scores: { select: { impact: true, effort: true } },
+    },
   });
 
   // The raw scores are dropped here and the summary is attached only for a reviewer, so a
   // submitter's response carries neither. Computing and discarding is deliberate: one query, and
   // the decision about who sees it lives in one line rather than in two divergent queries.
-  return rows.map(({ scores, ...rest }) => ({
+  //
+  // The section bodies are dropped too. The list needs to know *whether* each is written, not
+  // what it says, and a board of forty ideas each carrying six essays is a payload for nothing.
+  return rows.map(({ scores, problem, audience, approach, whyNow, risks, questions, ...rest }) => ({
     ...rest,
+    maturity: maturity({ pitch: rest.pitch, problem, audience, approach, whyNow, risks }),
+    openQuestions: (questions as IdeaChecklistItem[]).filter((q) => !q.done).length,
     score: options.canReview === true ? summarise(scores) : null,
   }));
 }
@@ -95,10 +170,10 @@ export async function allProjectIdeas(
 export async function findProjectIdea(db: Db, humanId: string) {
   const idea = await db.projectIdea.findFirst({
     where: { humanId, deletedAt: null },
-    select: SELECT,
+    select: DETAIL,
   });
   if (idea === null) throw new NotFound(humanId);
-  return idea;
+  return { ...idea, maturity: maturity(idea) };
 }
 
 export async function createProjectIdea(
@@ -115,6 +190,7 @@ export async function createProjectIdea(
         seq,
         title: input.title,
         ...(input.pitch === undefined ? {} : { pitch: input.pitch }),
+        ...canvasData(input),
         // Null when a token wrote it: a token is not a person, and inventing an author would put
         // a name on the board next to something nobody there actually said.
         ...(submittedById === null || submittedById === undefined
@@ -172,6 +248,7 @@ export async function updateProjectIdea(
       data: {
         ...(input.title === undefined ? {} : { title: input.title }),
         ...(input.pitch === undefined ? {} : { pitch: input.pitch }),
+        ...canvasData(input),
         ...(input.status === undefined ? {} : { status: input.status }),
         ...(input.reason === undefined ? {} : { reason: input.reason ?? null }),
         ...(input.status === undefined
@@ -181,7 +258,7 @@ export async function updateProjectIdea(
         // must not linger on an idea nobody has judged.
         ...(input.status === 'new' && input.reason === undefined ? { reason: null } : {}),
       },
-      select: SELECT,
+      select: DETAIL,
     });
 
     await record(tx, {
@@ -249,5 +326,105 @@ export async function convertProjectIdea(
     return converted;
   });
 
-  return { idea, project };
+  const brief = await writeBrief(db, actor, project.code, before, humanId);
+  return { idea, project, brief };
+}
+
+/**
+ * The idea's canvas, handed to the new project as its discovery document (FRM-REQ-176).
+ *
+ * This is what makes growing an idea worth doing. Without it the thinking stays on a frozen record
+ * beside the project rather than inside it, and the first planning session starts from a title.
+ * With it, `/plan-project` opens on a problem statement, an audience, a sketch and a list of the
+ * questions that were already known to be open.
+ *
+ * **Best effort, on purpose.** The project and the conversion are already committed by the time
+ * this runs, and a brief that fails to write must not report the conversion as failed — the idea
+ * keeps every word regardless, so nothing is lost, only not yet copied. It says so in the log and
+ * returns null, and the console says so to the person.
+ */
+async function writeBrief(
+  db: Db,
+  actor: Actor,
+  code: string,
+  idea: {
+    title: string;
+    pitch: string | null;
+    problem: string | null;
+    audience: string | null;
+    approach: string | null;
+    whyNow: string | null;
+    risks: string | null;
+    notes: string | null;
+    questions: unknown;
+    nextSteps: unknown;
+    links: unknown;
+    related: string[];
+    id: string;
+  },
+  humanId: string,
+) {
+  const sections: { heading: string; bodyMd: string }[] = [];
+  if (filled(idea.pitch)) sections.push({ heading: 'Pitch', bodyMd: idea.pitch ?? '' });
+
+  for (const section of IDEA_SECTIONS) {
+    const body = idea[section.key];
+    if (filled(body)) sections.push({ heading: section.heading, bodyMd: body ?? '' });
+  }
+
+  const checklist = (items: unknown) =>
+    (items as IdeaChecklistItem[]).map((i) => `- [${i.done ? 'x' : ' '}] ${i.text}`).join('\n');
+  if ((idea.questions as IdeaChecklistItem[]).length > 0) {
+    sections.push({ heading: 'Open questions', bodyMd: checklist(idea.questions) });
+  }
+  if ((idea.nextSteps as IdeaChecklistItem[]).length > 0) {
+    sections.push({ heading: 'Next steps', bodyMd: checklist(idea.nextSteps) });
+  }
+  if ((idea.links as IdeaLink[]).length > 0) {
+    sections.push({
+      heading: 'Links',
+      bodyMd: (idea.links as IdeaLink[]).map((l) => `- [${l.label}](${l.url})`).join('\n'),
+    });
+  }
+  if (idea.related.length > 0) {
+    // Written as bare human IDs so the citation parser turns every project-scoped one into a
+    // backlink — the related project learns this one exists without anybody linking it by hand.
+    sections.push({ heading: 'Related', bodyMd: idea.related.map((r) => `- ${r}`).join('\n') });
+  }
+
+  // The thoughts log, oldest first — the order the idea was actually thought through in.
+  // Public ones only: a board-only note was written for the board, not for the project's record.
+  const thoughts = await db.ideaComment.findMany({
+    where: { projectIdeaId: idea.id, deletedAt: null, internal: false },
+    orderBy: { createdAt: 'asc' },
+    select: { body: true, createdAt: true, user: { select: { displayName: true } } },
+  });
+  if (thoughts.length > 0) {
+    sections.push({
+      heading: 'Thoughts',
+      bodyMd: thoughts
+        .map((t) => `**${t.createdAt.toISOString().slice(0, 10)} · ${t.user.displayName}**\n\n${t.body}`)
+        .join('\n\n---\n\n'),
+    });
+  }
+
+  try {
+    return await createDocument(db, actor, code, {
+      kind: 'discovery',
+      title: `Idea brief — ${idea.title}`,
+      sourcePath: `foreman://project-ideas/${humanId}`,
+      // An idea with nothing on its canvas still gets the document, with one line saying where it
+      // came from: an empty brief is more honest than a missing one, which reads as a failure.
+      sections:
+        sections.length > 0
+          ? sections
+          : [{ heading: 'Origin', bodyMd: `Converted from ${humanId} before its canvas was started.` }],
+    });
+  } catch (error) {
+    logger.error(
+      { idea: humanId, project: code, err: error instanceof Error ? error.message : String(error) },
+      'the idea brief was not written; the idea still holds its canvas',
+    );
+    return null;
+  }
 }

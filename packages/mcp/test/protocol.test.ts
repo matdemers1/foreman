@@ -530,6 +530,26 @@ describe('what the MCP surface deliberately cannot do', () => {
     expect(text(wrong).toLowerCase()).toContain('belongs to no project');
   });
 
+  it('writes a named canvas section on a project idea, not its title', async () => {
+    const { client: api, calls } = fakeApi({ '/api/project-ideas/PI-007': { ok: true } });
+    const { client } = await connect(api);
+
+    await client.callTool({
+      name: 'foreman_update',
+      arguments: {
+        id: 'PI-007',
+        section: 'risks',
+        text: 'Bambu may close the local MQTT port in a firmware update.',
+      },
+    });
+
+    // FRM-ADR-017: "write up the risks on PI-007" must land on the risks section. Sent as the
+    // title, it would silently replace the idea's name with a paragraph about firmware.
+    const call = calls.find((c) => c.method === 'PATCH');
+    expect(call?.path).toBe('/api/project-ideas/PI-007');
+    expect(call?.body).toEqual({ risks: 'Bambu may close the local MQTT port in a firmware update.' });
+  });
+
   it('routes a project idea’s status change away from the project paths', async () => {
     const { client: api, calls } = fakeApi({
       '/api/entities/PI-007': { type: 'project_idea', entity: { status: 'new' } },
