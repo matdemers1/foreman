@@ -43,17 +43,43 @@ Authentication is **dual** — app-native credentials *and* "Sign in with D3 Aut
 
 ## Status
 
-**Planned, not yet implemented.** 152 requirements, 11 phases, 112 tasks. Planning lives in `../D3 Cloud Vault/Foreman/`; start with `Scope of Work.md`.
+**Built and deployed.** Foreman runs at [foreman.d3cloud.io](https://foreman.d3cloud.io) and has
+been the source of truth for D3 Cloud project state since the cutover from the Obsidian vault on
+2026-09-20. It tracks itself as project `FRM`, so which phases are built — and what is open — is
+recorded there rather than repeated here: a second copy is a copy that goes stale.
+
+One known gap: the GitHub App integration is written but has never run against real GitHub. See
+[`docs/runbooks/github-app-setup.md`](docs/runbooks/github-app-setup.md).
 
 ## Getting started
 
-Nothing to run yet — Phase 0 creates the working stack. Once it exists:
+Requires Node 22, pnpm and Docker.
 
 ```bash
 pnpm install
 pnpm dev:up
-pnpm seed:example
 ```
+
+`pnpm dev:up` writes a local `.env` with fresh secrets (`scripts/dev-env.mjs`, which never
+overwrites an existing one), builds and starts the stack, and seeds the **Example Project**.
+Open <http://127.0.0.1:3200> and sign in as the operator in `.env` (`OPERATOR_EMAIL` /
+`OPERATOR_PASSWORD`). `pnpm dev:down` stops it.
+
+Host ports are published only by the dev overlay, and only on loopback.
+
+### MCP
+
+Two ways for an agent to reach Foreman, with the same tools:
+
+- **Local stdio shim** — [`packages/mcp`](packages/mcp) (`foreman-mcp`). Create a scoped token
+  under *Tokens* in the console, then run it with `FOREMAN_URL` and `FOREMAN_TOKEN` set.
+- **Remote** — `/mcp` on the server, authorised by D3 Auth. It is mounted only when
+  `D3AUTH_ISSUER` is configured.
+
+### Runbooks
+
+[`docs/runbooks/`](docs/runbooks) — deploying, backup and restore, importing a vault, the GitHub
+App, and running an innovation-fund board.
 
 ## License
 
