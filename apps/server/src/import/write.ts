@@ -1,5 +1,11 @@
 import { basename } from 'node:path';
-import { parseLocation, sectionKeyFor, type ChecklistItem, type Section } from '@foreman/shared';
+import {
+  parseLocation,
+  parsePhaseHeading,
+  sectionKeyFor,
+  type ChecklistItem,
+  type Section,
+} from '@foreman/shared';
 import type { Db } from '../db.js';
 
 /**
@@ -21,37 +27,52 @@ export interface WriteContext {
 
 // ─── Phases and tasks ──────────────────────────────────────────────────────
 
-/** `## Phase 8.5 — The Half Phase` → `{ number: 8.5, name: 'The Half Phase' }`. */
-export function parsePhaseHeading(heading: string): { number: string; name: string } | null {
-  const match = /^Phase\s+(\d+(?:\.\d+)?)\s*[—–-]\s*(.+)$/i.exec(heading.trim());
-  if (match === null) return null;
-  return { number: match[1] ?? '', name: (match[2] ?? '').trim() };
+/** Moved to `@foreman/shared` beside `parseChecklist`, which needs it to know a phase heading. */
+export { parsePhaseHeading };
+
+export interface PhaseWrite {
+  readonly number: string;
+  readonly name: string;
+  readonly sortOrder: number;
+  readonly objective: string | null;
+  readonly size: 'XS' | 'S' | 'M' | 'L' | 'XL' | null;
+  /**
+   * The phase's deliverables, as the checklist they were written as.
+   *
+   * A scope of work lists a phase's **Deliverables** above its **Tasks**, and the deliverables
+   * restate what the tasks produce — `Logo.tsx component` over `Create src/components/Logo.tsx`.
+   * Importing both counted the work twice and made every deliverable a task that no commit would
+   * ever be attributed to, so a permanent coverage hole. What a deliverable list *is* is the
+   * answer to "what can you show when this phase is done" — the exit demo.
+   */
+  readonly exitDemo: string | null;
 }
 
-export async function writePhase(
-  ctx: WriteContext,
-  number: string,
-  name: string,
-  sortOrder: number,
-): Promise<string> {
-  const humanId = `${ctx.code}-P-${number}`;
-  const phase = await ctx.db.phase.upsert({
+export async function writePhase(ctx: WriteContext, phase: PhaseWrite): Promise<string> {
+  const humanId = `${ctx.code}-P-${phase.number}`;
+  const detail = {
+    ...(phase.objective === null ? {} : { objective: phase.objective }),
+    ...(phase.size === null ? {} : { size: phase.size }),
+    ...(phase.exitDemo === null ? {} : { exitDemo: phase.exitDemo }),
+  };
+  const row = await ctx.db.phase.upsert({
     where: { humanId },
     create: {
       projectId: ctx.projectId,
       humanId,
       // Decimal, because Bindery shipped a Phase 8.5 and an integer column makes that plan
       // unrepresentable.
-      number,
+      number: phase.number,
       // Independent of the number: the order they were built in is not the order they are
       // numbered, and the import order is the authored order.
-      sortOrder,
-      name,
+      sortOrder: phase.sortOrder,
+      name: phase.name,
+      ...detail,
     },
-    update: { name },
+    update: { name: phase.name, ...detail },
     select: { id: true },
   });
-  return phase.id;
+  return row.id;
 }
 
 export interface TaskWrite {
@@ -108,7 +129,14 @@ export function taskFrom(
 
   return {
     humanId: id === null ? `${code}-T-${phaseNumber}.${String(position)}` : `${code}-${id}`,
-    title: title.length > 0 ? title.slice(0, 300) : item.text.slice(0, 300),
+    /**
+     * Prefixed with its group, which is the only thing that says what `Initial commit` or
+     * `Verify npm run build` is part of once the `**Repo setup**` line above it is not a task.
+     */
+    title: (() => {
+      const own = title.length > 0 ? title : item.text;
+      return (item.group === null ? own : `${item.group} — ${own}`).slice(0, 300);
+    })(),
     done: item.done,
     /**
      * `~` is in progress and `→` is promoted elsewhere. Both are real states the corpus uses, and

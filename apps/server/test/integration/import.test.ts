@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDb, type Db } from '../../src/db.js';
 import { codeFor, runImport } from '../../src/import/run.js';
@@ -31,11 +32,11 @@ describe.skipIf(url === undefined)('the importer', { timeout: 30_000 }, () => {
 
   beforeEach(async () => {
     // The fixture corpus imports as its real codes, so the test cleans exactly those.
-    await db.project.deleteMany({ where: { code: { in: ['BND', 'BURR', 'CW', 'AUTH', 'PW'] } } });
+    await db.project.deleteMany({ where: { code: { in: ['BND', 'BURR', 'CW', 'AUTH', 'PW', 'DI'] } } });
   });
 
   afterAll(async () => {
-    await db.project.deleteMany({ where: { code: { in: ['BND', 'BURR', 'CW', 'AUTH', 'PW'] } } });
+    await db.project.deleteMany({ where: { code: { in: ['BND', 'BURR', 'CW', 'AUTH', 'PW', 'DI'] } } });
     await db.$disconnect();
   });
 
@@ -162,6 +163,96 @@ describe.skipIf(url === undefined)('the importer', { timeout: 30_000 }, () => {
       expect(clearwhen?.status).toBe('mapped');
       expect(clearwhen?.note).toContain('synthesized');
       expect(report.entities['task-synthesized']).toBeGreaterThan(20);
+    });
+  });
+
+  /**
+   * d3cloud.io (2026-09-24): `### Deliverables` / `### Tasks` under each `## Phase N`, tasks
+   * grouped under bold parent lines, and requirements only as a MoSCoW table. It imported as 0
+   * phases, 0 requirements and 199 tasks numbered `DI-T-0.1 … 0.199`, every one a coverage hole,
+   * and every file in the report said `mapped`.
+   */
+  describe('a scope of work with subheadings and groups, and a MoSCoW table (DI)', () => {
+    it('imports its five phases, with every task in one of them', async () => {
+      await runImport(db, { path: FIXTURES, dryRun: false, only: ['d3cloud.io'] });
+      const project = await db.project.findFirstOrThrow({ where: { code: 'DI' } });
+
+      const phases = await db.phase.findMany({ where: { projectId: project.id }, orderBy: { sortOrder: 'asc' } });
+      expect(phases.map((p) => p.humanId)).toEqual(['DI-P-0', 'DI-P-1', 'DI-P-2', 'DI-P-3', 'DI-P-4']);
+      expect(phases[0]?.name).toBe('Foundation & Deploy Proof');
+      expect(phases[0]?.objective).toMatch(/^Stand up the repo/);
+      expect(phases[0]?.size).toBe('M');
+
+      const tasks = await db.task.findMany({ where: { projectId: project.id } });
+      expect(tasks).toHaveLength(134);
+      expect(tasks.filter((t) => t.phaseId === null)).toEqual([]);
+      expect(tasks.filter((t) => t.humanId.startsWith('DI-T-4.')).length).toBeGreaterThan(0);
+    });
+
+    it('imports no bare bold heading as a task, and names the group on its children', async () => {
+      await runImport(db, { path: FIXTURES, dryRun: false, only: ['d3cloud.io'] });
+      const tasks = await db.task.findMany({ where: { project: { code: 'DI' } } });
+
+      expect(tasks.filter((t) => /^\*\*[^*]+\*\*:?$/.test(t.title)).map((t) => t.title)).toEqual([]);
+      expect(tasks.some((t) => t.title.startsWith('Repo setup — Initial commit'))).toBe(true);
+    });
+
+    it('makes the deliverables each phase’s exit demo, not a second copy of its tasks', async () => {
+      await runImport(db, { path: FIXTURES, dryRun: false, only: ['d3cloud.io'] });
+      const zero = await db.phase.findUniqueOrThrow({ where: { humanId: 'DI-P-0' } });
+
+      expect(zero.exitDemo).toContain('`d3cloud-www/` repo created at workspace root');
+      expect(zero.exitDemo?.split('\n')).toHaveLength(6);
+      expect(await db.task.count({ where: { project: { code: 'DI' }, title: { contains: 'repo created at workspace root' } } })).toBe(0);
+    });
+
+    it('imports the MoSCoW table as requirements, the tier as the priority', async () => {
+      await runImport(db, { path: FIXTURES, dryRun: false, only: ['d3cloud.io'] });
+      const requirements = await db.requirement.findMany({ where: { project: { code: 'DI' } }, orderBy: { seq: 'asc' } });
+      const count = (p: string) => requirements.filter((r) => r.priority === p).length;
+
+      expect(requirements).toHaveLength(25);
+      expect([count('M'), count('S'), count('C'), count('W')]).toEqual([9, 5, 3, 8]);
+      expect(requirements[0]?.humanId).toBe('DI-REQ-001');
+      expect(requirements[0]?.source).toBe('MoSCoW');
+    });
+
+    it('is idempotent on this shape too', async () => {
+      await runImport(db, { path: FIXTURES, dryRun: false, only: ['d3cloud.io'] });
+      await runImport(db, { path: FIXTURES, dryRun: false, only: ['d3cloud.io'] });
+      expect(await db.task.count({ where: { project: { code: 'DI' } } })).toBe(134);
+      expect(await db.requirement.count({ where: { project: { code: 'DI' } } })).toBe(25);
+    });
+
+    it('reports the phases in a dry run, and raises no warning', async () => {
+      const report = await runImport(db, { path: FIXTURES, dryRun: true, only: ['d3cloud.io'] });
+      expect(report.entities['phase']).toBe(5);
+      expect(report.entities['task']).toBe(134);
+      expect(report.entities['requirement']).toBe(25);
+      expect(report.warnings).toEqual([]);
+    });
+  });
+
+  describe('a project whose shape is wrong even though every file mapped', () => {
+    it('warns on >50 tasks with no phase and no requirement, and marks the file partial', async () => {
+      // What d3cloud.io looked like to the importer before the fix, reproduced directly.
+      const vault = mkdtempSync(join(tmpdir(), 'foreman-shape-'));
+      try {
+        mkdirSync(join(vault, 'Shape'));
+        const lines = ['# Shape — Scope of Work', '', '## Tasks', ''];
+        for (let i = 1; i <= 60; i += 1) lines.push(`- [ ] Task number ${String(i)}`);
+        writeFileSync(join(vault, 'Shape', 'Scope of Work.md'), lines.join('\n'));
+
+        const report = await runImport(db, { path: vault, dryRun: true });
+        expect(report.warnings).toHaveLength(1);
+        expect(report.warnings[0]?.message).toMatch(/60 tasks, but 0 phases and 0 requirements/);
+
+        const sow = report.files.find((f) => f.kind === 'scope-of-work');
+        expect(sow?.status).toBe('partial');
+        expect(sow?.note).toMatch(/not one phase heading/);
+      } finally {
+        rmSync(vault, { recursive: true, force: true });
+      }
     });
   });
 

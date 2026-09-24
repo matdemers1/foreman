@@ -1,7 +1,7 @@
 {
   "totals": {
-    "seen": 17,
-    "mapped": 17,
+    "seen": 19,
+    "mapped": 19,
     "partial": 0,
     "unmapped": 0
   },
@@ -30,6 +30,11 @@
       "code": "PW",
       "folder": "Personal Website",
       "files": 1
+    },
+    {
+      "code": "DI",
+      "folder": "d3cloud.io",
+      "files": 2
     }
   ],
   "files": [
@@ -102,7 +107,8 @@
       "kind": "scope-of-work",
       "note": null,
       "produced": [
-        "227 tasks"
+        "227 tasks",
+        "23 phases"
       ]
     },
     {
@@ -129,7 +135,9 @@
       "kind": "scope-of-work",
       "note": "no task IDs in the file — every task ID was synthesized and flagged",
       "produced": [
-        "84 tasks (84 with synthesized IDs)"
+        "63 tasks (63 with synthesized IDs)",
+        "8 phases",
+        "21 deliverables, as phase exit demos"
       ]
     },
     {
@@ -138,7 +146,31 @@
       "kind": "scope-of-work",
       "note": null,
       "produced": [
-        "78 tasks (6 with synthesized IDs)"
+        "73 tasks (1 with synthesized IDs)",
+        "8 phases",
+        "5 deliverables, as phase exit demos"
+      ]
+    },
+    {
+      "path": "d3cloud.io/Discovery & Requirements.md",
+      "status": "mapped",
+      "kind": "document",
+      "note": null,
+      "produced": [
+        "1 document, 11 sections",
+        "25 requirements, from the MoSCoW scope (IDs assigned in order)"
+      ]
+    },
+    {
+      "path": "d3cloud.io/Scope of Work.md",
+      "status": "mapped",
+      "kind": "scope-of-work",
+      "note": "no task IDs in the file — every task ID was synthesized and flagged",
+      "produced": [
+        "134 tasks (134 with synthesized IDs)",
+        "5 phases",
+        "34 deliverables, as phase exit demos",
+        "31 group headings, folded into their tasks"
       ]
     },
     {
@@ -189,14 +221,15 @@
   ],
   "entities": {
     "adr": 2,
-    "document": 7,
-    "document_section": 62,
+    "document": 8,
+    "document_section": 73,
     "finding": 1,
     "term": 29,
-    "requirement": 295,
+    "requirement": 320,
     "risk": 25,
-    "task": 389,
-    "task-synthesized": 90
+    "task": 497,
+    "task-synthesized": 198,
+    "phase": 44
   },
   "substitutions": 926
 }

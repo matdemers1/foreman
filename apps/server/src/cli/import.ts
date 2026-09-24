@@ -92,6 +92,14 @@ function render(report: ImportReport): string {
   }
   lines.push('');
 
+  if (report.warnings.length > 0) {
+    lines.push(`WARNINGS (${String(report.warnings.length)}) — every file below may say mapped; the shape does not`);
+    for (const warning of report.warnings) {
+      lines.push(`  ${warning.code.padEnd(8)} ${warning.folder}: ${warning.message}`);
+    }
+    lines.push('');
+  }
+
   const byStatus = (status: string) => report.files.filter((f) => f.status === status);
 
   for (const status of ['partial', 'unmapped'] as const) {

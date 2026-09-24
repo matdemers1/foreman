@@ -42,12 +42,28 @@ const DOCUMENT_KINDS: Record<string, string> = {
   'feature ideas': 'feature_ideas',
 };
 
+/**
+ * A filename with its project prefix taken off: `Subtitler — Scope of Work` → `Scope of Work`.
+ *
+ * Subtitler names every planning file after itself, so its scope of work classified as a research
+ * document and its discovery file as nothing typed at all. Only a prefix whose remainder is a name
+ * this importer knows is removed — `Planning — d3-ui Migration` keeps its whole title.
+ */
+function stem(name: string): string {
+  const bare = name.replace(/\.md$/i, '');
+  const rest = /^.+?\s+[—–]\s+(.+)$/.exec(bare)?.[1];
+  if (rest === undefined) return bare;
+  const lower = rest.toLowerCase();
+  const known = ['requirements register', 'scope of work', 'risk register', 'glossary'];
+  return known.includes(lower) || DOCUMENT_KINDS[lower] !== undefined ? rest : bare;
+}
+
 export function documentKindFor(name: string): string | null {
-  return DOCUMENT_KINDS[name.replace(/\.md$/i, '').toLowerCase()] ?? null;
+  return DOCUMENT_KINDS[stem(name).toLowerCase()] ?? null;
 }
 
 export function classify(path: string, frontmatter: Record<string, unknown>): Classification {
-  const name = basename(path).replace(/\.md$/i, '');
+  const name = stem(basename(path));
   const lower = name.toLowerCase();
   const folder = basename(dirname(path)).toLowerCase();
   const tags = Array.isArray(frontmatter['tags']) ? (frontmatter['tags'] as string[]) : [];

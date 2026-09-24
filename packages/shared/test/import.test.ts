@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
   parseChecklist,
   parseFrontmatter,
+  parseMoscow,
+  parsePhaseHeading,
+  parsePhaseMeta,
   parseSections,
   parseTables,
   rewriteCitations,
@@ -133,6 +136,150 @@ describe('scopes of work (T-8.4)', () => {
     const items = parseChecklist(body);
     const phase = items.find((i) => i.section?.startsWith('Phase 0') === true);
     expect(phase).toBeDefined();
+  });
+});
+
+/**
+ * d3cloud.io's scope of work, the shape that imported as 199 tasks in no phase (2026-09-24).
+ *
+ * `## Phase N — Name`, then `### Deliverables` and `### Tasks` under each, and the tasks nested:
+ * a bold line (`- [ ] **Repo setup**`) with indented checkboxes under it. Seven of the fourteen
+ * projects still in the archive are written this way.
+ */
+describe('a scope of work with subheadings and grouped tasks (d3cloud.io)', () => {
+  const { body } = parseFrontmatter(read('d3cloud.io/Scope of Work.md'));
+  const items = parseChecklist(body);
+
+  it('puts every item under its phase, not under the Tasks heading beneath it', () => {
+    const phases = new Set(items.map((i) => i.section));
+    expect([...phases].every((section) => parsePhaseHeading(section ?? '') !== null)).toBe(true);
+    expect(phases.size).toBe(5);
+  });
+
+  it('keeps the subheading, so deliverables can be told apart from tasks', () => {
+    expect(new Set(items.map((i) => i.subsection))).toEqual(new Set(['Deliverables', 'Tasks']));
+    expect(items.filter((i) => i.subsection === 'Deliverables')).toHaveLength(34);
+  });
+
+  it('marks a bare bold line with children as a group, and names it on each child', () => {
+    const groups = items.filter((i) => i.isGroup);
+    expect(groups).toHaveLength(31);
+    expect(groups.every((g) => /^\*\*[^*]+\*\*$/.test(g.text))).toBe(true);
+
+    const commit = items.find((i) => i.text.startsWith('Initial commit'));
+    expect(commit?.group).toBe('Repo setup');
+    expect(commit?.isGroup).toBe(false);
+  });
+
+  it('leaves no bare bold heading among the items that are not groups', () => {
+    const work = items.filter((i) => !i.isGroup && i.subsection === 'Tasks');
+    expect(work).toHaveLength(134);
+    expect(work.filter((i) => /^\*\*[^*]+\*\*:?$/.test(i.text))).toEqual([]);
+  });
+
+  it('reads each phase’s objective and size from its callout', () => {
+    const meta = parsePhaseMeta(body);
+    const zero = meta.get('Phase 0 — Foundation & Deploy Proof');
+    expect(zero?.size).toBe('M');
+    expect(zero?.objective).toMatch(/^Stand up the repo/);
+    expect(meta.get('Phase 1 — Visual Foundation')?.size).toBe('S');
+  });
+});
+
+describe('group detection, at its edges', () => {
+  it('keeps a bold item with no children as a task', () => {
+    const items = parseChecklist('## Phase 0 — A\n- [ ] **Ship it**\n- [ ] Next thing\n');
+    expect(items.map((i) => i.isGroup)).toEqual([false, false]);
+  });
+
+  it('does not take a bold label followed by prose as a group — D3 Auth’s go-live line is work', () => {
+    const { body } = parseFrontmatter(read('D3 Auth/Scope of Work.md'));
+    const goLive = parseChecklist(body).find((i) => i.text.startsWith('**Go-live'));
+    expect(goLive?.isGroup).toBe(false);
+  });
+
+  it('reads a bold label on its own line as a subheading, the way Clearwhen writes it', () => {
+    const { body } = parseFrontmatter(read('Clearwhen/Scope of Work.md'));
+    const labels = new Set(parseChecklist(body).map((i) => i.subsection));
+    expect(labels.has('Deliverables')).toBe(true);
+    expect(labels.has('Tasks')).toBe(true);
+  });
+
+  it('keeps Bindery’s Phase 10 tasks in Phase 10, under its 10a–10d subheadings', () => {
+    const { body } = parseFrontmatter(read('Bindery/Scope of Work.md'));
+    const task = parseChecklist(body).find((i) => i.text.includes('**T-10.1**'));
+    expect(task?.section).toMatch(/^Phase 10 —/);
+    expect(task?.subsection).toBe('10a — The front door');
+  });
+});
+
+describe('phase headings', () => {
+  it('reads a dash, an en dash, or a colon — Subtitler writes `Phase 0: Foundation`', () => {
+    expect(parsePhaseHeading('Phase 8.5 — First Real Corpus')).toEqual({ number: '8.5', name: 'First Real Corpus' });
+    expect(parsePhaseHeading('Phase 0: Foundation')).toEqual({ number: '0', name: 'Foundation' });
+    expect(parsePhaseHeading('Phase Dependency Graph')).toBeNull();
+  });
+});
+
+describe('MoSCoW feature scopes, as requirements', () => {
+  it('reads d3cloud.io’s tier column: every row, its tier from the first cell', () => {
+    const { body } = parseFrontmatter(read('d3cloud.io/Discovery & Requirements.md'));
+    const rows = parseMoscow(body);
+    const count = (p: string) => rows.filter((r) => r.priority === p).length;
+
+    expect(rows).toHaveLength(25);
+    expect([count('M'), count('S'), count('C'), count('W')]).toEqual([9, 5, 3, 8]);
+    expect(rows[0]?.statement).toBe('Hero section with wordmark + one-line value prop');
+    // The decisions table beside it has no tier and is not requirements.
+    expect(rows.some((r) => r.statement.startsWith('Authentication') && r.priority !== 'W')).toBe(false);
+  });
+
+  it('takes the tier from a heading over a table, with the author’s label and a quoted table', () => {
+    const rows = parseMoscow(
+      [
+        '### Must Have — useless without',
+        '| # | Feature | Notes |',
+        '|---|---|---|',
+        '| M1 | Single URL input | fast |',
+        '### Won’t Have — out of scope',
+        '> [!danger] Hard no',
+        '> | # | Excluded | Why |',
+        '> |---|---|---|',
+        '> | W1 | User accounts | no backend |',
+      ].join('\n'),
+    );
+    expect(rows).toEqual([
+      { priority: 'M', statement: 'Single URL input', label: 'M1', line: 4 },
+      { priority: 'W', statement: 'User accounts', label: 'W1', line: 9 },
+    ]);
+  });
+
+  it('reads checkboxes under a tier callout, and a tier cell with an emoji', () => {
+    const rows = parseMoscow(
+      [
+        '> [!todo] Must Have — MVP is useless without these',
+        '> - [ ] Account creation',
+        '> - [ ] **Stewards**: designate contacts',
+        '',
+        '| Priority | Feature | Notes |',
+        '|---|---|---|',
+        '| 🟥 **Should** | Share sheet | |',
+      ].join('\n'),
+    );
+    expect(rows.map((r) => [r.priority, r.statement])).toEqual([
+      ['M', 'Account creation'],
+      ['M', 'Stewards: designate contacts'],
+      ['S', 'Share sheet'],
+    ]);
+  });
+
+  it('splits a cell that packs a tier’s features with middots, as Battlefront’s does', () => {
+    const rows = parseMoscow('| Priority | Requirement |\n|---|---|\n| **Could Have** | Grenades · iron-sight · ragdoll |');
+    expect(rows.map((r) => r.statement)).toEqual(['Grenades', 'iron-sight', 'ragdoll']);
+  });
+
+  it('leaves a heading that merely begins with a tier word alone', () => {
+    expect(parseMoscow('## Should we ship?\n- [ ] maybe\n')).toEqual([]);
   });
 });
 

@@ -16,7 +16,7 @@ that protects the vault should not be one you have to remember.
 | Flag | What it does |
 |---|---|
 | `--path <dir>` | The vault root. Required. |
-| `--only A,B` | Import only these project folders. |
+| `--only A,B` | Import only these project folders. A project inside `Personal Projects/` is named by its own folder — `--only Subtitler`. |
 | `--write` | Actually write. Without it, nothing is created or changed. |
 | `--json out.json` | The whole report, including every citation rewritten. |
 
@@ -38,6 +38,39 @@ every file is accounted for (535 of 535)
 
 If that last line ever says `MISSING`, stop: files are being dropped, and the report is the only
 place that shows it.
+
+**A file can map and a project still be wrong.** The report counts files, and d3cloud.io's scope of
+work read without complaint into 199 tasks, no phases and no requirements — every row `mapped`. So a
+project with more than 50 tasks and neither a phase nor a requirement is named at the top:
+
+```
+WARNINGS (1) — every file below may say mapped; the shape does not
+  DI       d3cloud.io: 199 tasks, but 0 phases and 0 requirements — …
+```
+
+and its scope of work is `partial` rather than `mapped`. Do not `--write` a project with a warning.
+
+## How a scope of work is read
+
+- **Phases** are `## Phase N — Name` (or `Phase N: Name`; a `### Phase N` counts too). Each phase's
+  `Objective` callout and `Size` are read onto the phase.
+- **Subheadings** — `### Deliverables`, `### Tasks`, or a bold label on its own line
+  (`**Deliverables**`) — divide a phase; they are not phases.
+- **Deliverables become the phase's exit demo**, not tasks: they restate what the tasks produce, so
+  importing both counts the work twice and leaves a task no commit will ever be attributed to. A
+  phase with deliverables and *no* task list keeps them as its tasks, because then they are the only
+  record of its work. `**Deliverables & Tasks**` is one list and stays tasks.
+- **A bare bold checkbox with indented children** (`- [ ] **Repo setup**`) is a group, not a task.
+  Its name prefixes each child's title — `Repo setup — Initial commit`.
+
+## Requirements without a register
+
+A project with no `Requirements Register.md` gets its requirements from the **MoSCoW scope** in its
+`Discovery & Requirements.md`: a tier column (`| **Must** | … |`, `| 🟥 **Must** | … |`,
+`| **Must Have** | … |`), a tier heading over a table or list (`### Must Have — …`), or a tier
+callout over checkboxes (`> [!todo] Must Have`). IDs are assigned in the order written
+(`DI-REQ-001`…), and `source` says `MoSCoW` plus the author's own label (`M10`, `F3`) where there is
+one. Won't-haves import as priority `W`.
 
 ## Project codes are immutable
 
@@ -68,11 +101,12 @@ Review with `--json` before the write that matters.
 
 Twelve scopes of work in the corpus have no task IDs at all. Those tasks get an ID synthesized from
 their phase and position, and the row is **flagged** `id_synthesized` so it is never mistaken for
-one somebody chose and cited. Completion state is preserved either way.
+one somebody chose and cited. Completion state is preserved either way. A synthesized ID never
+takes a number an authored ID in the same file already has.
 
 ```
 Bindery   207 tasks, 0 synthesized      — every task carries an authored ID
-Clearwhen  84 tasks, 84 synthesized     — free text, 42 already done
+Clearwhen  63 tasks, 63 synthesized     — free text; its 21 deliverables are phase exit demos
 ```
 
 ## Running it twice

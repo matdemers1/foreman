@@ -4,6 +4,9 @@ import {
   lintEars,
   parseChecklist,
   parseFrontmatter,
+  parseMoscow,
+  parsePhaseHeading,
+  parsePhaseMeta,
   parseSections,
   parseTables,
   rewriteCitations,
@@ -13,7 +16,6 @@ import type { Db } from '../db.js';
 import type { ImportStatus } from '../generated/prisma/enums.js';
 import { classify, documentKindFor, type FileKind } from './classify.js';
 import {
-  parsePhaseHeading,
   taskFrom,
   writeAdr,
   writeDocument,
@@ -74,6 +76,15 @@ export interface ImportReport {
   /** Every citation rewritten, for review before anybody trusts the prose (T-8.5). */
   readonly substitutions: readonly (Substitution & { file: string })[];
   readonly entities: Record<string, number>;
+  /**
+   * A project whose files all "mapped" and whose shape is still wrong.
+   *
+   * The reconciliation report accounts for files, and d3cloud.io's scope of work was a file the
+   * importer read without complaint — into 199 tasks, no phases and no requirements. Every row of
+   * the report said `mapped`. A project with that shape is almost never what its author wrote, so
+   * the report says so by name before anybody writes it.
+   */
+  readonly warnings: readonly { code: string; folder: string; message: string }[];
 }
 
 /** Folders that are not projects. `Templates` is not a project; nor is the audit index. */
@@ -107,7 +118,17 @@ const KNOWN_CODES: Record<string, string> = {
   'battlefront remake': 'GF',
   'bambu print notifier': 'BPN',
   atlas: 'ATL',
+  'd3cloud.io': 'DI',
 };
+
+/**
+ * Folders that hold projects rather than being one. `Personal Projects/Subtitler` is the project
+ * Subtitler; importing `Personal Projects` would have made one project called that, coded `PP`.
+ */
+const CONTAINERS = new Set(['personal projects']);
+
+/** More than this many tasks with no phase and no requirement is a scope of work misread. */
+const SHAPELESS_TASKS = 50;
 
 /**
  * A project code from a folder name, deterministic so a re-run produces the same one.
@@ -157,24 +178,36 @@ async function markdownIn(dir: string, root: string): Promise<string[]> {
 
 export async function runImport(db: Db, options: ImportOptions): Promise<ImportReport> {
   const root = options.path;
-  const folders = (await readdir(root, { withFileTypes: true }))
-    .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
-    .filter((e) => !NOT_PROJECTS.has(e.name.toLowerCase()))
-    .filter((e) => options.only === undefined || options.only.includes(e.name))
-    .map((e) => e.name);
+  const dirs = async (at: string) =>
+    (await readdir(join(root, at), { withFileTypes: true }))
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+      .map((e) => (at === '' ? e.name : join(at, e.name)));
+
+  const candidates: string[] = [];
+  for (const dir of await dirs('')) {
+    if (NOT_PROJECTS.has(dir.toLowerCase())) continue;
+    if (CONTAINERS.has(dir.toLowerCase())) candidates.push(...(await dirs(dir)));
+    else candidates.push(dir);
+  }
+  // `--only Subtitler` and `--only "Personal Projects/Subtitler"` both name the same project.
+  const folders = candidates.filter(
+    (dir) => options.only === undefined || options.only.includes(dir) || options.only.includes(basename(dir)),
+  );
 
   const files: FileOutcome[] = [];
   const substitutions: (Substitution & { file: string })[] = [];
   const entities: Record<string, number> = {};
   const projects: { code: string; folder: string; files: number; derived: boolean }[] = [];
+  const warnings: { code: string; folder: string; message: string }[] = [];
 
   const count = (kind: string, n = 1) => {
     entities[kind] = (entities[kind] ?? 0) + n;
   };
 
-  for (const folder of folders) {
+  for (const dir of folders) {
+    const folder = basename(dir);
     const code = codeFor(folder);
-    const paths = await markdownIn(join(root, folder), root);
+    const paths = await markdownIn(join(root, dir), root);
 
     /**
      * The project's overview, which does not live in the project's folder.
@@ -197,6 +230,19 @@ export async function runImport(db: Db, options: ImportOptions): Promise<ImportR
 
     // A project folder with zero files is legal — Personal Website has an overview and nothing
     // else. It still gets a project row, because the folder existing is the statement.
+    // What this project alone produced, for the shape check after its files are read.
+    const before = { ...entities };
+    const produced = (kind: string) => (entities[kind] ?? 0) - (before[kind] ?? 0);
+
+    /**
+     * Whether the project has a register. A discovery document's MoSCoW table becomes the
+     * project's requirements only when there is no register to say otherwise — the register has
+     * authored IDs, and two sources numbering the same requirements would collide on them.
+     */
+    const hasRegister = paths.some(
+      (path) => classify(path, {}).kind === 'requirements-register',
+    );
+
     const project = options.dryRun
       ? null
       : await db.project.upsert({
@@ -228,9 +274,20 @@ export async function runImport(db: Db, options: ImportOptions): Promise<ImportR
         code,
         projectId: project?.id ?? null,
         dryRun: options.dryRun,
+        hasRegister,
         count,
       });
       files.push(outcome);
+    }
+
+    if (produced('phase') === 0 && produced('requirement') === 0 && produced('task') > SHAPELESS_TASKS) {
+      warnings.push({
+        code,
+        folder,
+        message:
+          `${String(produced('task'))} tasks, but 0 phases and 0 requirements — the scope of work ` +
+          'was almost certainly misread; check it before writing',
+      });
     }
 
     /**
@@ -305,7 +362,7 @@ export async function runImport(db: Db, options: ImportOptions): Promise<ImportR
     unmapped: files.filter((f) => f.status === 'unmapped').length,
   };
 
-  return { root, dryRun: options.dryRun, files, totals, projects, substitutions, entities };
+  return { root, dryRun: options.dryRun, files, totals, projects, substitutions, entities, warnings };
 }
 
 interface MapContext {
@@ -318,6 +375,7 @@ interface MapContext {
   readonly code: string;
   readonly projectId: string | null;
   readonly dryRun: boolean;
+  readonly hasRegister: boolean;
   readonly count: (kind: string, n?: number) => void;
 }
 
@@ -355,14 +413,49 @@ async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
     }
 
     case 'scope-of-work': {
-      const items = parseChecklist(ctx.body);
-      if (items.length === 0) {
+      const all = parseChecklist(ctx.body);
+      if (all.length === 0) {
         return outcome('partial', 'recognised as a scope of work, but it has no checklist items');
       }
 
-      const withIds = items.filter((i) => /\bT-\d+(?:\.\d+)?\b/.test(i.text)).length;
+      /**
+       * What is a task, and what is not.
+       *
+       * A group line (`- [ ] **Repo setup**` with children) names the work under it and is not
+       * work itself. A deliverable is what the phase's tasks produce — it becomes the phase's exit
+       * demo, not a second task for the same work. Sceptrefall's `**Deliverables & Tasks**` is one
+       * list and stays tasks, because nothing in it says which half a line belongs to.
+       */
+      const isDeliverable = (subsection: string | null) =>
+        subsection !== null && /^deliverables?\b/i.test(subsection) && !/\btasks?\b/i.test(subsection);
+      /**
+       * Only where the phase has a task list of its own. Someday Vault's Phases 3–5 have a
+       * Deliverables list and no Tasks list, and the open work — the Stripe keys nobody has
+       * created yet — is in it. Turning that into an exit demo would leave a phase with no tasks
+       * and its outstanding work nowhere a brief could see it.
+       */
+      const hasTasks = new Set(
+        all.filter((i) => !i.isGroup && !isDeliverable(i.subsection)).map((i) => i.section),
+      );
+      const asDemo = (i: (typeof all)[number]) => isDeliverable(i.subsection) && hasTasks.has(i.section);
+      const items = all.filter((i) => !i.isGroup && !asDemo(i));
+      const deliverables = all.filter((i) => !i.isGroup && asDemo(i));
+      const groups = all.filter((i) => i.isGroup).length;
+
+      // Phases are read whether or not anything is written, so a dry run reports them too. It
+      // counted them only inside the write, and a dry run of every project said `phase: 0`.
+      const meta = parsePhaseMeta(ctx.body);
+      const phaseSections = [...new Set(all.map((i) => i.section))].flatMap((section) => {
+        const parsed = section === null ? null : parsePhaseHeading(section);
+        return section === null || parsed === null ? [] : [{ section, ...parsed }];
+      });
+
+      const authored = items.map((i) => taskFrom(i, ctx.code, '0', 0)).filter((t) => !t.synthesized);
+      const explicitIds = new Set(authored.map((t) => t.humanId));
+      const withIds = authored.length;
       ctx.count('task', items.length);
       ctx.count('task-synthesized', items.length - withIds);
+      ctx.count('phase', phaseSections.length);
 
       if (!ctx.dryRun && ctx.projectId !== null) {
         const write: WriteContext = { db, projectId: ctx.projectId, code: ctx.code };
@@ -370,32 +463,55 @@ async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
         // Phases first: a task's ID carries its phase number, so the phase has to exist and be
         // known before any task under it can be named.
         const phases = new Map<string, { id: string; number: string }>();
-        let order = 0;
-        for (const section of new Set(items.map((i) => i.section))) {
-          if (section === null) continue;
-          const parsed = parsePhaseHeading(section);
-          if (parsed === null) continue;
-          const id = await writePhase(write, parsed.number, parsed.name, order);
-          phases.set(section, { id, number: parsed.number });
-          order += 1;
-          ctx.count('phase');
+        for (const [order, { section, number, name }] of phaseSections.entries()) {
+          const its = deliverables.filter((d) => d.section === section);
+          const id = await writePhase(write, {
+            number,
+            name,
+            sortOrder: order,
+            objective: meta.get(section)?.objective ?? null,
+            size: meta.get(section)?.size ?? null,
+            exitDemo: its.length === 0 ? null : its.map((d) => `- [${d.marker}] ${d.text}`).join('\n'),
+          });
+          phases.set(section, { id, number });
         }
 
         const positions = new Map<string, number>();
         for (const item of items) {
           const phase = item.section === null ? undefined : phases.get(item.section);
           const number = phase?.number ?? '0';
-          const position = (positions.get(number) ?? 0) + 1;
+          let position = (positions.get(number) ?? 0) + 1;
+          let task = taskFrom(item, ctx.code, number, position);
+          /**
+           * A synthesized ID never takes one an author wrote. A phase mixing `**T-0.1**` lines
+           * with bare ones synthesized `T-0.1` for the first bare line, and the upsert on
+           * `human_id` then wrote the authored task's title over it.
+           */
+          while (task.synthesized && explicitIds.has(task.humanId)) {
+            position += 1;
+            task = taskFrom(item, ctx.code, number, position);
+          }
           positions.set(number, position);
-
-          const task = taskFrom(item, ctx.code, number, position);
           await writeTask(write, { ...task, phaseId: phase?.id ?? null });
         }
       }
+
       produced.push(
         `${String(items.length)} tasks${items.length - withIds > 0 ? ` (${String(items.length - withIds)} with synthesized IDs)` : ''}`,
       );
+      if (phaseSections.length > 0) produced.push(`${String(phaseSections.length)} phases`);
+      if (deliverables.length > 0) {
+        produced.push(`${String(deliverables.length)} deliverables, as phase exit demos`);
+      }
+      if (groups > 0) produced.push(`${String(groups)} group headings, folded into their tasks`);
 
+      if (phaseSections.length === 0 && items.length > SHAPELESS_TASKS) {
+        return outcome(
+          'partial',
+          `${String(items.length)} tasks and not one phase heading (\`## Phase N — Name\`) — ` +
+            'every task would land in no phase',
+        );
+      }
       return outcome(
         'mapped',
         withIds === 0
@@ -506,6 +622,31 @@ async function mapFile(db: Db, ctx: MapContext): Promise<FileOutcome> {
       ctx.count('document');
       ctx.count('document_section', sections.length);
       produced.push(`1 document, ${String(sections.length)} sections`);
+
+      /**
+       * The discovery document is also where a project without a register keeps its requirements:
+       * a MoSCoW feature scope, the tier on every row. It stays a document — the notes beside each
+       * feature are prose worth keeping — and its rows become requirements too, numbered in the
+       * order they were written, because nothing else in the project numbers them.
+       */
+      if (documentKindFor(basename(ctx.path)) === 'discovery' && !ctx.hasRegister) {
+        const moscow = parseMoscow(ctx.body);
+        if (moscow.length > 0) {
+          if (!ctx.dryRun && ctx.projectId !== null) {
+            for (const [index, item] of moscow.entries()) {
+              await upsertRequirement(db, ctx.projectId, ctx.code, {
+                ID: `REQ-${String(index + 1).padStart(3, '0')}`,
+                Req: item.statement,
+                Pri: item.priority,
+                // Provenance, since the ID is ours: where it came from, and the author's label.
+                Src: item.label === null ? 'MoSCoW' : `MoSCoW ${item.label}`,
+              }, index + 1);
+            }
+          }
+          ctx.count('requirement', moscow.length);
+          produced.push(`${String(moscow.length)} requirements, from the MoSCoW scope (IDs assigned in order)`);
+        }
+      }
       return outcome('mapped', documentKindFor(basename(ctx.path)) === null ? 'stored as a research document: no typed kind matches this filename' : null);
     }
 
