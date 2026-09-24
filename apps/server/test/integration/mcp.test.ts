@@ -252,6 +252,63 @@ describe.skipIf(url === undefined)('the MCP shim, end to end', () => {
       expect(created).not.toBeNull();
     });
 
+    it('files a created task under its phase, citing what it satisfies', async () => {
+      // FRM-T-003 on 2026-09-24: created with phase FRM-P-8 and satisfies FRM-REQ-148, it came
+      // back as a backlog ID with phaseId null and no requirements. The shim sent both as query
+      // parameters and the route never read them — each side's tests passed on its own, which is
+      // why this one goes through the tool rather than the route.
+      await post(`/projects/${CODE}/phases`, { number: 8, name: 'Phase eight' });
+      const requirement = (await (
+        await post(`/projects/${CODE}/requirements`, { statement: 'Foreman shall be satisfied.' })
+      ).json()) as { humanId: string };
+
+      const client = await connect(writeToken);
+      const result = await client.callTool({
+        name: 'foreman_create',
+        arguments: {
+          project: CODE,
+          kind: 'task',
+          text: 'Filed through the shim',
+          phase: `${CODE}-P-8`,
+          satisfies: [requirement.humanId],
+          size: 'M',
+        },
+      });
+      expect(result.isError, text(result)).toBeFalsy();
+
+      const back = await client.callTool({
+        name: 'foreman_get',
+        arguments: { id: `${CODE}-T-8.1` },
+      });
+      expect(back.isError, text(back)).toBeFalsy();
+      const { entity } = JSON.parse(text(back)) as {
+        entity: {
+          phase: { humanId: string } | null;
+          size: string;
+          requirements: { humanId: string }[];
+        };
+      };
+      expect(entity.phase?.humanId).toBe(`${CODE}-P-8`);
+      expect(entity.size).toBe('M');
+      expect(entity.requirements.map((r) => r.humanId)).toEqual([requirement.humanId]);
+    });
+
+    it('refuses a create citing a requirement that is not there, rather than dropping it', async () => {
+      const client = await connect(writeToken);
+      const result = await client.callTool({
+        name: 'foreman_create',
+        arguments: {
+          project: CODE,
+          kind: 'task',
+          text: 'Cites a ghost',
+          satisfies: [`${CODE}-REQ-999`],
+        },
+      });
+      expect(result.isError).toBe(true);
+      expect(text(result)).toContain(`${CODE}-REQ-999`);
+      expect(await db.task.findFirst({ where: { title: 'Cites a ghost' } })).toBeNull();
+    });
+
     it('advances a task, and the audit trail names the token that did it', async () => {
       const client = await connect(writeToken);
       await client.callTool({
