@@ -125,7 +125,18 @@ describe.skipIf(url === undefined)('the session brief', () => {
     const { brief } = await getBrief();
     expect(brief.project.code).toBe(CODE);
     expect(brief.activePhase?.humanId).toBe(`${CODE}-P-1`);
-    expect(brief.activePhase?.tasks).toEqual({ done: 1, total: 2 });
+    expect(brief.activePhase?.tasks).toEqual({ done: 1, cancelled: 0, total: 2 });
+  });
+
+  it('counts a cancelled task as closed, so done-or-cancelled work is the whole phase', async () => {
+    // Found on real phases: 18 done and 7 cancelled read as 72%, because the ring divided `done`
+    // by a total that included the seven nobody was going to do.
+    await addTask(`${CODE}-T-1.1`, { status: 'done' });
+    await addTask(`${CODE}-T-1.2`, { status: 'cancelled' });
+    await addTask(`${CODE}-T-1.3`, { status: 'blocked' });
+
+    const { brief } = await getBrief();
+    expect(brief.activePhase?.tasks).toEqual({ done: 1, cancelled: 1, total: 3 });
   });
 
   it('prefers a phase explicitly marked active over any guess', async () => {

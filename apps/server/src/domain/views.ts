@@ -34,6 +34,8 @@ export interface ScopeOfWorkPhase {
   readonly size: string | null;
   readonly tasks: readonly ScopeOfWorkTask[];
   readonly done: number;
+  /** Closed like `done` — a phase whose tasks are all done or cancelled is finished. */
+  readonly cancelled: number;
   /** Musts assigned to this phase that no live task cites. What the exit gate will refuse over. */
   readonly uncoveredMusts: readonly string[];
 }
@@ -97,6 +99,7 @@ export async function scopeOfWork(db: Db, code: string): Promise<ScopeOfWork> {
         size: phase.size,
         tasks: mine.map(shape),
         done: mine.filter((task) => task.status === 'done').length,
+        cancelled: mine.filter((task) => task.status === 'cancelled').length,
         uncoveredMusts: musts
           .filter((must) => must.phaseId === phase.id && must.tasks.length === 0)
           .map((must) => must.humanId),

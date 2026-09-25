@@ -91,6 +91,7 @@ export function ScopeOfWorkView({ code }: { code: string }) {
                 </Badge>{' '}
                 <span className="fm-muted">
                   {phase.done} of {phase.tasks.length} done
+                  {phase.cancelled === 0 ? '' : `, ${String(phase.cancelled)} cancelled`}
                   {phase.size === null ? '' : ` · ${phase.size}`}
                 </span>
               </div>

@@ -12,6 +12,7 @@ import {
 } from '@d3cloud/ui';
 import { foreman, type PortfolioRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { percentClosed } from '../lib/completion';
 import { Donut, Pill, SegmentBar } from '../ui/viz';
 import { ciTone, lifecycleTone, relativeDay, SERIES } from '../ui/tone';
 
@@ -53,8 +54,9 @@ function byActivity(a: PortfolioRow, b: PortfolioRow): number {
 }
 
 function ProjectCard({ row }: { row: PortfolioRow }) {
-  const total = row.tasks.open + row.tasks.blocked + row.tasks.done;
-  const percent = total === 0 ? 0 : Math.round((row.tasks.done / total) * 100);
+  const total = row.tasks.open + row.tasks.blocked + row.tasks.done + row.tasks.cancelled;
+  const closed = row.tasks.done + row.tasks.cancelled;
+  const percent = percentClosed(row.tasks.done, row.tasks.cancelled, total);
 
   return (
     <Card padding="md" href={`/projects/${row.code}`} interactive>
@@ -72,11 +74,12 @@ function ProjectCard({ row }: { row: PortfolioRow }) {
             size={88}
             segments={[
               { label: 'Done', value: row.tasks.done, color: SERIES.done },
+              { label: 'Cancelled', value: row.tasks.cancelled, color: SERIES.quiet },
               { label: 'Blocked', value: row.tasks.blocked, color: SERIES.blocked },
               { label: 'Open', value: row.tasks.open, color: SERIES.waiting },
             ]}
             label={total === 0 ? '—' : `${String(percent)}%`}
-            caption={total === 0 ? 'no tasks' : `${String(row.tasks.done)}/${String(total)}`}
+            caption={total === 0 ? 'no tasks' : `${String(closed)}/${String(total)}`}
           />
           <Stack gap="8" className="fm-card__facts">
             <Fact
@@ -101,6 +104,7 @@ function ProjectCard({ row }: { row: PortfolioRow }) {
             showLegend={false}
             segments={[
               { label: 'Done', value: row.tasks.done, color: SERIES.done },
+              { label: 'Cancelled', value: row.tasks.cancelled, color: SERIES.quiet },
               { label: 'Blocked', value: row.tasks.blocked, color: SERIES.blocked },
               { label: 'Open', value: row.tasks.open, color: SERIES.waiting },
             ]}

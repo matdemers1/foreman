@@ -49,7 +49,8 @@ export interface Brief {
     readonly name: string;
     readonly objective: string | null;
     readonly exitDemo: string | null;
-    readonly tasks: { readonly done: number; readonly total: number };
+    /** A cancelled task is closed, like a done one: a phase of done and cancelled work is 100%. */
+    readonly tasks: { readonly done: number; readonly cancelled: number; readonly total: number };
   } | null;
   /** Ready to pick up: never blocked, never done, never waiting on an unfinished dependency. */
   readonly nextTasks: readonly {
@@ -193,10 +194,13 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
 
   const phaseTasks =
     activePhase === null
-      ? { done: 0, total: 0 }
+      ? { done: 0, cancelled: 0, total: 0 }
       : {
           done: await db.task.count({
             where: { phaseId: activePhase.id, status: 'done', deletedAt: null },
+          }),
+          cancelled: await db.task.count({
+            where: { phaseId: activePhase.id, status: 'cancelled', deletedAt: null },
           }),
           total: await db.task.count({ where: { phaseId: activePhase.id, deletedAt: null } }),
         };

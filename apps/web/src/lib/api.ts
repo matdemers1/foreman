@@ -157,7 +157,7 @@ export interface PortfolioRow {
   name: string;
   lifecycle: string;
   phase: { humanId: string; number: string; name: string } | null;
-  tasks: { open: number; blocked: number; done: number };
+  tasks: { open: number; blocked: number; done: number; cancelled: number };
   openCriticals: number;
   /** `unknown` is a third state, and renders grey rather than green (S-04). */
   ci: { conclusion: string | null; unknown: boolean };
@@ -236,7 +236,7 @@ export interface Brief {
     name: string;
     objective: string | null;
     exitDemo: string | null;
-    tasks: { done: number; total: number };
+    tasks: { done: number; cancelled: number; total: number };
   } | null;
   nextTasks: { humanId: string; title: string; status: string; size: string | null }[];
   blocked: { humanId: string; title: string; reason: string | null }[];
@@ -298,6 +298,7 @@ export interface ScopeOfWork {
     size: string | null;
     tasks: ScopeOfWorkTask[];
     done: number;
+    cancelled: number;
     uncoveredMusts: string[];
   }[];
   unphased: ScopeOfWorkTask[];

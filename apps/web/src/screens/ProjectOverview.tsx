@@ -12,6 +12,7 @@ import {
 } from '@d3cloud/ui';
 import { foreman, type Brief } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { percentClosed } from '../lib/completion';
 import { EditForm, LIFECYCLES } from './EditForms';
 import { ProjectHeader } from '../components/ProjectHeader';
 import { forgetBrief, SECTIONS } from '../lib/project';
@@ -72,8 +73,9 @@ export function ProjectOverview({ code }: { code: string }) {
   const brief = state.value;
   const phase = brief.activePhase;
   const done = phase?.tasks.done ?? 0;
+  const cancelled = phase?.tasks.cancelled ?? 0;
   const total = phase?.tasks.total ?? 0;
-  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+  const percent = percentClosed(done, cancelled, total);
 
   return (
     <Page>
@@ -157,10 +159,15 @@ export function ProjectOverview({ code }: { code: string }) {
                     size={104}
                     segments={[
                       { label: 'Done', value: done, color: SERIES.done },
-                      { label: 'Remaining', value: Math.max(0, total - done), color: SERIES.waiting },
+                      { label: 'Cancelled', value: cancelled, color: SERIES.quiet },
+                      {
+                        label: 'Remaining',
+                        value: Math.max(0, total - done - cancelled),
+                        color: SERIES.waiting,
+                      },
                     ]}
                     label={total === 0 ? '—' : `${String(percent)}%`}
-                    caption={`${String(done)} of ${String(total)}`}
+                    caption={`${String(done + cancelled)} of ${String(total)}`}
                   />
                   <Stack gap="6" className="fm-grow">
                     <Link href={`/projects/${code}/phases/${phase.humanId}`}>

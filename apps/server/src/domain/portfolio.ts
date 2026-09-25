@@ -17,7 +17,13 @@ export interface PortfolioRow {
   readonly name: string;
   readonly lifecycle: string;
   readonly phase: { readonly humanId: string; readonly number: string; readonly name: string } | null;
-  readonly tasks: { readonly open: number; readonly blocked: number; readonly done: number };
+  readonly tasks: {
+    readonly open: number;
+    readonly blocked: number;
+    readonly done: number;
+    /** Closed like `done`. Left out, a project of done and cancelled work read as unfinished. */
+    readonly cancelled: number;
+  };
   readonly openCriticals: number;
   readonly ci: { readonly conclusion: string | null; readonly unknown: boolean };
   /** Proposals awaiting review (ADR-005). Not drift, so not inside it — see `Brief`. */
@@ -41,7 +47,7 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
   // thousand — and it keeps each column's meaning legible. If that ever changes, this is one query.
   return Promise.all(
     projects.map(async (project): Promise<PortfolioRow> => {
-      const [phase, open, blocked, done, criticals, check, unconfirmed, drift, lastCommit] =
+      const [phase, open, blocked, done, cancelled, criticals, check, unconfirmed, drift, lastCommit] =
         await Promise.all([
           // The same definition the brief uses. Taking `status: 'active'` alone said `null` for
           // every one of the nine projects imported at the cutover, while the brief beside it
@@ -56,6 +62,7 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
           }),
           db.task.count({ where: { projectId: project.id, deletedAt: null, status: 'blocked' } }),
           db.task.count({ where: { projectId: project.id, deletedAt: null, status: 'done' } }),
+          db.task.count({ where: { projectId: project.id, deletedAt: null, status: 'cancelled' } }),
           db.finding.count({
             where: {
               projectId: project.id,
@@ -93,7 +100,7 @@ export async function portfolio(db: Db, codes?: string[]): Promise<PortfolioRow[
           phase === null
             ? null
             : { humanId: phase.humanId, number: phase.number.toString(), name: phase.name },
-        tasks: { open, blocked, done },
+        tasks: { open, blocked, done, cancelled },
         openCriticals: criticals,
         ci: {
           conclusion: check?.conclusion ?? null,

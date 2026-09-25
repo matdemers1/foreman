@@ -1,6 +1,7 @@
 import { Card, Cluster, EmptyState, Grid, Page, Section, Skeleton, Stack } from '@d3cloud/ui';
 import { foreman, type PhaseRow, type TaskRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { percentClosed } from '../lib/completion';
 import { ProjectHeader } from '../components/ProjectHeader';
 import { plainText } from '../lib/text';
 import { Donut, Pill, SegmentBar } from '../ui/viz';
@@ -21,12 +22,13 @@ import { phaseStatusTone, SERIES } from '../ui/tone';
 interface Counted {
   readonly phase: PhaseRow;
   readonly done: number;
+  readonly cancelled: number;
   readonly total: number;
 }
 
 function PhaseCard({ counted, code }: { counted: Counted; code: string }) {
-  const { phase, done, total } = counted;
-  const percent = total === 0 ? 0 : Math.round((done / total) * 100);
+  const { phase, done, cancelled, total } = counted;
+  const percent = percentClosed(done, cancelled, total);
 
   return (
     <Card padding="md" href={`/projects/${code}/phases/${phase.humanId}`} interactive>
@@ -35,7 +37,12 @@ function PhaseCard({ counted, code }: { counted: Counted; code: string }) {
           size={72}
           segments={[
             { label: 'Done', value: done, color: SERIES.done },
-            { label: 'Remaining', value: Math.max(0, total - done), color: SERIES.waiting },
+            { label: 'Cancelled', value: cancelled, color: SERIES.quiet },
+            {
+              label: 'Remaining',
+              value: Math.max(0, total - done - cancelled),
+              color: SERIES.waiting,
+            },
           ]}
           label={total === 0 ? '—' : `${String(percent)}%`}
         />
@@ -46,7 +53,9 @@ function PhaseCard({ counted, code }: { counted: Counted; code: string }) {
           </Cluster>
           <span className="fm-card__title">{plainText(phase.name)}</span>
           <span className="fm-muted">
-            {total === 0 ? 'No tasks' : `${String(done)} of ${String(total)} done`}
+            {total === 0
+              ? 'No tasks'
+              : `${String(done)} of ${String(total)} done${cancelled === 0 ? '' : `, ${String(cancelled)} cancelled`}`}
             {phase.size === null ? '' : ` · ${phase.size}`}
           </span>
           {/* Worth saying out loud: a phase with no exit demo has no definition of done. */}
@@ -69,6 +78,7 @@ export function Phases({ code }: { code: string }) {
     return {
       phase,
       done: mine.filter((task) => task.status === 'done').length,
+      cancelled: mine.filter((task) => task.status === 'cancelled').length,
       total: mine.length,
     };
   });

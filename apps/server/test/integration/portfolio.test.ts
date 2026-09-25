@@ -180,7 +180,7 @@ describe.skipIf(url === undefined)('portfolio and search', () => {
 
       expect(alpha?.lifecycle).toBe('building');
       expect(alpha?.phase?.humanId).toBe('PFA-P-2');
-      expect(alpha?.tasks).toEqual({ open: 1, blocked: 1, done: 1 });
+      expect(alpha?.tasks).toEqual({ open: 1, blocked: 1, done: 1, cancelled: 0 });
       expect(alpha?.openCriticals).toBe(1);
       expect(alpha?.ci).toEqual({ conclusion: 'failure', unknown: false });
       // The badge's breakdown is the drift screen's, part for part, and sums to the badge.
@@ -204,7 +204,7 @@ describe.skipIf(url === undefined)('portfolio and search', () => {
       expect(beta?.phase).toBeNull();
       expect(beta?.lastActivityAt).toBeNull();
       // And a count of zero is still a count, not an absence.
-      expect(beta?.tasks).toEqual({ open: 0, blocked: 0, done: 0 });
+      expect(beta?.tasks).toEqual({ open: 0, blocked: 0, done: 0, cancelled: 0 });
     });
 
     it('names the phase in flight even when none is marked active', async () => {

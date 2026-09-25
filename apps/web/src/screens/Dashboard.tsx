@@ -12,6 +12,7 @@ import {
 } from '@d3cloud/ui';
 import { foreman, type FindingRow, type PortfolioRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { percentClosed } from '../lib/completion';
 import { BarRow, Donut, Pill, SegmentBar, StatCard } from '../ui/viz';
 import { ciTone, relativeDay, SERIES, severityTone } from '../ui/tone';
 import { plainText } from '../lib/text';
@@ -36,12 +37,13 @@ function totals(rows: readonly PortfolioRow[]) {
       open: acc.open + row.tasks.open,
       blocked: acc.blocked + row.tasks.blocked,
       done: acc.done + row.tasks.done,
+      cancelled: acc.cancelled + row.tasks.cancelled,
       criticals: acc.criticals + row.openCriticals,
       drift: acc.drift + row.drift.total,
       failing: acc.failing + (!row.ci.unknown && row.ci.conclusion !== 'success' ? 1 : 0),
       unknownCi: acc.unknownCi + (row.ci.unknown ? 1 : 0),
     }),
-    { open: 0, blocked: 0, done: 0, criticals: 0, drift: 0, failing: 0, unknownCi: 0 },
+    { open: 0, blocked: 0, done: 0, cancelled: 0, criticals: 0, drift: 0, failing: 0, unknownCi: 0 },
   );
 }
 
@@ -72,8 +74,8 @@ export function Dashboard() {
 
   const rows = portfolio.state.value.items;
   const t = totals(rows);
-  const tasks = t.open + t.blocked + t.done;
-  const percent = tasks === 0 ? 0 : Math.round((t.done / tasks) * 100);
+  const tasks = t.open + t.blocked + t.done + t.cancelled;
+  const percent = percentClosed(t.done, t.cancelled, tasks);
 
   const needsAttention = [...rows]
     .filter((row) => row.openCriticals > 0 || row.tasks.blocked > 0 || row.drift.total > 0)
@@ -134,16 +136,19 @@ export function Dashboard() {
                 size={128}
                 segments={[
                   { label: 'Done', value: t.done, color: SERIES.done },
+                  { label: 'Cancelled', value: t.cancelled, color: SERIES.quiet },
                   { label: 'Blocked', value: t.blocked, color: SERIES.blocked },
                   { label: 'Open', value: t.open, color: SERIES.waiting },
                 ]}
                 label={`${String(percent)}%`}
-                caption={`${String(t.done)} of ${String(tasks)}`}
+                caption={`${String(t.done + t.cancelled)} of ${String(tasks)}`}
               />
               <div className="fm-grow">
                 <SegmentBar
                   segments={[
                     { label: 'Done', value: t.done, color: SERIES.done },
+                    { label: 'Cancelled', value: t.cancelled, color: SERIES.quiet },
+                  { label: 'Cancelled', value: t.cancelled, color: SERIES.quiet },
                     { label: 'Blocked', value: t.blocked, color: SERIES.blocked },
                     { label: 'Open', value: t.open, color: SERIES.waiting },
                   ]}
@@ -263,6 +268,7 @@ export function Dashboard() {
                       showLegend={false}
                       segments={[
                         { label: 'Done', value: row.tasks.done, color: SERIES.done },
+                        { label: 'Cancelled', value: row.tasks.cancelled, color: SERIES.quiet },
                         { label: 'Blocked', value: row.tasks.blocked, color: SERIES.blocked },
                         { label: 'Open', value: row.tasks.open, color: SERIES.waiting },
                       ]}
