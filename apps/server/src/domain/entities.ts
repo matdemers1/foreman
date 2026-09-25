@@ -111,6 +111,17 @@ async function findOne(
           },
           dependsOn: { where: { dependsOn: { deletedAt: null } }, select: { dependsOn: { select: EDGE } } },
           dependedOnBy: { where: { task: { deletedAt: null } }, select: { task: { select: EDGE } } },
+          // Where this shipped (FRM-T-006, SHP-REQ-088): newest first, capped — a task deployed
+          // dozens of times over its life does not need the whole history in one call.
+          deployments: {
+            orderBy: { deployment: { deployedAt: 'desc' } },
+            take: 20,
+            select: {
+              deployment: {
+                select: { environment: true, imageSha: true, schemaRevision: true, deployedAt: true },
+              },
+            },
+          },
         },
       });
       return row === null
@@ -124,6 +135,7 @@ async function findOne(
               // Both directions (FRM-REQ-181): what this waits on, and what waits on it.
               dependsOn: row.dependsOn.map((d) => d.dependsOn),
               dependedOnBy: row.dependedOnBy.map((d) => d.task),
+              deployments: row.deployments.map((d) => d.deployment),
             },
           };
     }

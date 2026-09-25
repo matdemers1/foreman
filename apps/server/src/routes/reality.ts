@@ -1,4 +1,4 @@
-import { PageQuery } from '@foreman/shared';
+import { PageQuery, parseHumanId } from '@foreman/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireScope } from '../auth/middleware.js';
@@ -242,6 +242,13 @@ export function realityRoutes(db: Db, registry?: JobRegistry): Router {
     schemaRevision: z.string().max(200).optional(),
     deployedAt: z.iso.datetime({ offset: true }).optional(),
     note: z.string().max(1000).optional(),
+    /**
+     * Task human IDs the deploy shipped (FRM-T-006, SHP-REQ-088). Only IDs that resolve to a live
+     * task in this project are linked; anything else — a foreign project, an unknown or a
+     * soft-deleted task — is ignored rather than rejected, because a deploy naming a since-deleted
+     * task is not a reason to fail the deploy.
+     */
+    tasks: z.array(z.string()).max(200).optional(),
   });
 
   /**
@@ -259,7 +266,18 @@ export function realityRoutes(db: Db, registry?: JobRegistry): Router {
       if (body === null) return;
       const project = await findProject(db, param(req, 'code'));
 
-      const deployment = await db.$transaction(async (tx) => {
+      // Only IDs that parse as a task in *this* project are candidates — a foreign-project or
+      // malformed ID is ignored here rather than in the database round trip.
+      const candidateIds = [
+        ...new Set(
+          (body.tasks ?? []).filter((id) => {
+            const parsed = parseHumanId(id);
+            return parsed !== null && parsed.type === 'T' && parsed.code === project.code;
+          }),
+        ),
+      ];
+
+      const { deployment, tasks } = await db.$transaction(async (tx) => {
         const created = await tx.deployment.create({
           data: {
             projectId: project.id,
@@ -278,10 +296,29 @@ export function realityRoutes(db: Db, registry?: JobRegistry): Router {
           entityId: created.id,
           after: created,
         });
-        return created;
+
+        let linkedTasks: string[] = [];
+        if (candidateIds.length > 0) {
+          const liveTasks = await tx.task.findMany({
+            where: { projectId: project.id, humanId: { in: candidateIds }, deletedAt: null },
+            select: { id: true, humanId: true },
+          });
+          if (liveTasks.length > 0) {
+            // Idempotent, one link per task per deployment: `createMany` with `skipDuplicates`
+            // rather than a loop of upserts, since the composite key already guarantees at most
+            // one row per (deployment, task).
+            await tx.deploymentTask.createMany({
+              data: liveTasks.map((t) => ({ deploymentId: created.id, taskId: t.id })),
+              skipDuplicates: true,
+            });
+            linkedTasks = liveTasks.map((t) => t.humanId);
+          }
+        }
+
+        return { deployment: created, tasks: linkedTasks };
       });
 
-      res.status(201).json(deployment);
+      res.status(201).json({ ...deployment, tasks });
     }),
   );
 

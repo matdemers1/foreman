@@ -503,6 +503,7 @@ model Task {
   commits      CommitTask[]
   dependsOn    TaskDependency[] @relation("task_depends_on")
   dependedOnBy TaskDependency[] @relation("task_depended_on_by")
+  deployments  DeploymentTask[]
 
   @@index([projectId, status])
   @@index([phaseId, sortOrder])
@@ -1160,9 +1161,26 @@ model Deployment {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   DeploymentTask[]
 
   @@index([projectId, deployedAt])
   @@map("deployment")
+}
+
+/// Which tasks shipped in a deployment (FRM-T-006, SHP-REQ-088). Many-to-many: a deploy usually
+/// ships several tasks, and a task can be cited by more than one deploy over its life.
+model DeploymentTask {
+  deploymentId String @map("deployment_id") @db.Uuid
+  taskId       String @map("task_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  deployment Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  task       Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([deploymentId, taskId])
+  @@index([taskId])
+  @@map("deployment_task")
 }
 
 model TechItem {
