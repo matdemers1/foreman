@@ -98,6 +98,37 @@ cannot resolve it, and the error names DNS rather than configuration.
 On the Zima the same two values are written into `server.env` directly, because that file is only
 ever read by containers — there is no host-shaped copy to disagree with.
 
+## Labels for Shipyard
+
+Shipyard (SHP) is the deploy tool for this host. It verifies a release from the published image's
+labels rather than trusting a tag, and it reads two beyond the ones `docker/metadata-action` sets
+on its own:
+
+| Label | Meaning |
+|---|---|
+| `org.opencontainers.image.revision` | The commit SHA, set by `docker/metadata-action`. |
+| `dev.d3cloud.shipyard.migration` | `expand`, `contract` or `none`. A `contract` release is never auto-rolled back (SHP-D-057) — the schema it left behind may no longer match an older image. |
+| `dev.d3cloud.shipyard.schema` | The newest migration directory name at build time. Shipyard compares it with what `/health` reports as `schemaRevision` once the new image has booted. |
+
+Both are computed by `scripts/shipyard-labels.sh` in the `images` job of `.github/workflows/ci.yml`
+and passed into `docker/metadata-action`'s `labels:` input, which merges them with its own. The
+`migration` label comes from the HEAD commit's `Shipyard-Migration` git trailer:
+
+```
+Shipyard-Migration: contract
+```
+
+- Missing entirely → `none`.
+- `expand`, `contract` or `none` (case-insensitive, leading/trailing whitespace trimmed) → used
+  as given.
+- Anything else fails the `images` job with a clear message. There is no silent default for a
+  typo'd value, because the whole point is that Shipyard trusts the label without re-deriving it.
+
+Add the trailer to a commit — including a merge commit, since Shipyard reads whatever ends up at
+`HEAD` on `main` — whenever that commit's migrations are additive-only (`expand`), destructive
+(`contract`), or the release carries no schema change at all (`none`, the default). Run
+`bash scripts/shipyard-labels.sh` locally against any checkout to see what CI will compute.
+
 ## Health after a deploy
 
 - `/health` — schema revision, whether D3 Auth is reachable.
