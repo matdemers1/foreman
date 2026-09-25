@@ -129,6 +129,26 @@ export type RequirementUpdate = z.infer<typeof RequirementUpdate>;
 
 // ─── Task ──────────────────────────────────────────────────────────────────
 
+/**
+ * A repo-relative path or glob a task declares against (FRM-T-007). Attribution's weakest signal
+ * matches commits against these, and a match alone never marks work complete (ADR-005) — but a
+ * path that could climb out of the repo (`../secrets`) or was written as absolute (`/etc/passwd`)
+ * is not a repo-relative path at all, so both are refused rather than stored.
+ */
+export const TaskFilePath = z
+  .string()
+  .min(1)
+  .max(300)
+  .refine((value) => !value.startsWith('/'), 'a file path is repo-relative — no leading /')
+  .refine(
+    (value) => !value.split('/').includes('..'),
+    'a file path may not climb out of the repo with a .. segment',
+  );
+export type TaskFilePath = z.infer<typeof TaskFilePath>;
+
+/** At most 100 declared files or globs per task — a scope of work, not a file manifest. */
+export const TaskFiles = z.array(TaskFilePath).max(100);
+
 export const Task = z
   .object({
     id: Uuid,
@@ -145,7 +165,7 @@ export const Task = z
     idSynthesized: z.boolean(),
     startedAt: Instant.nullable(),
     completedAt: Instant.nullable(),
-    files: z.array(z.string().max(500)).default([]),
+    files: z.array(z.string()).default([]),
     /** The requirements this task satisfies. Many-to-many, in both directions. */
     requirementIds: z.array(Uuid).default([]),
   })
@@ -160,7 +180,7 @@ const TaskFields = z.object({
   size: Size.optional(),
   doneWhen: z.string().max(2000).optional(),
   sortOrder: z.number().int().optional(),
-  files: z.array(z.string().max(500)).optional(),
+  files: TaskFiles.optional(),
   requirementIds: z.array(Uuid).optional(),
 });
 

@@ -660,6 +660,45 @@ describe('what the MCP surface deliberately cannot do', () => {
     expect(call?.body).toEqual({ status: 'parked', reason: 'After Someday Vault ships.' });
   });
 
+  it('replaces a task’s declared files (FRM-T-007)', async () => {
+    const { client: api, calls } = fakeApi({ '/api/projects/SPN/tasks/SPN-T-001': { ok: true } });
+    const { client } = await connect(api);
+
+    const result = await client.callTool({
+      name: 'foreman_update',
+      arguments: { id: 'SPN-T-001', files: ['apps/server/src/one.ts', 'apps/server/src/two.ts'] },
+    });
+
+    expect(result.isError).toBeFalsy();
+    const call = calls.find((c) => c.method === 'PATCH');
+    expect(call?.path).toBe('/api/projects/SPN/tasks/SPN-T-001');
+    expect(call?.body).toMatchObject({
+      files: ['apps/server/src/one.ts', 'apps/server/src/two.ts'],
+    });
+  });
+
+  it('clears a task’s declared files with an empty array', async () => {
+    const { client: api, calls } = fakeApi({ '/api/projects/SPN/tasks/SPN-T-001': { ok: true } });
+    const { client } = await connect(api);
+
+    await client.callTool({ name: 'foreman_update', arguments: { id: 'SPN-T-001', files: [] } });
+
+    const call = calls.find((c) => c.method === 'PATCH');
+    expect(call?.body).toMatchObject({ files: [] });
+  });
+
+  it('refuses files on anything but a task', async () => {
+    const { client: api } = fakeApi({ '/api/projects/SPN/requirements/SPN-REQ-001': { ok: true } });
+    const { client } = await connect(api);
+
+    const result = await client.callTool({
+      name: 'foreman_update',
+      arguments: { id: 'SPN-REQ-001', files: ['x.ts'] },
+    });
+
+    expect(result.isError).toBe(true);
+  });
+
   it('gates that delete unconditionally, unlike every other write', async () => {
     const remove = WRITE_TOOLS.find((t) => t.name === 'foreman_delete');
     const decision = await remove?.gate({} as never, { id: 'BND-IDEA-004' });

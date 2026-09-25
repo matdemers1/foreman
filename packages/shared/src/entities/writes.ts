@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { Priority, Size } from '../enums.js';
 import { AnyId, HumanId, parseAnyId, ProjectCode } from '../ids.js';
 import { IdeaFieldKey } from './record.js';
+import { TaskFiles } from './spine.js';
 
 /**
  * The write surface, shared by the API and the MCP shim (FRM-REQ-089, FRM-REQ-090, FRM-REQ-091).
@@ -159,6 +160,14 @@ export const UpdateInput = z.object({
     .regex(/^[0-9a-f]{7,40}$/i)
     .optional()
     .describe('For a finding: the commit that fixed it'),
+  /**
+   * For a task: the repo-relative paths or globs it declares against — what `/fleet-develop`
+   * plans waves from (FRM-T-007). Replaces the whole list; an empty array clears it. Refused for
+   * every other kind, the same shape as `phase` is refused for anything but a task or requirement.
+   */
+  files: TaskFiles.optional().describe(
+    'Task only: replaces its declared files/globs wholesale. Repo-relative, no leading / or .. segment, max 100',
+  ),
 });
 export type UpdateInput = z.infer<typeof UpdateInput>;
 

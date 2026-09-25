@@ -131,7 +131,7 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
   {
     name: 'foreman_update',
     title: 'Update',
-    description: 'Change an entity’s text, priority, size or phase.',
+    description: 'Change an entity’s text, priority, size, phase or (a task) its declared files.',
     inputSchema: UpdateInput,
     gate: (_client, input) => {
       const args = UpdateInput.parse(input);
@@ -161,6 +161,15 @@ export const WRITE_TOOLS: readonly WriteToolDefinition[] = [
       if (args.body !== undefined) body['body'] = args.body;
       if (args.reason !== undefined) body['reason'] = args.reason;
       if (args.fixedCommitSha !== undefined) body['fixedCommitSha'] = args.fixedCommitSha;
+
+      // Only a task declares files — the wave-planning `/fleet-develop` reads (FRM-T-007). Refused
+      // by name for every other kind, the same shape as `phase` is refused above.
+      if (args.files !== undefined) {
+        if (kind !== 'tasks') {
+          throw new Error(`${args.id} has no files to declare; only a task does`);
+        }
+        body['files'] = args.files;
+      }
 
       // Advertised from the start and never sent until 2026-09-24: a move reported success and
       // left the task where it was. Only a task or a requirement has a phase, so anything else is

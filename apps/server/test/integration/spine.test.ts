@@ -375,6 +375,79 @@ describe.skipIf(url === undefined)('the spine', () => {
       // The start is not overwritten by finishing.
       expect(done.startedAt?.getTime()).toBe(started.startedAt?.getTime());
     });
+
+    describe('declared files (FRM-T-007)', () => {
+      it('replaces a task’s file list in the same update', async () => {
+        await makeProject();
+        await post('/projects/SPN/tasks', {
+          title: 'Declares files',
+          files: ['apps/server/src/one.ts'],
+        });
+
+        const res = await patch('/projects/SPN/tasks/SPN-T-001', {
+          files: ['apps/server/src/two.ts', 'apps/server/src/three.ts'],
+        });
+        expect(res.status).toBe(200);
+
+        const { entity } = (await (await api('/entities/SPN-T-001')).json()) as {
+          entity: { files: string[] };
+        };
+        expect(entity.files.sort()).toEqual(['apps/server/src/three.ts', 'apps/server/src/two.ts']);
+      });
+
+      it('clears a task’s file list with an empty array', async () => {
+        await makeProject();
+        await post('/projects/SPN/tasks', {
+          title: 'Declares files',
+          files: ['apps/server/src/one.ts'],
+        });
+
+        const res = await patch('/projects/SPN/tasks/SPN-T-001', { files: [] });
+        expect(res.status).toBe(200);
+
+        const { entity } = (await (await api('/entities/SPN-T-001')).json()) as {
+          entity: { files: string[] };
+        };
+        expect(entity.files).toEqual([]);
+      });
+
+      it('refuses an absolute path or one that climbs out of the repo', async () => {
+        await makeProject();
+        await post('/projects/SPN/tasks', { title: 'Declares files' });
+
+        const absolute = await patch('/projects/SPN/tasks/SPN-T-001', { files: ['/etc/passwd'] });
+        expect(absolute.status).toBe(400);
+
+        const climbing = await patch('/projects/SPN/tasks/SPN-T-001', {
+          files: ['apps/../../../secrets.env'],
+        });
+        expect(climbing.status).toBe(400);
+
+        const tooMany = await patch('/projects/SPN/tasks/SPN-T-001', {
+          files: Array.from({ length: 101 }, (_, i) => `apps/server/src/${String(i)}.ts`),
+        });
+        expect(tooMany.status).toBe(400);
+      });
+
+      it('audits the file change with before and after', async () => {
+        await makeProject();
+        await post('/projects/SPN/tasks', {
+          title: 'Declares files',
+          files: ['apps/server/src/one.ts'],
+        });
+
+        await patch('/projects/SPN/tasks/SPN-T-001', { files: ['apps/server/src/two.ts'] });
+
+        const event = await db.auditEvent.findFirstOrThrow({
+          where: { entityHumanId: 'SPN-T-001', action: 'update' },
+          orderBy: { createdAt: 'desc' },
+        });
+        const before = event.before as { files: { path: string }[] };
+        const after = event.after as { files: { path: string }[] };
+        expect(before.files.map((f) => f.path)).toEqual(['apps/server/src/one.ts']);
+        expect(after.files.map((f) => f.path)).toEqual(['apps/server/src/two.ts']);
+      });
+    });
   });
 
   describe('paging (FRM-REQ-092)', () => {
