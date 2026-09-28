@@ -2,6 +2,7 @@ import type { Db } from '../db.js';
 import type { EntityType } from '../generated/prisma/enums.js';
 import { record, scrub, type Actor, type TransactionClient } from './audit.js';
 import { Conflict, NotFound } from './errors.js';
+import { rollupAfter } from './rollup.js';
 
 /**
  * Soft delete and undo (FRM-REQ-138, FRM-REQ-139, FRM-REQ-140).
@@ -111,6 +112,8 @@ export async function softDelete(
       before,
       after: { deleted: true },
     });
+    // A deleted task stops counting toward its phase; a deleted phase toward its project.
+    await rollupAfter(tx, actor, type, before, { ...before, deletedAt: new Date() }, humanId);
     return { id };
   });
 }
@@ -198,6 +201,10 @@ export async function undo(db: Db, actor: Actor, auditEventId: string): Promise<
       after: restored,
     });
 
+    // The status beneath changed back, so what it adds up to is worked out again — itself a
+    // rollup event of its own, never a silent side effect of the reversal.
+    await rollupAfter(tx, actor, type, current, restored, event.entityHumanId ?? type);
+
     // Stamped, so the same change cannot be undone twice.
     await tx.auditEvent.update({
       where: { id: event.id },
@@ -227,6 +234,10 @@ function assertUnchangedSince(current: Record<string, unknown>, after: Record<st
   const drifted: string[] = [];
   for (const [key, value] of Object.entries(after)) {
     if (NOT_RESTORED.has(key)) continue;
+    // The same rule `restorable` keeps: a snapshot may carry an included relation — a task's
+    // `files` and `requirements` — which the bare row read here does not have. Comparing it anyway
+    // reported every task update as drifted, so no task update could ever be undone.
+    if (!(key in current)) continue;
     // Compared through the same scrubber that wrote the snapshot, so a Date and its ISO string
     // are not reported as a difference.
     const now = JSON.stringify(scrub(current[key]));

@@ -40,7 +40,7 @@ export async function phaseInFlight(db: Db, projectId: string) {
   const started = await db.phase.findFirst({
     where: {
       projectId,
-      status: { not: 'complete' },
+      status: { notIn: ['complete', 'cancelled'] },
       deletedAt: null,
       tasks: { some: { status: 'done', deletedAt: null } },
     },
@@ -49,7 +49,7 @@ export async function phaseInFlight(db: Db, projectId: string) {
   if (started !== null) return started;
 
   return db.phase.findFirst({
-    where: { projectId, status: { not: 'complete' }, deletedAt: null },
+    where: { projectId, status: { notIn: ['complete', 'cancelled'] }, deletedAt: null },
     orderBy: { sortOrder: 'asc' },
   });
 }

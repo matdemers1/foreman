@@ -1,4 +1,5 @@
 import type { Db } from '../db.js';
+import type { TransactionClient } from './audit.js';
 import { Conflict, NotFound } from './errors.js';
 
 /**
@@ -150,8 +151,14 @@ export interface GateResult {
  *
  * **Every failure names the requirement, task or finding responsible** (FRM-REQ-056). "The exit gate
  * failed" tells somebody to go looking; naming the three Musts with no task tells them what to do.
+ *
+ * Takes a transaction as readily as the client: the status rollup asks it from inside the
+ * transaction that closed the phase's last task.
  */
-export async function exitGate(db: Db, phaseHumanId: string): Promise<GateResult> {
+export async function exitGate(
+  db: TransactionClient,
+  phaseHumanId: string,
+): Promise<GateResult> {
   const phase = await db.phase.findFirst({
     where: { humanId: phaseHumanId, deletedAt: null },
     include: { project: { select: { id: true, code: true } } },

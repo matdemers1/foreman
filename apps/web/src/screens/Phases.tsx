@@ -85,8 +85,9 @@ export function Phases({ code }: { code: string }) {
 
   const complete = items.filter((phase) => phase.status === 'complete').length;
   const active = items.filter((phase) => phase.status === 'active').length;
+  const cancelled = items.filter((phase) => phase.status === 'cancelled').length;
   const parked = items.filter((phase) => phase.status === 'parked').length;
-  const planned = items.length - complete - active - parked;
+  const planned = items.length - complete - active - cancelled - parked;
 
   return (
     <Page>
@@ -117,6 +118,7 @@ export function Phases({ code }: { code: string }) {
                 { label: 'Complete', value: complete, color: SERIES.done },
                 { label: 'Active', value: active, color: SERIES.active },
                 { label: 'Planned', value: planned, color: SERIES.waiting },
+                { label: 'Cancelled', value: cancelled, color: SERIES.quiet },
                 { label: 'Parked', value: parked, color: SERIES.warning },
               ]}
             />

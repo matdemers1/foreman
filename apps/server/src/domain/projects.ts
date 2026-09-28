@@ -14,6 +14,7 @@ import { record, type Actor } from './audit.js';
 import { Conflict, Invalid, NotFound } from './errors.js';
 import { exitGate, GateRefused } from './coverage.js';
 import { allocate, nextTaskPosition, phaseHumanId, taskHumanId } from './humanId.js';
+import { rollupPhase, rollupProject, rollupTaskPhases } from './rollup.js';
 
 /**
  * The spine's write paths.
@@ -181,7 +182,11 @@ export async function updatePhase(db: Db, actor: Actor, humanId: string, input: 
       before,
       after: phase,
     });
-    return phase;
+    const rolledUp =
+      phase.status === before.status
+        ? []
+        : await rollupProject(tx, actor, phase.projectId, phase.humanId);
+    return { ...phase, rolledUp };
   });
 }
 
@@ -354,7 +359,10 @@ export async function createTask(db: Db, actor: Actor, code: string, input: Task
       entityHumanId: task.humanId,
       after: task,
     });
-    return task;
+    // New work in a closed phase reopens it; new work that is already started starts one.
+    const rolledUp =
+      task.phaseId === null ? [] : await rollupPhase(tx, actor, task.phaseId, task.humanId);
+    return { ...task, rolledUp };
   });
 }
 
@@ -425,6 +433,6 @@ export async function updateTask(db: Db, actor: Actor, humanId: string, input: T
       before,
       after: task,
     });
-    return task;
+    return { ...task, rolledUp: await rollupTaskPhases(tx, actor, before, task) };
   });
 }

@@ -192,6 +192,7 @@ export const PHASE_STATUSES = [
   { value: 'planned', label: 'Planned' },
   { value: 'active', label: 'Active' },
   { value: 'complete', label: 'Complete' },
+  { value: 'cancelled', label: 'Cancelled' },
   { value: 'parked', label: 'Parked' },
 ];
 

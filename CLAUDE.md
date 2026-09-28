@@ -10,7 +10,7 @@ P10 cutover on 2026-09-20, which is the point: the tool holds its own remaining 
 - `foreman_brief FRM` — the active phase, what is next, what is blocked, drift.
 - `foreman_coverage FRM` — uncovered Musts, tasks citing nothing, EARS warnings.
 - `foreman://FRM/architecture`, `/data-model`, `/api-contract`, `/ux-flows`, `/glossary`.
-- **ADR-001** Node/Express/Prisma over Python/FastAPI · **ADR-002** a small verb surface over a large graph · **ADR-003** local stdio shim, not a remote MCP server · **ADR-004** dual login as a permanent ecosystem pattern · **ADR-005** attribution is declared, not inferred · **ADR-006** five registers are views, not documents · **ADR-007** database backup as the only escape hatch · **ADR-008** project-prefixed human IDs · **ADR-009** one cutover, not a migration window · **ADR-013** remote MCP uses pre-registration, not DCR or CIMD · **ADR-014** *(proposed)* MCP may delete what nothing cites · **ADR-015** a project idea is its own entity, not an idea with no project · **ADR-016** *(proposed)* Foreman runs as one of two products, chosen by deployment · **ADR-017** a project idea grows through a named canvas, not a blank page.
+- **ADR-001** Node/Express/Prisma over Python/FastAPI · **ADR-002** a small verb surface over a large graph · **ADR-003** local stdio shim, not a remote MCP server · **ADR-004** dual login as a permanent ecosystem pattern · **ADR-005** attribution is declared, not inferred · **ADR-006** five registers are views, not documents · **ADR-007** database backup as the only escape hatch · **ADR-008** project-prefixed human IDs · **ADR-009** one cutover, not a migration window · **ADR-013** remote MCP uses pre-registration, not DCR or CIMD · **ADR-014** *(proposed)* MCP may delete what nothing cites · **ADR-015** a project idea is its own entity, not an idea with no project · **ADR-016** *(proposed)* Foreman runs as one of two products, chosen by deployment · **ADR-017** a project idea grows through a named canvas, not a blank page · **ADR-018** phase status and project lifecycle are derived from what is beneath them.
 
 The archived vault at `../D3 Cloud Vault/Foreman/` holds the pre-cutover plan. Read it for history;
 never write to it.
@@ -45,6 +45,9 @@ pnpm e2e
 pnpm --filter foreman-server run import -- --path "../D3 Cloud Vault" --only "<Folder>" --write
 # Not writing is the default; `--write` is the flag. Used at the P10 cutover and for the fourteen
 # projects still only in the archive.
+pnpm --filter foreman-server run reconcile-status -- --write
+# Derives phase status from tasks and project lifecycle from phases over data written before the
+# rollup existed (ADR-018). Reports by default; promotes only, and lists closed phases it held.
 pnpm --filter foreman-server run relint -- --write
 # Re-runs the EARS lint over requirements already stored. The importer did not lint until
 # 2026-09-20, so everything it wrote sat on the column defaults — unparsed, not ok, no note.
@@ -64,6 +67,7 @@ pnpm --filter foreman-server run relint -- --write
 - **A write-scoped API token is minted from the console**, at `/tokens`. The routes existed from P2 with nothing reaching them, so the only way was `issue-token` over SSH — which made the credential the audit and planning skills need unobtainable from the tool that issues it. `FOREMAN_URL` and `FOREMAN_WRITE_TOKEN` are what those skills read.
 - **Dual login, both paths always.** App-native (Argon2id + pepper + TOTP) *and* D3 Auth OIDC. Identities link by `(iss, sub)`, **never by email**. One e2e test asserts the password path still works with the issuer unreachable.
 - **`phase.number` is `numeric`** (Bindery shipped a Phase 8.5) and **`phase.sort_order` is independent of it** (Bindery built 0–8.5, 9–11, 13–16, with P12 still ahead).
+- **Status rolls up; only parking is a decision** (ADR-018). A task write re-derives its phase (`active` / `complete` through the exit gate / `cancelled` / reopened), and a phase change promotes its project (`building`, then `deployed`, never back). `domain/rollup.ts` is the one place the rules live, and each move is its own `system` audit event (`rollup via FRM-T-11.5`). A write that changes status or phase must go through `rollupTaskPhases`/`rollupAfter`, or the ledger rots again. `reconcile-status` is the backfill, and it only promotes.
 - **`requirement.phase_id` is nullable** — an unassigned requirement is the backlog.
 - **`human_id` is immutable once assigned**, project-prefixed and globally unique. Renumbering breaks every citation in every document body.
 - **EARS lint warns, never blocks.** A non-conforming requirement is stored with a warning.

@@ -16,7 +16,11 @@ export const ProjectLifecycle = z.enum([
 ]);
 export type ProjectLifecycle = z.infer<typeof ProjectLifecycle>;
 
-export const PhaseStatus = z.enum(['planned', 'active', 'complete', 'parked']);
+/**
+ * `planned`, `active`, `complete` and `cancelled` are derived from the phase's tasks
+ * (FRM-REQ-183); only `parked` is a decision nobody else can make, so only `parked` is sticky.
+ */
+export const PhaseStatus = z.enum(['planned', 'active', 'complete', 'cancelled', 'parked']);
 export type PhaseStatus = z.infer<typeof PhaseStatus>;
 
 /** T-shirt sizes only. Foreman records no time estimates anywhere (FRM-REQ-125 territory). */
