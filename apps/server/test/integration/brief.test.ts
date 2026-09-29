@@ -4,7 +4,12 @@ import { createApp } from '../../src/app.js';
 import { setPassword } from '../../src/auth/native.js';
 import { loadConfig, type Config } from '../../src/config.js';
 import { createDb, type Db } from '../../src/db.js';
-import { approximateTokens, BRIEF_TOKEN_BUDGET, type Brief } from '../../src/domain/brief.js';
+import {
+  approximateTokens,
+  BRIEF_TOKEN_BUDGET,
+  GUIDELINES_TOKEN_BUDGET,
+  type Brief,
+} from '../../src/domain/brief.js';
 
 /**
  * The session brief (T-1.7).
@@ -402,13 +407,16 @@ describe.skipIf(url === undefined)('the session brief', () => {
     });
 
     const { brief, tokensHeader } = await getBrief();
-    const tokens = approximateTokens(brief);
+    // The guidelines are the same in every brief and carry their own ceiling (FRM-REQ-187), so the
+    // project's budget is measured without them — and theirs is measured here too.
+    const { guidelines, ...projectState } = brief;
 
     expect(brief.nextTasks.length).toBeLessThanOrEqual(5);
     expect(brief.openCriticals.length).toBeLessThanOrEqual(5);
-    expect(tokens).toBeLessThan(BRIEF_TOKEN_BUDGET);
+    expect(approximateTokens(projectState)).toBeLessThan(BRIEF_TOKEN_BUDGET);
+    expect(approximateTokens(guidelines)).toBeLessThan(GUIDELINES_TOKEN_BUDGET);
     // The header lets a caller see the cost without measuring it.
-    expect(Number(tokensHeader)).toBe(tokens);
+    expect(Number(tokensHeader)).toBe(approximateTokens(brief));
   });
 
   it('404s an unknown project rather than returning an empty brief', async () => {

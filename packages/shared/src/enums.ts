@@ -77,6 +77,14 @@ export const IDEA_NEEDS_REASON: readonly IdeaStatus[] = ['parked', 'rejected'];
  * `considering` is the step in between that a feature idea has no use for — the point where
  * somebody is actually thinking about it rather than having merely written it down.
  */
+/**
+ * A guideline is followed or it is not. `retired` keeps the card and its reasoning — the history
+ * of why something used to be the rule is worth more than a clean list — but drops it from every
+ * brief, so a session is never told to follow what was abandoned.
+ */
+export const GuidelineStatus = z.enum(['active', 'retired']);
+export type GuidelineStatus = z.infer<typeof GuidelineStatus>;
+
 export const ProjectIdeaStatus = z.enum([
   'new',
   'considering',
@@ -236,6 +244,7 @@ export const EntityType = z.enum([
   'tech_item',
   'idea',
   'project_idea',
+  'guideline',
   'idea_score',
   'idea_comment',
   'user',

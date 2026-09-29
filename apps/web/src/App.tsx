@@ -16,6 +16,7 @@ import {
 import {
   Activity as ActivityIcon,
   BookText,
+  Compass,
   CalendarRange,
   FileStack,
   FolderKanban,
@@ -55,6 +56,7 @@ import { FindingDetail } from './screens/FindingDetail';
 import { Findings } from './screens/Findings';
 import { Glossary } from './screens/Glossary';
 import { Ideas } from './screens/Ideas';
+import { Guidelines } from './screens/Guidelines';
 import { ProjectIdeas } from './screens/ProjectIdeas';
 import { ProjectIdeaDetail } from './screens/ProjectIdeaDetail';
 import { Members } from './screens/Members';
@@ -170,6 +172,14 @@ export function App() {
               label={board ? 'Submissions' : 'Project ideas'}
               current={path.startsWith('/project-ideas')}
             />
+            {!board && (
+              <SideNavItem
+                href="/guidelines"
+                icon={<Compass />}
+                label="Guidelines"
+                current={path === '/guidelines'}
+              />
+            )}
             {board && user.role === 'admin' && (
               <SideNavItem
                 href="/members"
@@ -308,6 +318,8 @@ function Screen({ path, search }: { path: string; search: string }) {
       // Keyed by the ID so moving from one idea to a related one resets every section's editing
       // state, instead of carrying half an edit from the last idea into the next.
       return <ProjectIdeaDetail key={route.humanId} humanId={route.humanId ?? ''} />;
+    case 'guidelines':
+      return <Guidelines />;
     case 'members':
       return <Members />;
     case 'project':

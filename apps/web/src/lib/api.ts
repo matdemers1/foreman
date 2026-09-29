@@ -412,6 +412,28 @@ export interface IdeaRow {
 }
 
 /** A project idea. `project` is set only once it has been converted into one. */
+/** A standing decision for every project (FRM-REQ-186). */
+export interface GuidelineRow {
+  id: string;
+  humanId: string;
+  title: string;
+  area: string;
+  decision: string;
+  rationale: string | null;
+  guidance: string | null;
+  status: 'active' | 'retired';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GuidelineInput {
+  title: string;
+  area: string;
+  decision: string;
+  rationale: string;
+  guidance: string;
+}
+
 export interface ProjectIdeaRow {
   id: string;
   humanId: string;
@@ -851,6 +873,13 @@ export const foreman = {
 
   // --- Project ideas --------------------------------------------------------
   // No project in any of these paths, because a project idea has none. That is the feature.
+  guidelines: () => api.get<Page<GuidelineRow>>('/api/guidelines'),
+  createGuideline: (body: GuidelineInput) => api.post<GuidelineRow>('/api/guidelines', body),
+  updateGuideline: (
+    humanId: string,
+    body: Partial<GuidelineInput> & { status?: GuidelineRow['status'] },
+  ) => api.patch<GuidelineRow>(`/api/guidelines/${humanId}`, body),
+  deleteGuideline: (humanId: string) => api.del(`/api/guidelines/${humanId}`),
   projectIdeas: (status?: string) =>
     api.get<Page<ProjectIdeaRow>>(
       `/api/project-ideas${status === undefined ? '' : `?status=${status}`}`,

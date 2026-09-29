@@ -1,4 +1,4 @@
-import { parseAnyId, PROJECT_IDEA_PREFIX } from '@foreman/shared';
+import { GUIDELINE_PREFIX, parseAnyId, PROJECT_IDEA_PREFIX } from '@foreman/shared';
 import type { Db } from '../db.js';
 import type { EntityType } from '../generated/prisma/enums.js';
 import { NotFound } from './errors.js';
@@ -32,6 +32,8 @@ const BY_TYPE: Record<string, EntityType> = {
   // The one entry whose ID carries no project code: a project idea belongs to no project, which
   // is the entire point of it (FRM-ADR-015).
   [PROJECT_IDEA_PREFIX]: 'project_idea',
+  // The other codeless one: a guideline applies to every project and so belongs to none.
+  [GUIDELINE_PREFIX]: 'guideline',
 };
 
 export interface EntityResult {
@@ -61,7 +63,7 @@ export async function getByHumanId(
     // Not a lookup failure: an unprefixed ID is ambiguous by construction, and saying so is more
     // useful than "not found".
     throw new NotFound(
-      `${humanId} is not a human ID Foreman issues (expected BND-REQ-021, or PI-007)`,
+      `${humanId} is not a human ID Foreman issues (expected BND-REQ-021, PI-007 or GL-004)`,
     );
   }
 
@@ -204,6 +206,10 @@ async function findOne(
         where,
         include: { project: { select: { code: true, name: true, lifecycle: true } } },
       });
+      return row === null ? null : { id: row.id, entity: row };
+    }
+    case 'guideline': {
+      const row = await db.guideline.findFirst({ where });
       return row === null ? null : { id: row.id, entity: row };
     }
     case 'finding': {

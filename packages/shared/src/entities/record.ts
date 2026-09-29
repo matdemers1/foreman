@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   AdrStatus,
   DocumentKind,
+  GuidelineStatus,
   ProjectIdeaStatus,
   ProjectLifecycle,
   UserRole,
@@ -542,3 +543,35 @@ export type TermCreate = z.infer<typeof TermCreate>;
 
 export const TermUpdate = TermCreate.partial();
 export type TermUpdate = z.infer<typeof TermUpdate>;
+
+// ── Guidelines (FRM-REQ-186) ─────────────────────────────────────────────────
+
+/**
+ * A standing decision for every project: what was decided, why, and how to apply it.
+ *
+ * Four named fields rather than one body, for the same reason a project idea has a canvas
+ * (FRM-ADR-017): the structure is what keeps this from becoming the freeform wiki Foreman rules
+ * out. `decision` is the line a brief carries, so it is short by construction — the reasoning and
+ * the detail live in the fields a session reads only when it needs them.
+ */
+export const GuidelineCreate = z.object({
+  title: z.string().trim().min(1).max(200),
+  /** A grouping on the page — "Design", "Security", "Process". Free text, so no migration adds one. */
+  area: z.string().trim().min(1).max(40),
+  decision: z.string().trim().min(1).max(400),
+  rationale: z.string().max(20_000).optional(),
+  guidance: z.string().max(20_000).optional(),
+});
+export type GuidelineCreate = z.infer<typeof GuidelineCreate>;
+
+export const GuidelineUpdate = GuidelineCreate.partial().extend({
+  status: GuidelineStatus.optional(),
+});
+export type GuidelineUpdate = z.infer<typeof GuidelineUpdate>;
+
+/** What a brief and the portfolio carry: enough to act on, and short enough to always include. */
+export interface GuidelineSummary {
+  readonly humanId: string;
+  readonly title: string;
+  readonly decision: string;
+}

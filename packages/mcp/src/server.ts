@@ -33,7 +33,9 @@ export function createServer({ client, name, version }: ServerOptions): McpServe
       capabilities: { tools: {}, resources: {} },
       instructions:
         'Foreman holds the plan-of-record for every D3 Cloud project: requirements, phases, ' +
-        'tasks, ADRs, findings. Call foreman_brief before starting work on a project.',
+        'tasks, ADRs, findings. Call foreman_brief before starting work on a project. Its ' +
+        '`guidelines` are standing decisions for every project (GL-<SEQ>): follow them, and read ' +
+        'one in full with foreman_get, or all of them at foreman://guidelines.',
     },
   );
 
@@ -186,5 +188,26 @@ export function createServer({ client, name, version }: ServerOptions): McpServe
     },
   );
 
+  /**
+   * Every active guideline as one page (FRM-REQ-188). Static, not templated: there is one, and it
+   * belongs to no project — so it has no code to put in `foreman://<code>/…`.
+   */
+  server.registerResource(
+    'guidelines',
+    GUIDELINES_URI,
+    {
+      title: 'Guidelines',
+      description:
+        'Standing decisions for every D3 Cloud project — each with its reasoning and how to apply it.',
+      mimeType: 'text/markdown',
+    },
+    async (uri) => {
+      const body = await client.get<{ markdown: string }>('/api/guidelines/markdown');
+      return { contents: [{ uri: uri.href, mimeType: 'text/markdown', text: body.markdown }] };
+    },
+  );
+
   return server;
 }
+
+export const GUIDELINES_URI = 'foreman://guidelines';

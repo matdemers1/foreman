@@ -1,6 +1,8 @@
+import type { GuidelineSummary } from '@foreman/shared';
 import type { Db, Prisma } from '../db.js';
 import { driftFor, type DriftCategory } from './drift.js';
 import { NotFound } from './errors.js';
+import { activeGuidelineSummaries } from './guidelines.js';
 import { phaseInFlight } from './wherewestand.js';
 
 /**
@@ -116,6 +118,13 @@ export interface Brief {
     readonly message: string;
     readonly at: string;
   }[];
+  /**
+   * The ecosystem's standing decisions (FRM-REQ-187): every active guideline, as its ID, title and
+   * decision. Here so that the one call a session starts with also tells it the house rules —
+   * `foreman_get GL-004` has the reasoning. Identical in every project's brief, and budgeted on its
+   * own (`GUIDELINES_TOKEN_BUDGET`) rather than against the project's state.
+   */
+  readonly guidelines: readonly GuidelineSummary[];
 }
 
 export async function buildBrief(db: Db, code: string): Promise<Brief> {
@@ -259,6 +268,7 @@ export async function buildBrief(db: Db, code: string): Promise<Brief> {
       message: commit.message.split('\n')[0] ?? '',
       at: commit.committedAt.toISOString(),
     })),
+    guidelines: await activeGuidelineSummaries(db),
   };
 }
 
@@ -274,3 +284,11 @@ export function approximateTokens(payload: unknown): number {
 
 /** The ceiling. A brief that costs more than this has stopped being a brief. */
 export const BRIEF_TOKEN_BUDGET = 900;
+
+/**
+ * The guidelines' own ceiling, separate from the brief's. They are the same in every brief and grow
+ * with the ecosystem rather than with a project, so counting them against the project's budget
+ * would make every project's brief fail the day somebody writes a twentieth rule. Exceeding this
+ * one means the decisions have stopped being one-liners.
+ */
+export const GUIDELINES_TOKEN_BUDGET = 1500;

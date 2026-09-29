@@ -72,6 +72,7 @@ export interface Route {
     | 'projects'
     | 'project-ideas'
     | 'project-idea'
+    | 'guidelines'
     | 'members'
     | 'project'
     | 'phases'
@@ -117,6 +118,8 @@ export function routeFor(path: string): Route {
       ? { screen: 'project-ideas' }
       : { screen: 'project-idea', humanId: parts[1] };
   }
+  // Cross-project, like project ideas: a guideline applies to every project and belongs to none.
+  if (parts[0] === 'guidelines' && parts[1] === undefined) return { screen: 'guidelines' };
   if (parts[0] === 'members' && parts[1] === undefined) return { screen: 'members' };
 
   if (parts[0] === 'projects' && parts[1] !== undefined) {

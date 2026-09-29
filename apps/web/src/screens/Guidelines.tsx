@@ -1,0 +1,443 @@
+import { useState } from 'react';
+import {
+  Alert,
+  Button,
+  Card,
+  Cluster,
+  EmptyState,
+  FormActions,
+  FormField,
+  Grid,
+  Input,
+  Modal,
+  Page,
+  PageHeader,
+  Section,
+  SegmentedControl,
+  Skeleton,
+  Stack,
+  Textarea,
+} from '@d3cloud/ui';
+import { Markdown } from '../components/Markdown';
+import { foreman, type GuidelineInput, type GuidelineRow } from '../lib/api';
+import { useAsync } from '../lib/useAsync';
+import { Pill } from '../ui/viz';
+
+/**
+ * Guidelines — the standing decisions for every project (FRM-REQ-186).
+ *
+ * Dual login everywhere, tokens not hex, no time estimates: rules that used to live as prose in a
+ * CLAUDE.md, found only by a session that happened to read the right paragraph. Each is a card
+ * here — the decision on its face, the reasoning and the how-to behind it — and every brief
+ * carries the active ones, so they reach a session without anybody remembering to look
+ * (FRM-REQ-187).
+ *
+ * Grouped by area, because "what are the design rules" is the question you arrive with. Retired
+ * guidelines stay, behind the toggle: why something *used* to be the rule is worth keeping, and
+ * a card that vanishes says nothing about whether it was ever there.
+ */
+
+type View = 'active' | 'retired';
+
+const EMPTY: GuidelineInput = { title: '', area: '', decision: '', rationale: '', guidance: '' };
+
+export function Guidelines() {
+  const { state, reload } = useAsync(() => foreman.guidelines(), []);
+  const [view, setView] = useState<View>('active');
+  const [open, setOpen] = useState<GuidelineRow | null>(null);
+  const [editing, setEditing] = useState<GuidelineRow | 'new' | null>(null);
+
+  const all = state.status === 'ready' ? state.value.items : [];
+  const items = all.filter((row) => row.status === view);
+  const areas = [...new Set(all.map((row) => row.area))].sort();
+  const byArea = groupBy(items, (row) => row.area);
+
+  const saved = (row: GuidelineRow) => {
+    setEditing(null);
+    // Reopen what was just saved, so an edit made from the card's dialog lands back on it.
+    setOpen(row);
+    reload();
+  };
+
+  return (
+    <Page>
+      <PageHeader
+        title="Guidelines"
+        description="Standing decisions for every project. Each brief carries the active ones, so every session starts with them."
+        {...(state.status === 'ready'
+          ? {
+              count: all.filter((row) => row.status === 'active').length,
+              countNoun: { one: 'active guideline', other: 'active guidelines' },
+            }
+          : {})}
+        actions={
+          <>
+            <SegmentedControl
+              items={[
+                { value: 'active', label: 'Active' },
+                { value: 'retired', label: 'Retired' },
+              ]}
+              value={view}
+              onValueChange={(next) => { setView(next === 'retired' ? 'retired' : 'active'); }}
+              size="sm"
+              aria-label="Which guidelines to show"
+            />
+            <Button variant="primary" onClick={() => { setEditing('new'); }}>
+              New guideline
+            </Button>
+          </>
+        }
+      />
+
+      {state.status === 'loading' ? (
+        <Skeleton lines={10} />
+      ) : state.status === 'error' ? (
+        <EmptyState kind="error" heading="The guidelines did not load">
+          {state.message}
+        </EmptyState>
+      ) : items.length === 0 ? (
+        view === 'active' ? (
+          <EmptyState kind="empty" heading="No guidelines yet">
+            Write down a decision that should hold in every project — a design rule, a security
+            stance, a way of working — and every brief will carry it from then on.
+          </EmptyState>
+        ) : (
+          <EmptyState kind="empty" heading="Nothing retired">
+            A guideline you stop following moves here, with its reasoning intact.
+          </EmptyState>
+        )
+      ) : (
+        <Stack gap="24">
+          {[...byArea.entries()].map(([area, rows]) => (
+            <Section key={area} title={area} surface="plain">
+              <Grid minItemWidth="md">
+                {rows.map((row) => (
+                  <GuidelineCard key={row.humanId} row={row} onOpen={() => { setOpen(row); }} />
+                ))}
+              </Grid>
+            </Section>
+          ))}
+        </Stack>
+      )}
+
+      <Modal
+        open={open !== null}
+        onOpenChange={(next) => { if (!next) setOpen(null); }}
+        size="lg"
+        title={open === null ? '' : `${open.humanId} — ${open.title}`}
+      >
+        {open !== null && (
+          <GuidelineBody
+            row={open}
+            onEdit={() => {
+              setEditing(open);
+              setOpen(null);
+            }}
+            onChanged={(row) => {
+              setOpen(row);
+              reload();
+            }}
+            onDeleted={() => {
+              setOpen(null);
+              reload();
+            }}
+          />
+        )}
+      </Modal>
+
+      <GuidelineForm
+        editing={editing}
+        areas={areas}
+        onClose={() => { setEditing(null); }}
+        onSaved={saved}
+      />
+    </Page>
+  );
+}
+
+function GuidelineCard({ row, onOpen }: { row: GuidelineRow; onOpen: () => void }) {
+  return (
+    <Card
+      padding="md"
+      interactive
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+    >
+      <Stack gap="8">
+        <Cluster gap="8" align="center" justify="between">
+          <code className="fm-card__code">{row.humanId}</code>
+          {row.status === 'retired' && <Pill tone="neutral">retired</Pill>}
+        </Cluster>
+        <span className="fm-card__title">{row.title}</span>
+        <span className="fm-guideline__decision">{row.decision}</span>
+      </Stack>
+    </Card>
+  );
+}
+
+function GuidelineBody({
+  row,
+  onEdit,
+  onChanged,
+  onDeleted,
+}: {
+  row: GuidelineRow;
+  onEdit: () => void;
+  onChanged: (row: GuidelineRow) => void;
+  onDeleted: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = (work: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    work()
+      .catch((caught: unknown) => {
+        setError(caught instanceof Error ? caught.message : String(caught));
+      })
+      .finally(() => { setBusy(false); });
+  };
+
+  const retired = row.status === 'retired';
+
+  return (
+    <Stack gap="16">
+      <Cluster gap="8" align="center">
+        <Pill tone="neutral">{row.area}</Pill>
+        {retired && <Pill tone="warning">retired — no longer in any brief</Pill>}
+      </Cluster>
+
+      <div className="fm-callout">
+        <span className="fm-callout__label">The decision</span>
+        {row.decision}
+      </div>
+
+      {row.rationale !== null && <Part label="Why" body={row.rationale} />}
+      {row.guidance !== null && <Part label="How to apply it" body={row.guidance} />}
+
+      {error !== null && <Alert tone="danger" title="That did not save">{error}</Alert>}
+
+      <FormActions>
+        <Button
+          variant="danger-ghost"
+          disabled={busy}
+          onClick={() => {
+            // Soft delete, undoable from the audit log — but still the one action here that
+            // removes the card from view entirely, so it asks.
+            if (!window.confirm(`Delete ${row.humanId}? Retiring keeps it on record instead.`)) return;
+            run(() => foreman.deleteGuideline(row.humanId).then(onDeleted));
+          }}
+        >
+          Delete
+        </Button>
+        <Button
+          disabled={busy}
+          onClick={() => {
+            run(() =>
+              foreman
+                .updateGuideline(row.humanId, { status: retired ? 'active' : 'retired' })
+                .then(onChanged),
+            );
+          }}
+        >
+          {retired ? 'Reinstate' : 'Retire'}
+        </Button>
+        <Button variant="primary" disabled={busy} onClick={onEdit}>
+          Edit
+        </Button>
+      </FormActions>
+    </Stack>
+  );
+}
+
+function GuidelineForm({
+  editing,
+  areas,
+  onClose,
+  onSaved,
+}: {
+  editing: GuidelineRow | 'new' | null;
+  areas: readonly string[];
+  onClose: () => void;
+  onSaved: (row: GuidelineRow) => void;
+}) {
+  return (
+    <Modal
+      open={editing !== null}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      size="lg"
+      title={editing === 'new' || editing === null ? 'New guideline' : `Edit ${editing.humanId}`}
+      description="The decision is what every brief carries — keep it to a line or two. The reasoning and the how-to are read when someone needs them."
+    >
+      {editing !== null && (
+        // Keyed so opening a different card starts from its values, not the last one's.
+        <FormBody
+          key={editing === 'new' ? 'new' : editing.humanId}
+          editing={editing}
+          areas={areas}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
+      )}
+    </Modal>
+  );
+}
+
+function FormBody({
+  editing,
+  areas,
+  onClose,
+  onSaved,
+}: {
+  editing: GuidelineRow | 'new';
+  areas: readonly string[];
+  onClose: () => void;
+  onSaved: (row: GuidelineRow) => void;
+}) {
+  const [draft, setDraft] = useState<GuidelineInput>(
+    editing === 'new'
+      ? EMPTY
+      : {
+          title: editing.title,
+          area: editing.area,
+          decision: editing.decision,
+          rationale: editing.rationale ?? '',
+          guidance: editing.guidance ?? '',
+        },
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (key: keyof GuidelineInput) => (value: string) => {
+    setDraft((current) => ({ ...current, [key]: value }));
+  };
+
+  const valid =
+    draft.title.trim().length > 0 &&
+    draft.area.trim().length > 0 &&
+    draft.decision.trim().length > 0;
+
+  const submit = () => {
+    setBusy(true);
+    setError(null);
+    const body = { ...draft, title: draft.title.trim(), area: draft.area.trim() };
+    (editing === 'new'
+      ? foreman.createGuideline(body)
+      : foreman.updateGuideline(editing.humanId, body)
+    )
+      .then(onSaved)
+      .catch((caught: unknown) => {
+        setError(caught instanceof Error ? caught.message : String(caught));
+      })
+      .finally(() => { setBusy(false); });
+  };
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (valid && !busy) submit();
+      }}
+    >
+      <Stack gap="16">
+        <FormField label="Title" help="What it is about, in a few words.">
+          <Input
+            value={draft.title}
+            maxLength={200}
+            onChange={(event) => { set('title')(event.target.value); }}
+            placeholder="Every app gets both logins"
+          />
+        </FormField>
+
+        <FormField
+          label="Area"
+          help={
+            areas.length === 0
+              ? 'Groups cards on the page — Design, Security, Process.'
+              : `Groups cards on the page. In use: ${areas.join(', ')}.`
+          }
+        >
+          <Input
+            value={draft.area}
+            maxLength={40}
+            list="fm-guideline-areas"
+            onChange={(event) => { set('area')(event.target.value); }}
+            placeholder="Architecture"
+          />
+        </FormField>
+        <datalist id="fm-guideline-areas">
+          {areas.map((area) => (
+            <option key={area} value={area} />
+          ))}
+        </datalist>
+
+        <FormField label="The decision" help="The rule itself. This line goes into every brief.">
+          <Textarea
+            rows={2}
+            maxLength={400}
+            value={draft.decision}
+            onChange={(event) => { set('decision')(event.target.value); }}
+          />
+        </FormField>
+
+        <FormField label="Why" help="Markdown. What it protects, and what went wrong without it.">
+          <Textarea
+            rows={5}
+            value={draft.rationale}
+            onChange={(event) => { set('rationale')(event.target.value); }}
+          />
+        </FormField>
+
+        <FormField
+          label="How to apply it"
+          help="Markdown. The specifics — checklists, do and don't, the exceptions."
+        >
+          <Textarea
+            rows={7}
+            value={draft.guidance}
+            onChange={(event) => { set('guidance')(event.target.value); }}
+          />
+        </FormField>
+
+        {error !== null && <Alert tone="danger" title="It was not saved">{error}</Alert>}
+
+        <FormActions>
+          <Button type="button" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={busy || !valid}>
+            {busy ? 'Saving…' : editing === 'new' ? 'Add guideline' : 'Save'}
+          </Button>
+        </FormActions>
+      </Stack>
+    </form>
+  );
+}
+
+function Part({ label, body }: { label: string; body: string }) {
+  return (
+    <Stack gap="4">
+      <span className="fm-part__label">{label}</span>
+      <Markdown>{body}</Markdown>
+    </Stack>
+  );
+}
+
+function groupBy<T>(rows: readonly T[], key: (row: T) => string): Map<string, T[]> {
+  const out = new Map<string, T[]>();
+  for (const row of rows) {
+    const k = key(row);
+    const list = out.get(k);
+    if (list === undefined) out.set(k, [row]);
+    else list.push(row);
+  }
+  return out;
+}

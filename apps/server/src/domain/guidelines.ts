@@ -1,0 +1,174 @@
+import {
+  formatGuidelineId,
+  type GuidelineCreate,
+  type GuidelineStatus,
+  type GuidelineSummary,
+  type GuidelineUpdate,
+} from '@foreman/shared';
+import type { Db } from '../db.js';
+import { record, type Actor, type TransactionClient } from './audit.js';
+import { NotFound } from './errors.js';
+
+/**
+ * Guidelines — standing decisions that apply to every project (FRM-REQ-186 … FRM-REQ-188).
+ *
+ * The ecosystem's house rules: dual login everywhere, tokens not hex, no time estimates. They used
+ * to live as prose in a CLAUDE.md, where a session found them only if it happened to read the
+ * right paragraph. Here each is a record with an ID, and every brief carries the active ones —
+ * so starting work on any project puts them in front of whoever is doing it (FRM-REQ-187).
+ *
+ * Like a project idea, a guideline belongs to no project, and for the same reason its `GL-004`
+ * comes from a Postgres sequence rather than a project's counter (ADR-008, ADR-015).
+ */
+
+const SELECT = {
+  id: true,
+  humanId: true,
+  seq: true,
+  title: true,
+  area: true,
+  decision: true,
+  rationale: true,
+  guidance: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+async function nextSeq(tx: TransactionClient): Promise<number> {
+  const rows = await tx.$queryRaw<{ seq: number }[]>`
+    select nextval('guideline_seq')::int as seq
+  `;
+  const seq = rows[0]?.seq;
+  if (seq === undefined) throw new Error('guideline_seq did not yield a value');
+  return seq;
+}
+
+/** An empty string clears an optional section rather than storing '' as "written". */
+const orNull = (value: string): string | null => (value.trim().length === 0 ? null : value);
+
+export async function allGuidelines(db: Db, options: { status?: GuidelineStatus } = {}) {
+  return db.guideline.findMany({
+    where: { deletedAt: null, ...(options.status === undefined ? {} : { status: options.status }) },
+    // Active above retired (the enum is ordered that way), then grouped by area, then in the
+    // order they were written — the first rule in an area is usually the one the rest refine.
+    orderBy: [{ status: 'asc' }, { area: 'asc' }, { seq: 'asc' }],
+    select: SELECT,
+  });
+}
+
+/**
+ * The line a brief and the portfolio carry for each active guideline.
+ *
+ * Title and decision only: the rationale and guidance can run to pages, and a brief is read at the
+ * start of every session whether or not any of it is relevant. `foreman_get GL-004` has the rest.
+ */
+export async function activeGuidelineSummaries(db: Db): Promise<GuidelineSummary[]> {
+  return db.guideline.findMany({
+    where: { deletedAt: null, status: 'active' },
+    orderBy: [{ area: 'asc' }, { seq: 'asc' }],
+    select: { humanId: true, title: true, decision: true },
+  });
+}
+
+export async function findGuideline(db: Db, humanId: string) {
+  const row = await db.guideline.findFirst({ where: { humanId, deletedAt: null }, select: SELECT });
+  if (row === null) throw new NotFound(humanId);
+  return row;
+}
+
+export async function createGuideline(db: Db, actor: Actor, input: GuidelineCreate) {
+  return db.$transaction(async (tx) => {
+    const seq = await nextSeq(tx);
+    const guideline = await tx.guideline.create({
+      data: {
+        humanId: formatGuidelineId(seq),
+        seq,
+        title: input.title,
+        area: input.area,
+        decision: input.decision,
+        ...(input.rationale === undefined ? {} : { rationale: orNull(input.rationale) }),
+        ...(input.guidance === undefined ? {} : { guidance: orNull(input.guidance) }),
+      },
+      select: SELECT,
+    });
+    await record(tx, {
+      ...actor,
+      action: 'create',
+      entityType: 'guideline',
+      entityId: guideline.id,
+      entityHumanId: guideline.humanId,
+      after: guideline,
+    });
+    return guideline;
+  });
+}
+
+export async function updateGuideline(
+  db: Db,
+  actor: Actor,
+  humanId: string,
+  input: GuidelineUpdate,
+) {
+  return db.$transaction(async (tx) => {
+    const before = await tx.guideline.findFirst({
+      where: { humanId, deletedAt: null },
+      select: SELECT,
+    });
+    if (before === null) throw new NotFound(humanId);
+
+    const after = await tx.guideline.update({
+      where: { id: before.id },
+      data: {
+        ...(input.title === undefined ? {} : { title: input.title }),
+        ...(input.area === undefined ? {} : { area: input.area }),
+        ...(input.decision === undefined ? {} : { decision: input.decision }),
+        ...(input.rationale === undefined ? {} : { rationale: orNull(input.rationale) }),
+        ...(input.guidance === undefined ? {} : { guidance: orNull(input.guidance) }),
+        ...(input.status === undefined ? {} : { status: input.status }),
+      },
+      select: SELECT,
+    });
+    await record(tx, {
+      ...actor,
+      action: 'update',
+      entityType: 'guideline',
+      entityId: after.id,
+      entityHumanId: after.humanId,
+      before,
+      after,
+    });
+    return after;
+  });
+}
+
+/**
+ * Every active guideline as one Markdown page — the `foreman://guidelines` resource.
+ *
+ * Headings are the IDs, so a reader can cite what it is following by the same name the console
+ * shows.
+ */
+export async function guidelinesMarkdown(db: Db): Promise<string> {
+  const rows = await db.guideline.findMany({
+    where: { deletedAt: null, status: 'active' },
+    orderBy: [{ area: 'asc' }, { seq: 'asc' }],
+    select: SELECT,
+  });
+  const out: string[] = [
+    '# Guidelines',
+    '',
+    'Standing decisions for every D3 Cloud project. Follow them unless the project records an ADR that says otherwise.',
+  ];
+  let area: string | null = null;
+  for (const row of rows) {
+    if (row.area !== area) {
+      area = row.area;
+      out.push('', `## ${area}`);
+    }
+    out.push('', `### ${row.humanId} — ${row.title}`, '', `**Decision.** ${row.decision}`);
+    if (row.rationale !== null) out.push('', `**Why.** ${row.rationale}`);
+    if (row.guidance !== null) out.push('', '**How to apply.**', '', row.guidance);
+  }
+  if (rows.length === 0) out.push('', '_No active guidelines._');
+  return `${out.join('\n')}\n`;
+}

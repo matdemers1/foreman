@@ -256,6 +256,7 @@ enum EntityType {
   tech_item
   idea
   project_idea
+  guideline
   idea_score
   idea_comment
   user
@@ -689,6 +690,34 @@ model Idea {
 /// than from a project's counter, because there is no project to count against.
 ///
 /// `projectId` is the project it *became*, set only by converting — not the project it belongs to.
+enum GuidelineStatus {
+  active
+  retired
+}
+
+/// A standing decision for every project (FRM-REQ-186): what was decided, why, and how to apply
+/// it. Like a project idea it belongs to no project, so its `GL-004` ID comes from a sequence
+/// rather than a project's counter. `decision` is the line every brief carries.
+model Guideline {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  humanId   String          @unique @map("human_id")
+  seq       Int             @unique
+  title     String
+  area      String
+  decision  String
+  rationale String?
+  guidance  String?
+  status    GuidelineStatus @default(active)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  @@index([status])
+  @@map("guideline")
+}
+
 model ProjectIdea {
   id String @id @default(uuid(7)) @db.Uuid
 

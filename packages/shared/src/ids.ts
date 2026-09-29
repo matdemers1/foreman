@@ -39,6 +39,10 @@ export const ProjectCode = z
   // untangle later. Refused at the only moment it can be — a code is immutable (ADR-008).
   .refine((code) => code !== PROJECT_IDEA_PREFIX, {
     message: '`PI` is reserved: it prefixes project ideas, which belong to no project',
+  })
+  // `GL` likewise: it prefixes guidelines, the ecosystem's standing decisions (FRM-REQ-186).
+  .refine((code) => code !== GUIDELINE_PREFIX, {
+    message: '`GL` is reserved: it prefixes guidelines, which belong to no project',
   });
 export type ProjectCode = z.infer<typeof ProjectCode>;
 
@@ -69,6 +73,21 @@ export function formatProjectIdeaId(seq: number): string {
 }
 
 /**
+ * A **guideline** — a standing decision that applies to every project (FRM-REQ-186) — is the
+ * second record no project owns, so it takes the same codeless shape: `GL-004`.
+ */
+export const GUIDELINE_PREFIX = 'GL';
+
+export const GUIDELINE_ID_RE = /^GL-(\d+)$/;
+
+export const GuidelineId = z.string().regex(GUIDELINE_ID_RE, 'expected GL-<SEQ>, e.g. GL-004');
+export type GuidelineId = z.infer<typeof GuidelineId>;
+
+export function formatGuidelineId(seq: number): string {
+  return `${GUIDELINE_PREFIX}-${String(seq).padStart(3, '0')}`;
+}
+
+/**
  * Either kind of ID, for the places that take whatever a person typed — `/api/entities/:id`,
  * search, and the MCP verbs that address an entity by name.
  *
@@ -82,7 +101,10 @@ export function parseAnyId(
   if (parsed !== null) return { code: parsed.code, type: parsed.type, seq: parsed.seq };
 
   const m = PROJECT_IDEA_ID_RE.exec(value.trim());
-  return m?.[1] === undefined ? null : { code: null, type: PROJECT_IDEA_PREFIX, seq: m[1] };
+  if (m?.[1] !== undefined) return { code: null, type: PROJECT_IDEA_PREFIX, seq: m[1] };
+
+  const g = GUIDELINE_ID_RE.exec(value.trim());
+  return g?.[1] === undefined ? null : { code: null, type: GUIDELINE_PREFIX, seq: g[1] };
 }
 
 /**
@@ -94,7 +116,7 @@ export function parseAnyId(
  */
 export const AnyId = z
   .string()
-  .refine((value) => parseAnyId(value) !== null, 'expected <CODE>-<TYPE>-<SEQ>, or PI-<SEQ>');
+  .refine((value) => parseAnyId(value) !== null, 'expected <CODE>-<TYPE>-<SEQ>, PI-<SEQ> or GL-<SEQ>');
 export type AnyId = z.infer<typeof AnyId>;
 
 /**

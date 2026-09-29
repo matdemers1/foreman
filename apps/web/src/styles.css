@@ -575,6 +575,18 @@ dd a {
   color: var(--color-fg-muted);
 }
 
+/* A guideline's decision on its card. It is the rule itself, so it reads at
+   body size rather than muted — but clamped, so one long rule cannot stretch
+   the row it sits in. */
+.fm-guideline__decision {
+  font-size: var(--text-14);
+  line-height: var(--leading-14);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* An ADR's one-line abstract in the index. Clamped to two lines: the abstract
    is prose and some are a paragraph, and a card that grows to fit one of them
    breaks the grid for the row it is in. */
