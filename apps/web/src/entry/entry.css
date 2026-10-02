@@ -1,0 +1,331 @@
+/* FRM-T-13.2: the entry screens — Sign in, choosing a password from an invitation, and the
+ * console's loading and not-answering states. A split shell after Bindery's and Postroom's front
+ * doors: the story on the sunken ground at the left, the form on the page ground at the right, a
+ * hairline between. Below 1024px the story is dropped and the mark and name sit above the form.
+ *
+ * Tokens only, from the @d3cloud/ui this app has installed: no raw colour, no shadow, no invented
+ * token. The one off-scale size is the display headline, and it says why where it is set. */
+
+.fm-entry {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+
+/* --- the story --------------------------------------------------------------------------------- */
+
+.fm-entry__story {
+  display: none;
+}
+
+.fm-entry__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--text-16);
+  line-height: var(--leading-16);
+  font-weight: var(--weight-semibold);
+}
+
+/* Pinned to the bottom of the panel: no illustration above it, so the free space sits there. */
+.fm-entry__pitch {
+  margin-top: auto;
+  padding-top: var(--space-48);
+}
+
+/* d3-allow: the app's one display headline, on the screens that introduce it — the type scale tops out at 24px for working screens, and Bindery's and Postroom's front doors set the same exception */
+.fm-entry__headline {
+  max-width: 20ch;
+  margin: 0;
+  /* d3-allow: display size, see above — 40px, as on Bindery's and Postroom's front doors */
+  font-size: 40px;
+  /* d3-allow: display leading for a two-line headline at that size */
+  line-height: 1.08;
+  font-weight: var(--weight-semibold);
+  /* d3-allow: tight tracking on display type, which is set loose at body sizes; no letter-spacing scale by decision */
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.fm-entry__headline-accent {
+  display: block;
+  color: var(--color-accent);
+}
+
+.fm-entry__promise {
+  max-width: 44ch;
+  margin: var(--space-16) 0 0;
+  font-size: var(--text-16);
+  line-height: var(--leading-24);
+  color: var(--color-fg-muted);
+}
+
+.fm-entry__claims {
+  display: grid;
+  gap: var(--space-12);
+  max-width: 46ch;
+  margin: var(--space-32) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-14);
+  line-height: var(--leading-20);
+  color: var(--color-fg-muted);
+}
+
+.fm-entry__claim {
+  display: flex;
+  gap: var(--space-12);
+}
+
+.fm-entry__tick {
+  flex: none;
+  margin-top: var(--space-2);
+  color: var(--color-success);
+}
+
+.fm-entry__claim-title {
+  font-weight: var(--weight-medium);
+  color: var(--color-fg);
+}
+
+.fm-entry__foot {
+  display: flex;
+  gap: var(--space-16);
+  padding-top: var(--space-32);
+  font-size: var(--text-12);
+  line-height: var(--leading-12);
+  color: var(--color-fg-faint);
+}
+
+/* --- the form ---------------------------------------------------------------------------------- */
+
+.fm-entry__main {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  padding: var(--space-32) var(--space-16);
+}
+
+/* Bindery's 24rem and 28rem columns, in pixels: Foreman's root size is 14px, not 16. */
+.fm-entry__column {
+  width: 100%;
+  max-width: 384px;
+  min-width: 0;
+}
+
+.fm-entry__column--wide {
+  max-width: 448px;
+}
+
+.fm-entry__brand--compact {
+  margin-bottom: var(--space-32);
+}
+
+.fm-entry__heading {
+  margin-bottom: var(--space-24);
+}
+
+.fm-entry__title {
+  margin: 0;
+  font-size: var(--text-24);
+  line-height: var(--leading-24);
+  font-weight: var(--weight-title);
+  /* d3-allow: the same tight tracking the display headline uses, at the form's heading size */
+  letter-spacing: -0.015em;
+}
+
+.fm-entry__title:focus {
+  outline: none;
+}
+
+.fm-entry__lede {
+  margin: var(--space-6) 0 0;
+  font-size: var(--text-14);
+  line-height: var(--leading-20);
+  color: var(--color-fg-muted);
+}
+
+/* The form column's own vertical rhythm: kit components carry no margin. */
+.fm-entry__body {
+  display: grid;
+  gap: var(--space-20);
+}
+
+.fm-entry__notes {
+  display: grid;
+  gap: var(--space-8);
+  margin-top: var(--space-24);
+  padding-top: var(--space-20);
+  border-top: var(--border-width) solid var(--color-border);
+  font-size: var(--text-13);
+  line-height: var(--leading-20);
+  color: var(--color-fg-muted);
+  text-wrap: pretty;
+}
+
+.fm-entry__notes > p {
+  margin: 0;
+}
+
+.fm-entry__notes--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8) var(--space-16);
+}
+
+/* A text button, underlined: a way round on a sign-in page is the least findable thing on it when it
+ * is styled as a caption. Resets the button's own chrome. */
+.fm-entry-link {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: var(--weight-medium);
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.fm-entry-link:hover {
+  color: var(--color-accent-hover);
+}
+
+.fm-entry-link--quiet {
+  color: var(--color-fg-muted);
+}
+
+.fm-entry-link--quiet:hover {
+  color: var(--color-fg);
+}
+
+.fm-entry-link:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--radius-xs);
+}
+
+/* --- Sign in with D3 Auth ---------------------------------------------------------------------- */
+
+.fm-entry-sso-group {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.fm-entry-or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  font-size: var(--text-12);
+  line-height: var(--leading-12);
+  color: var(--color-fg-faint);
+}
+
+.fm-entry-or > span {
+  flex: 1;
+  height: var(--border-width);
+  background: var(--color-border);
+}
+
+/* Secondary to the password form above it: an option the operator switched on, not the way in. */
+/* border-box: this kit's base stylesheet leaves boxes content-sized, and the 40px is the whole
+ * control, as tall as the primary button above it. */
+.fm-entry-sso {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 40px;
+  margin: 0;
+  padding: var(--space-8) var(--space-16);
+  border: var(--border-width) solid var(--color-border-field);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-fg);
+  font-size: var(--text-14);
+  line-height: var(--leading-20);
+  font-weight: var(--weight-medium);
+  text-align: center;
+  text-decoration: none;
+  transition: background-color var(--motion-hover), border-color var(--motion-hover);
+}
+
+.fm-entry-sso:hover {
+  background: var(--color-surface-hover);
+}
+
+.fm-entry-sso:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: var(--focus-offset);
+}
+
+.fm-entry-sso__glyph {
+  flex: none;
+}
+
+/* A finger needs 44px; the link is alone in its row, so it grows for real. */
+@media (pointer: coarse) {
+  .fm-entry-sso,
+  .fm-entry-link {
+    min-height: 44px;
+  }
+}
+
+/* --- from lg up: the split --------------------------------------------------------------------- */
+
+@media (min-width: 1024px) {
+  .fm-entry {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  }
+
+  .fm-entry__story {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-48) var(--space-64);
+    border-right: var(--border-width) solid var(--color-border);
+    background: var(--color-bg-sunken);
+  }
+
+  .fm-entry__main {
+    align-items: center;
+    padding: var(--space-48) var(--space-32);
+  }
+
+  .fm-entry__brand--compact {
+    display: none;
+  }
+}
+
+/* --- arrival ----------------------------------------------------------------------------------- */
+
+/* The pitch settles in once per page load (the module flag in EntryShell). Backwards fill only, so
+ * nothing keeps a transform afterwards. */
+.fm-entry__pitch {
+  animation: fm-entry-arrive var(--dur-5) var(--ease-out) backwards;
+}
+
+.fm-entry__story[data-settled] .fm-entry__pitch {
+  animation: none;
+}
+
+@keyframes fm-entry-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fm-entry__pitch {
+    animation: none;
+  }
+}

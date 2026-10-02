@@ -21,7 +21,29 @@ test.describe('the console', () => {
     const response = await page.goto('/');
     expect(response?.status()).toBe(200);
     expect(response?.headers()['content-type']).toContain('text/html');
-    await expect(page.getByRole('heading', { name: 'Sign in to Foreman' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in', exact: true })).toBeVisible();
+  });
+
+  test('the front door says what Foreman is beside the form, and drops it below 1024px (FRM-T-13.2)', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    const story = page.getByRole('complementary', { name: 'About Foreman' });
+    await expect(story).toBeVisible();
+    await expect(story.getByRole('heading', { level: 2 })).toContainText('checked against the code.');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+
+    await page.setViewportSize({ width: 800, height: 900 });
+    await expect(story).toBeHidden();
+    await expect(page.getByRole('main').getByText('Foreman', { exact: true })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible();
+  });
+
+  test('serves the favicon, rather than the console in its place (FRM-T-13.1)', async ({ request }) => {
+    const res = await request.get('/favicon.svg');
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('image/svg+xml');
   });
 
   test('signs in with a password and lands on the shell', async ({ page }) => {
@@ -95,9 +117,9 @@ test.describe('the console', () => {
     await page.getByRole('button', { name: new RegExp(EMAIL.split('@')[0] ?? 'Developer') }).click();
     await page.getByRole('menuitem', { name: 'Sign out' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Sign in to Foreman' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in', exact: true })).toBeVisible();
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Sign in to Foreman' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Sign in', exact: true })).toBeVisible();
   });
 
   test('renders the shell on a phone, with the navigation reachable', async ({ page }) => {
