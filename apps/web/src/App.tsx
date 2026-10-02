@@ -34,6 +34,7 @@ import {
   Table2,
   Users,
 } from 'lucide-react';
+import { ForemanMark } from './brand/ForemanMark';
 import { fetchSession, logout, type SessionState } from './lib/api';
 import { briefFor, projectCodeFor, SECTIONS } from './lib/project';
 import { useAsync } from './lib/useAsync';
@@ -148,7 +149,7 @@ export function App() {
       <SessionProvider session={state.session}>
       <AppShell
         storageKey="foreman.nav"
-        brand={<AppShellBrand name="Foreman" href="/" />}
+        brand={<AppShellBrand name="Foreman" href="/" mark={<ForemanMark decorative className="fm-brand-mark" />} />}
         nav={
           <SideNav>
             {/* A fixed set of destinations that does not grow with the data. The project list

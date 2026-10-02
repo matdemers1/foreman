@@ -8,6 +8,12 @@
   line-height: var(--leading-13);
 }
 
+/* FRM-T-13.1: the kit tints the brand's mark slot with the accent, which suits a line glyph. The
+   family mark's ink is the text colour and its lit star is its only colour, as on d3cloud.io. */
+.fm-brand-mark {
+  color: var(--color-fg);
+}
+
 /* The board: one column per status. It scrolls sideways below `md` rather than stacking, because
    stacked columns are a list with extra headings — and the list view already exists. */
 .fm-board {
