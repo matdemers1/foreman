@@ -1,14 +1,6 @@
 import { useState, type SyntheticEvent } from 'react';
-import {
-  Alert,
-  AuthLayout,
-  Button,
-  Card,
-  FormActions,
-  FormField,
-  PasswordInput,
-  Stack,
-} from '@d3cloud/ui';
+import { Alert, Button, FormActions, FormField, PasswordInput, Stack } from '@d3cloud/ui';
+import { EntryHeading, EntryShell } from '../entry/EntryShell';
 import { foreman, ApiError } from '../lib/api';
 
 /**
@@ -20,6 +12,8 @@ import { foreman, ApiError } from '../lib/api';
  *
  * **Accepting does not sign anybody in.** It sets a password and then asks for it. A forwarded
  * invitation email must not be a session, and the extra step is the difference.
+ *
+ * FRM-T-13.2: in the entry shell, wide, beside the same story as Sign in.
  */
 export function AcceptInvite() {
   const token = new URLSearchParams(window.location.search).get('token') ?? '';
@@ -53,80 +47,80 @@ export function AcceptInvite() {
 
   if (token.length === 0) {
     return (
-      <AuthLayout title="That link is incomplete">
-        <Card padding="md">
-          <p>
-            The invitation link needs the token it was sent with. Open it from the email rather
-            than retyping it, or ask for a new invitation.
-          </p>
-        </Card>
-      </AuthLayout>
+      <EntryShell wide>
+        <EntryHeading title="That link is incomplete">
+          The invitation link needs the token it was sent with. Open it from the email rather than
+          retyping it, or ask for a new invitation.
+        </EntryHeading>
+      </EntryShell>
     );
   }
 
   if (done) {
     return (
-      <AuthLayout title="Your account is ready">
-        <Card padding="md">
-          <Stack gap="16">
-            <p>Sign in with the password you just set.</p>
-            <Button variant="primary" onClick={() => { window.location.assign('/'); }}>
-              Go to sign in
-            </Button>
-          </Stack>
-        </Card>
-      </AuthLayout>
+      <EntryShell wide>
+        <EntryHeading title="Your account is ready">
+          Sign in with the password you just set.
+        </EntryHeading>
+        <FormActions layout="stack">
+          <Button variant="primary" size="lg" onClick={() => { window.location.assign('/'); }}>
+            Go to sign in
+          </Button>
+        </FormActions>
+      </EntryShell>
     );
   }
 
   return (
-    <AuthLayout title="Choose a password">
-      <Card padding="md">
-        <form onSubmit={submit}>
-          <Stack gap="16">
-            {error !== null && (
-              <Alert tone="danger" title="That did not work" dynamic>
-                {error}
-              </Alert>
-            )}
+    <EntryShell wide>
+      <EntryHeading title="Choose a password">
+        You were invited to this Foreman. Set a password, then sign in with it.
+      </EntryHeading>
+      <form onSubmit={submit}>
+        <Stack gap="16">
+          {error !== null && (
+            <Alert tone="danger" title="That did not work" dynamic>
+              {error}
+            </Alert>
+          )}
 
-            <FormField
-              label="Password"
-              help="At least 12 characters. Length beats cleverness — a passphrase is fine."
-              {...(tooShort ? { error: 'A little longer.' } : {})}
+          <FormField
+            label="Password"
+            help="At least 12 characters. Length beats cleverness — a passphrase is fine."
+            {...(tooShort ? { error: 'A little longer.' } : {})}
+          >
+            <PasswordInput
+              name="password"
+              value={password}
+              autoComplete="new-password"
+              onChange={(e) => { setPassword(e.target.value); }}
+            />
+          </FormField>
+
+          <FormField
+            label="And again"
+            {...(mismatch ? { error: 'These do not match.' } : {})}
+          >
+            <PasswordInput
+              name="again"
+              value={again}
+              autoComplete="new-password"
+              onChange={(e) => { setAgain(e.target.value); }}
+            />
+          </FormField>
+
+          <FormActions layout="stack">
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              disabled={busy || password.length < 12 || password !== again}
             >
-              <PasswordInput
-                name="password"
-                value={password}
-                autoComplete="new-password"
-                onChange={(e) => { setPassword(e.target.value); }}
-              />
-            </FormField>
-
-            <FormField
-              label="And again"
-              {...(mismatch ? { error: 'These do not match.' } : {})}
-            >
-              <PasswordInput
-                name="again"
-                value={again}
-                autoComplete="new-password"
-                onChange={(e) => { setAgain(e.target.value); }}
-              />
-            </FormField>
-
-            <FormActions>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={busy || password.length < 12 || password !== again}
-              >
-                {busy ? 'Setting…' : 'Set password'}
-              </Button>
-            </FormActions>
-          </Stack>
-        </form>
-      </Card>
-    </AuthLayout>
+              {busy ? 'Setting…' : 'Set password'}
+            </Button>
+          </FormActions>
+        </Stack>
+      </form>
+    </EntryShell>
   );
 }

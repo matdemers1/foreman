@@ -86,6 +86,17 @@ for (const theme of ['light', 'dark'] as const) {
         expect(violations, `${screen.name} (${theme}):\n  ${violations.join('\n  ')}`).toEqual([]);
       });
     }
+
+    // FRM-T-13.2: the front door, signed out, with its story panel showing.
+    test('sign in has no violations', async ({ page }) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto('/');
+      await page.getByRole('complementary', { name: 'About Foreman' }).waitFor();
+
+      const violations = await violationsOn(page);
+      expect(violations, `sign in (${theme}):\n  ${violations.join('\n  ')}`).toEqual([]);
+    });
   });
 }
 

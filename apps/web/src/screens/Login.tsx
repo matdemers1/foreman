@@ -1,25 +1,17 @@
 import { type SyntheticEvent, useEffect, useState } from 'react';
-import {
-  Alert,
-  AuthLayout,
-  Button,
-  Card,
-  FormActions,
-  FormField,
-  Input,
-  Link,
-  PasswordInput,
-  Stack,
-} from '@d3cloud/ui';
+import { Alert, Button, FormActions, FormField, Input, PasswordInput, Stack } from '@d3cloud/ui';
+import { EntryHeading, EntryNotes, EntryShell } from '../entry/EntryShell';
+import { SignInWithD3Auth } from '../entry/SignInWithD3Auth';
 import { ApiError, login } from '../lib/api';
 
 /**
- * Two ways in, side by side (ADR-004).
+ * Two ways in (ADR-004).
  *
- * The password form is the primary one and is always present. The D3 Auth button appears only when
- * the server says the provider is **reachable** — a button that leads to a 503 is worse than no
- * button at all, and this screen is what someone reaches when the provider is the thing that is
- * broken.
+ * The password form is the primary one and is always present. Sign in with D3 Auth sits below it,
+ * after an "or", only when the server says the provider is **reachable** — a control that leads to
+ * a 503 is worse than none at all, and this screen is what someone reaches when the provider is the
+ * thing that is broken. FRM-T-13.2: in the split entry shell, after Bindery's and Postroom's front
+ * doors; the flow underneath is unchanged.
  */
 
 export interface LoginProps {
@@ -87,21 +79,24 @@ export function Login({ oidcAvailable, onSignedIn }: LoginProps) {
   };
 
   return (
-    <AuthLayout
-      title="Sign in to Foreman"
-      description={needsTotp ? 'One more step: the code from your authenticator.' : undefined}
-    >
-      <Card>
-        <form onSubmit={submit}>
-          <Stack gap="16">
-            {error === null ? null : (
-              <Alert tone="danger" title="Sign-in failed" dynamic>
-                {error}
-              </Alert>
-            )}
+    <EntryShell>
+      <EntryHeading title="Sign in">
+        {needsTotp
+          ? 'One more step: the code from your authenticator.'
+          : 'Welcome back to the ledger.'}
+      </EntryHeading>
 
+      <div className="fm-entry__body">
+        {error === null ? null : (
+          <Alert tone="danger" title="Sign-in failed" dynamic>
+            {error}
+          </Alert>
+        )}
+
+        <form onSubmit={submit} aria-label={needsTotp ? 'Enter your authentication code' : 'Sign in with your password'}>
+          <Stack gap="16">
             {needsTotp ? (
-              <FormField label="Authentication code">
+              <FormField label="Authentication code" help="Six digits from your authenticator app.">
                 <Input
                   name="totp"
                   inputMode="numeric"
@@ -134,20 +129,42 @@ export function Login({ oidcAvailable, onSignedIn }: LoginProps) {
               </>
             )}
 
-            <FormActions>
-              <Button type="submit" variant="primary" disabled={busy}>
+            <FormActions layout="stack">
+              <Button type="submit" variant="primary" size="lg" disabled={busy}>
                 {busy ? 'Signing in…' : 'Sign in'}
               </Button>
             </FormActions>
-
-            {oidcAvailable ? (
-              // A link and not a button, because it is a navigation: the provider's redirect is a
-              // top-level one, and a fetch cannot follow it.
-              <Link href="/auth/oidc/start">Sign in with D3 Auth instead</Link>
-            ) : null}
           </Stack>
         </form>
-      </Card>
-    </AuthLayout>
+
+        {/* Below the password form, and only when the provider is reachable (ADR-004). Not on the
+            code step: the password half is already done, so the other way in is a detour. */}
+        {needsTotp ? null : <SignInWithD3Auth available={oidcAvailable} />}
+      </div>
+
+      {needsTotp ? (
+        <EntryNotes row>
+          <button
+            type="button"
+            className="fm-entry-link fm-entry-link--quiet"
+            onClick={() => {
+              setNeedsTotp(false);
+              setTotpCode('');
+              setError(null);
+            }}
+          >
+            Start over
+          </button>
+        </EntryNotes>
+      ) : (
+        <EntryNotes>
+          <p>
+            {oidcAvailable
+              ? 'New here? If D3 Auth lets you in, your account is made the first time you sign in with it. Otherwise, ask whoever runs this Foreman.'
+              : 'New here? There is no sign-up page: accounts are made by whoever runs this Foreman.'}
+          </p>
+        </EntryNotes>
+      )}
+    </EntryShell>
   );
 }

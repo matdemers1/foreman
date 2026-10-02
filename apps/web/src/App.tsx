@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   AccountMenu,
+  Alert,
   AppShell,
   AppShellBrand,
+  Button,
   EmptyState,
   MenuItem,
   MenuSeparator,
@@ -34,6 +36,8 @@ import {
   Table2,
   Users,
 } from 'lucide-react';
+import { ForemanMark } from './brand/ForemanMark';
+import { EntryHeading, EntryShell } from './entry/EntryShell';
 import { fetchSession, logout, type SessionState } from './lib/api';
 import { briefFor, projectCodeFor, SECTIONS } from './lib/project';
 import { useAsync } from './lib/useAsync';
@@ -103,10 +107,15 @@ export function App() {
 
   useEffect(load, [load]);
 
+  // FRM-T-13.2: both states come before a session is known, so they stand in the entry shell with
+  // Sign in rather than on a bare page.
   if (state.status === 'loading') {
     return (
       <ThemeProvider>
-        <Spinner label="Loading Foreman" />
+        <EntryShell>
+          <EntryHeading title="Foreman" />
+          <Spinner label="Loading Foreman" />
+        </EntryShell>
       </ThemeProvider>
     );
   }
@@ -114,10 +123,27 @@ export function App() {
   if (state.status === 'unreachable') {
     return (
       <ThemeProvider>
-        {/* Said plainly: the person reading this is the person who can fix it. */}
-        <EmptyState kind="error" heading="Foreman is not answering">
-          The API did not respond. Check the server and reload.
-        </EmptyState>
+        <EntryShell>
+          <EntryHeading title="Foreman is not answering" focusOnMount />
+          {/* Said plainly: the person reading this is the person who can fix it. */}
+          <Alert
+            tone="danger"
+            title="Could not reach the server"
+            actions={
+              <Button
+                size="sm"
+                onClick={() => {
+                  setState({ status: 'loading' });
+                  load();
+                }}
+              >
+                Try again
+              </Button>
+            }
+          >
+            The API did not respond. Check the server, then try again.
+          </Alert>
+        </EntryShell>
       </ThemeProvider>
     );
   }
@@ -148,7 +174,7 @@ export function App() {
       <SessionProvider session={state.session}>
       <AppShell
         storageKey="foreman.nav"
-        brand={<AppShellBrand name="Foreman" href="/" />}
+        brand={<AppShellBrand name="Foreman" href="/" mark={<ForemanMark decorative className="fm-brand-mark" />} />}
         nav={
           <SideNav>
             {/* A fixed set of destinations that does not grow with the data. The project list
