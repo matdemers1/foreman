@@ -3,7 +3,7 @@ import type { Config } from '../config.js';
 import type { Db } from '../db.js';
 import { record } from '../domain/audit.js';
 import { logger } from '../logger.js';
-import { isSecureOrigin } from '../auth/middleware.js';
+import { isConsoleSession, isSecureOrigin } from '../auth/middleware.js';
 import {
   issueSessionFor,
   IdentityCollision,
@@ -50,8 +50,10 @@ export function oidcRoutes({ db, config, client }: OidcRouteDeps): Router {
         return;
       }
       // Linking attaches the identity to whoever is signed in here already — never to an account
-      // matched by email afterwards.
-      const linkTo = req.query['link'] === '1' ? req.auth?.userId : undefined;
+      // matched by email afterwards. And only to a console session: a linked identity is a way
+      // into the console, so a bearer credential must not be able to add one.
+      const linkTo =
+        req.query['link'] === '1' && isConsoleSession(req.auth) ? req.auth?.userId : undefined;
       const { url, tx } = await client.beginSignIn(linkTo ?? undefined);
       res.setHeader('Set-Cookie', txCookie(tx, 600));
       res.redirect(url);

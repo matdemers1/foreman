@@ -266,9 +266,29 @@ export function requireScope(db: Db, scope: Scope) {
   };
 }
 
-/** Guard: console-only routes. A scoped MCP token may not manage accounts. */
+/**
+ * Whether the caller is a person at the console — a session cookie — rather than a credential.
+ *
+ * **Not the same question as "is there a `userId`?"** A D3 Auth token for `/mcp` resolves to a
+ * real account and carries its `userId`, but it is a credential narrowed to `read`/`write`.
+ * Asking for a `userId` let it through every console-only route, where it could mint itself an
+ * `admin` token or reset the account's TOTP — undoing the narrowing in one request.
+ */
+export function isConsoleSession(auth: AuthContext | undefined): boolean {
+  return (
+    auth !== undefined &&
+    auth.actorKind === 'user' &&
+    auth.sessionId !== undefined &&
+    auth.userId !== null
+  );
+}
+
+/**
+ * Guard: console-only routes — tokens, TOTP enrolment. No bearer credential passes, whether a
+ * scoped `frm_` token or a D3 Auth token for the remote MCP endpoint, however it is scoped.
+ */
 export function requireUser(req: Request, res: Response, next: NextFunction): void {
-  if (req.auth === undefined || req.auth.userId === null) {
+  if (!isConsoleSession(req.auth)) {
     res.status(401).json({ error: 'a signed-in user is required' });
     return;
   }
