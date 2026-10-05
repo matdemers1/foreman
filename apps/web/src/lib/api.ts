@@ -927,6 +927,9 @@ export const foreman = {
   issueToken: (body: { name: string; scopes: string[]; expiresInDays?: number }) =>
     api.post<IssuedToken>('/api/tokens', body),
   revokeToken: (id: string) => api.del(`/api/tokens/${id}`),
+  /** Where you are signed in: browsers, and D3 Constellation on each device (FRM-T-14.4). */
+  sessions: () => api.get<SignedInSession[]>('/auth/sessions'),
+  endSession: (id: string) => api.post<undefined>(`/auth/sessions/${encodeURIComponent(id)}/revoke`),
   findings: (params: { project?: string; severity?: string; status?: string; lens?: string } = {}) => {
     const query = new URLSearchParams({ limit: '200' });
     // `exactOptionalPropertyTypes` means an absent key is absent, not undefined — so the only
@@ -946,3 +949,17 @@ export const foreman = {
   brief: (code: string) => api.get<Brief>(`/api/brief/${code}`),
   entity: (humanId: string) => api.get<EntityResult>(`/api/entities/${humanId}`),
 };
+
+/** One place you are signed in — a browser, or a phone by the name it gave (FRM-T-14.4). */
+export interface SignedInSession {
+  id: string;
+  method: string;
+  native: boolean;
+  deviceName: string | null;
+  devicePlatform: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastSeenAt: string;
+  current: boolean;
+}

@@ -4,7 +4,7 @@ import { createServer as createMcpServer } from '@d3cloud/foreman-mcp/server';
 import { createClient } from '@d3cloud/foreman-mcp/client';
 import type { Config } from '../config.js';
 import { requireAuth } from '../auth/middleware.js';
-import { wwwAuthenticate } from '../auth/resource-server.js';
+import { MCP_LOOPBACK_HEADER, MCP_LOOPBACK_SECRET, wwwAuthenticate } from '../auth/resource-server.js';
 import { logger } from '../logger.js';
 
 /**
@@ -49,6 +49,10 @@ export function mcpRoutes({ config }: McpRouteDeps): Router {
       const client = createClient({
         baseUrl: `http://127.0.0.1:${String(port)}`,
         token: authorization.replace(/^Bearer /, ''),
+        // Marked as the MCP endpoint's own loopback, so the API judges the token against the `/mcp`
+        // audience it was issued for — and an `/mcp` token sent to the API directly is not (FRM-T-14.3).
+        fetch: (input, init) =>
+          fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string> | undefined), [MCP_LOOPBACK_HEADER]: MCP_LOOPBACK_SECRET } }),
       });
 
       const server = createMcpServer({ client });

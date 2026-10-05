@@ -4,7 +4,7 @@ import type { Db } from '../db.js';
 import { REVIEWS, type UserRole } from '@foreman/shared';
 import type { ActorKind } from '../generated/prisma/enums.js';
 import { safeEqual } from './passwords.js';
-import type { Verifier } from './resource-server.js';
+import { MCP_LOOPBACK_HEADER, MCP_LOOPBACK_SECRET, type Verifier } from './resource-server.js';
 import { hashToken } from './sessions.js';
 import * as sessions from './sessions.js';
 
@@ -18,6 +18,10 @@ export interface AuthContext {
   readonly actor: string;
   readonly actorKind: ActorKind;
   readonly sessionId?: string;
+  /** A native app's session (FRM-P-14): a person, signed in on a device, with a Bearer token. */
+  readonly native?: boolean;
+  /** A D3 Auth token for the app's audience (FRM-T-14.3): a person, but never a console session. */
+  readonly appToken?: boolean;
   readonly tokenId?: string;
   readonly scopes: readonly string[];
   /**
@@ -62,10 +66,34 @@ export function attachAuth({ db, config, verifier }: AuthMiddlewareDeps) {
         // trying both: Foreman's own tokens are `frm_`-prefixed, and a JWT has three dot-separated
         // segments, so neither lookup ever sees the other's credential.
         if (verifier !== null && verifier !== undefined && !presented.startsWith('frm_') && presented.split('.').length === 3) {
-          const resolved = await resourceAuth(db, verifier, presented);
+          // Each path accepts exactly one audience (FRM-T-14.3): `/mcp`, and the API calls it loops
+          // back, take the MCP endpoint's; every other API request takes the app's. A token for one
+          // is refused on the other.
+          const viaMcp = req.path === '/mcp' || req.path.startsWith('/mcp/') || req.get(MCP_LOOPBACK_HEADER) === MCP_LOOPBACK_SECRET;
+          const resolved = viaMcp ? await resourceAuth(db, verifier, presented) : await appAuth(db, verifier, presented);
           // Assigned only when there is one: `exactOptionalPropertyTypes` treats an explicit
           // `undefined` as different from absent, and downstream guards test for absence.
           if (resolved !== null) req.auth = resolved;
+          next();
+          return;
+        }
+
+        // Neither an API token nor a JWT: a native app's session (FRM-P-14), whose access token is
+        // the row's hash and opens nothing as a cookie.
+        if (!presented.startsWith('frm_')) {
+          const session = await sessions.resolve(db, presented, 'bearer');
+          if (session !== null) {
+            const user = await db.user.findUnique({ where: { id: session.userId }, select: { email: true, role: true } });
+            req.auth = {
+              userId: session.userId,
+              actor: user?.email ?? session.userId,
+              actorKind: 'user',
+              sessionId: session.sessionId,
+              native: true,
+              scopes: ['*'],
+              role: user?.role ?? null,
+            };
+          }
           next();
           return;
         }
@@ -161,6 +189,36 @@ async function resourceAuth(
     // Null for the same reason: a remote token acts with scopes, not with the seniority of
     // whoever minted it. Reviewing and deciding are things a person does in the console.
     role: null,
+  };
+}
+
+/**
+ * A verified D3 Auth token for **the app's** audience (FRM-T-14.3): D3 Constellation acting as the
+ * person it signed in. Linked by `(iss, sub)` and nothing else, like every D3 Auth path.
+ *
+ * It reads and writes as that person, with their role — but it is never a console session: no
+ * `sessionId`, and never `admin` — so the console-only routes (tokens, TOTP) refuse it, and an app
+ * token can never mint an API token, whoever is holding it.
+ */
+async function appAuth(db: Db, verifier: Verifier, presented: string): Promise<AuthContext | null> {
+  let token;
+  try {
+    token = await verifier.verify(presented, 'app');
+  } catch {
+    return null;
+  }
+  const identity = await db.identity.findUnique({
+    where: { iss_sub: { iss: token.iss, sub: token.sub } },
+    select: { userId: true, user: { select: { email: true, status: true, role: true, deletedAt: true } } },
+  });
+  if (identity === null || identity.user.status !== 'active' || identity.user.deletedAt !== null) return null;
+  return {
+    userId: identity.userId,
+    actor: identity.user.email,
+    actorKind: 'user',
+    appToken: true,
+    scopes: ['read', 'write'],
+    role: identity.user.role,
   };
 }
 
@@ -275,11 +333,14 @@ export function requireScope(db: Db, scope: Scope) {
  * `admin` token or reset the account's TOTP — undoing the narrowing in one request.
  */
 export function isConsoleSession(auth: AuthContext | undefined): boolean {
+  // A native session is a person signed in with their own password and code (FRM-T-14.3), so it
+  // counts; an app token from D3 Auth carries no sessionId and never does.
   return (
     auth !== undefined &&
     auth.actorKind === 'user' &&
     auth.sessionId !== undefined &&
-    auth.userId !== null
+    auth.userId !== null &&
+    auth.appToken !== true
   );
 }
 

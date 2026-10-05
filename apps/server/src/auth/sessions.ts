@@ -73,19 +73,27 @@ export interface ResolvedSession {
   readonly method: AuthMethod;
 }
 
-/** Resolve a cookie value to a live session, or null. Expired and revoked both mean null. */
-export async function resolve(db: Db, token: string): Promise<ResolvedSession | null> {
+/**
+ * Resolve a token to a live session, or null. Expired and revoked both mean null.
+ *
+ * `via` keeps the two kinds apart: a cookie only ever resolves a browser session and a Bearer token
+ * only a native one (FRM-P-14) — so a console cookie lifted into an Authorization header is nothing,
+ * and a native access token pasted into a cookie is nothing either. A native session never slides:
+ * its access token lives fifteen minutes and renewing it is the refresh token's job.
+ */
+export async function resolve(db: Db, token: string, via: 'cookie' | 'bearer' = 'cookie'): Promise<ResolvedSession | null> {
   const session = await db.session.findUnique({
     where: { tokenHash: hashToken(token) },
     include: { user: { select: { status: true, deletedAt: true } } },
   });
   if (session === null) return null;
+  if (session.native !== (via === 'bearer')) return null;
   if (session.revokedAt !== null) return null;
   if (session.expiresAt.getTime() <= Date.now()) return null;
   if (session.user.deletedAt !== null || session.user.status === 'suspended') return null;
 
   const sinceSeen = Date.now() - session.lastSeenAt.getTime();
-  if (sinceSeen > SLIDING_REFRESH_MS) {
+  if (!session.native && sinceSeen > SLIDING_REFRESH_MS) {
     await db.session.update({
       where: { id: session.id },
       data: { lastSeenAt: new Date(), expiresAt: new Date(Date.now() + SESSION_TTL_MS) },
@@ -128,4 +136,116 @@ export function setCookie(res: Response, token: string, secure: boolean): void {
 
 export function clearCookie(res: Response, secure: boolean): void {
   res.clearCookie(cookieName(secure), { ...cookieOptions(secure), maxAge: undefined });
+}
+
+// ── Native sessions (FRM-P-14, the D3 App contract) ──────────────────────────────────────────────
+
+/** The contract's ceiling for an access token: a phone is lost more often than a desk. */
+export const NATIVE_ACCESS_MS = 15 * 60 * 1000;
+/** A refresh token's window, renewed by every use (the contract's sliding thirty days). */
+export const NATIVE_REFRESH_MS = 30 * 24 * 60 * 60 * 1000;
+
+export interface Device {
+  readonly name: string;
+  readonly platform: string;
+}
+
+export interface NativeTokens {
+  readonly sessionId: string;
+  readonly accessToken: string;
+  readonly refreshToken: string;
+  /** Seconds, as the contract carries it. */
+  readonly expiresIn: number;
+}
+
+const opaque = (): string => randomBytes(32).toString('base64url');
+
+/** A native session: an ordinary session row, marked and named, with its first refresh token. */
+export async function issueNative(
+  db: Db,
+  userId: string,
+  method: AuthMethod,
+  meta: { device: Device | null; ip?: string | undefined; userAgent?: string | undefined },
+): Promise<NativeTokens> {
+  const accessToken = opaque();
+  const refreshToken = opaque();
+  const now = Date.now();
+  return db.$transaction(async (tx) => {
+    const row = await tx.session.create({
+      data: {
+        userId,
+        tokenHash: hashToken(accessToken),
+        method,
+        native: true,
+        deviceName: meta.device?.name.slice(0, 120) ?? null,
+        devicePlatform: meta.device?.platform.slice(0, 40) ?? null,
+        ...(meta.ip !== undefined ? { ip: meta.ip } : {}),
+        ...(meta.userAgent !== undefined ? { userAgent: meta.userAgent.slice(0, 512) } : {}),
+        expiresAt: new Date(now + NATIVE_ACCESS_MS),
+      },
+    });
+    await tx.nativeRefresh.create({
+      data: { sessionId: row.id, tokenHash: hashToken(refreshToken), createdAt: new Date(now), expiresAt: new Date(now + NATIVE_REFRESH_MS) },
+    });
+    return { sessionId: row.id, accessToken, refreshToken, expiresIn: NATIVE_ACCESS_MS / 1000 };
+  });
+}
+
+export type Rotation =
+  | { readonly kind: 'rotated'; readonly tokens: NativeTokens; readonly userId: string }
+  | { readonly kind: 'reused'; readonly sessionId: string; readonly userId: string }
+  | { readonly kind: 'ended' };
+
+/**
+ * Exchange a refresh token for a new pair. The presented row is claimed with a conditional update,
+ * so two refreshes racing with one token cannot both succeed: the loser sees it replaced, which is
+ * reuse, and the session ends — exactly what a stolen token racing its owner should cause.
+ */
+export async function rotateNative(db: Db, refreshToken: string): Promise<Rotation> {
+  const now = new Date();
+  const presented = await db.nativeRefresh.findUnique({
+    where: { tokenHash: hashToken(refreshToken) },
+    include: { session: { select: { id: true, userId: true, revokedAt: true, user: { select: { status: true, deletedAt: true } } } } },
+  });
+  if (
+    presented === null ||
+    presented.expiresAt.getTime() <= now.getTime() ||
+    presented.session.revokedAt !== null ||
+    presented.session.user.deletedAt !== null ||
+    presented.session.user.status === 'suspended'
+  ) {
+    return { kind: 'ended' };
+  }
+  const { id: sessionId, userId } = presented.session;
+  if (presented.replacedAt !== null) return { kind: 'reused', sessionId, userId };
+  return db.$transaction(async (tx) => {
+    const { count } = await tx.nativeRefresh.updateMany({ where: { id: presented.id, replacedAt: null }, data: { replacedAt: now } });
+    if (count !== 1) return { kind: 'reused', sessionId, userId } as const;
+    const accessToken = opaque();
+    const next = opaque();
+    await tx.session.update({
+      where: { id: sessionId },
+      data: { tokenHash: hashToken(accessToken), expiresAt: new Date(now.getTime() + NATIVE_ACCESS_MS), lastSeenAt: now },
+    });
+    await tx.nativeRefresh.create({
+      data: { sessionId, tokenHash: hashToken(next), createdAt: now, expiresAt: new Date(now.getTime() + NATIVE_REFRESH_MS) },
+    });
+    return { kind: 'rotated', userId, tokens: { sessionId, accessToken, refreshToken: next, expiresIn: NATIVE_ACCESS_MS / 1000 } } as const;
+  });
+}
+
+/**
+ * Sessions still signed in, for the sessions list. A native row expires with its fifteen-minute
+ * access token while the device stays signed in for as long as its refresh token is live — so an
+ * idle phone stays listed, and so stays revocable.
+ */
+export function liveSessionWhere(userId: string, now: Date = new Date()) {
+  return {
+    userId,
+    revokedAt: null,
+    OR: [
+      { native: false, expiresAt: { gt: now } },
+      { native: true, refreshes: { some: { replacedAt: null, expiresAt: { gt: now } } } },
+    ],
+  };
 }

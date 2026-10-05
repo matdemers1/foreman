@@ -2,6 +2,7 @@ import type { Config } from '../config.js';
 import type { Db } from '../db.js';
 import { hashPassword, needsRehash, verifyPassword } from './passwords.js';
 import * as sessions from './sessions.js';
+import { record } from '../domain/audit.js';
 import * as throttle from './throttle.js';
 import { decryptSecret, encryptSecret, generateSecret, provisioningUri, verifyCode } from './totp.js';
 
@@ -45,7 +46,20 @@ function decoy(pepper: string): Promise<string> {
   return decoyHash;
 }
 
-export async function login({ db, config }: AuthDeps, input: LoginInput): Promise<LoginOutcome> {
+export type PasswordStep =
+  | { readonly kind: 'ok'; readonly userId: string; readonly email: string; readonly totpEnrolled: boolean }
+  | { readonly kind: 'rejected'; readonly reason: 'credentials' }
+  | { readonly kind: 'throttled'; readonly retryAfterMs: number; readonly scope?: throttle.Scope };
+
+/**
+ * The password leg, shared by the console's login and the native sign-in (FRM-P-14), so both get the
+ * same throttle-before-hash, the same decoy and the same rehash — there is one way to check a
+ * password here, not two.
+ */
+export async function passwordStep(
+  { db, config }: AuthDeps,
+  input: { email: string; password: string; ip: string },
+): Promise<PasswordStep> {
   const email = input.email.trim().toLowerCase();
   const keys = { account: email, ip: input.ip };
 
@@ -86,37 +100,58 @@ export async function login({ db, config }: AuthDeps, input: LoginInput): Promis
     });
   }
 
-  const totpEnrolled =
-    user.credential.totpConfirmedAt !== null && user.credential.totpSecret !== null;
+  const totpEnrolled = user.credential.totpConfirmedAt !== null && user.credential.totpSecret !== null;
+  return { kind: 'ok', userId: user.id, email, totpEnrolled };
+}
 
-  if (totpEnrolled) {
+/**
+ * The code leg: right, unused, and then burned so it cannot be replayed inside its window. A wrong
+ * one counts against the same throttle as a wrong password.
+ */
+export async function codeStep(
+  { db, config }: AuthDeps,
+  input: { userId: string; email: string; code: string; ip: string },
+): Promise<boolean> {
+  const keys = { account: input.email, ip: input.ip };
+  const credential = await db.credential.findUnique({ where: { userId: input.userId } });
+  if (credential === null || credential.totpSecret === null) return false;
+  const secret = decryptSecret(credential.totpSecret, config.KEK);
+  const result = verifyCode(
+    secret,
+    input.code,
+    input.email,
+    credential.totpLastStep === null ? null : Number(credential.totpLastStep),
+  );
+  if (!result.valid) {
+    await throttle.recordFailure(db, keys);
+    return false;
+  }
+  await db.credential.update({
+    where: { userId: input.userId },
+    data: { totpLastStep: BigInt(result.step ?? 0) },
+  });
+  return true;
+}
+
+export async function login(deps: AuthDeps, input: LoginInput): Promise<LoginOutcome> {
+  const first = await passwordStep(deps, input);
+  if (first.kind !== 'ok') return first;
+
+  if (first.totpEnrolled) {
     if (input.totpCode === undefined || input.totpCode.length === 0) {
-      return { kind: 'totp_required', userId: user.id };
+      return { kind: 'totp_required', userId: first.userId };
     }
-    const secret = decryptSecret(user.credential.totpSecret ?? '', config.KEK);
-    const result = verifyCode(
-      secret,
-      input.totpCode,
-      email,
-      user.credential.totpLastStep === null ? null : Number(user.credential.totpLastStep),
-    );
-    if (!result.valid) {
-      await throttle.recordFailure(db, keys);
+    if (!(await codeStep(deps, { userId: first.userId, email: first.email, code: input.totpCode, ip: input.ip }))) {
       return { kind: 'rejected', reason: 'credentials' };
     }
-    // Burn the step so the same code cannot be replayed inside its window.
-    await db.credential.update({
-      where: { userId: user.id },
-      data: { totpLastStep: BigInt(result.step ?? 0) },
-    });
   }
 
-  await throttle.clear(db, keys);
-  const session = await sessions.issue(db, user.id, 'password', {
+  await throttle.clear(deps.db, { account: first.email, ip: input.ip });
+  const session = await sessions.issue(deps.db, first.userId, 'password', {
     ip: input.ip,
     userAgent: input.userAgent,
   });
-  return { kind: 'session', token: session.token, userId: user.id };
+  return { kind: 'session', token: session.token, userId: first.userId };
 }
 
 /** Begin TOTP enrolment: a secret, stored encrypted but unconfirmed until a code proves it works. */
@@ -169,4 +204,33 @@ export async function setPassword(
     update: { passwordHash, passwordUpdatedAt: new Date() },
   });
   await sessions.revokeAllForUser(db, userId);
+}
+
+export type LinkOutcome = { readonly kind: 'linked' } | { readonly kind: 'elsewhere' };
+
+/**
+ * Link a D3 Auth identity to the account that just proved itself with its own password and code
+ * (FRM-T-14.2) — by `(iss, sub)`, never by email, and once: an identity linked to someone else is
+ * refused. The link and its audit event are written together.
+ */
+export async function linkIdentity(
+  { db }: AuthDeps,
+  input: { userId: string; email: string; iss: string; sub: string },
+): Promise<LinkOutcome> {
+  return db.$transaction(async (tx) => {
+    const existing = await tx.identity.findUnique({ where: { iss_sub: { iss: input.iss, sub: input.sub } } });
+    if (existing !== null && existing.userId !== input.userId) return { kind: 'elsewhere' } as const;
+    if (existing === null) {
+      await tx.identity.create({ data: { userId: input.userId, iss: input.iss, sub: input.sub, lastLoginAt: new Date() } });
+    }
+    await record(tx, {
+      actor: input.email,
+      actorKind: 'user',
+      action: 'create',
+      entityType: 'user',
+      entityId: input.userId,
+      after: { event: 'identity_linked', iss: input.iss, sub: input.sub, via: 'native', already: existing !== null },
+    });
+    return { kind: 'linked' } as const;
+  });
 }

@@ -17,7 +17,7 @@ import {
   Skeleton,
   Stack,
 } from '@d3cloud/ui';
-import { foreman, type IssuedToken, type TokenRow } from '../lib/api';
+import { foreman, type IssuedToken, type SignedInSession, type TokenRow } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { Pill, StatCard } from '../ui/viz';
 import { relativeDay } from '../ui/tone';
@@ -173,6 +173,8 @@ export function Tokens() {
         </Section>
       </Stack>
 
+      <SignedIn />
+
       <IssueDialog open={creating} onClose={() => { setCreating(false); }} onIssued={onIssued} />
       <ShownOnceDialog issued={issued} onClose={() => { setIssued(null); }} />
     </Page>
@@ -309,5 +311,58 @@ function ShownOnceDialog({
         </Stack>
       )}
     </Modal>
+  );
+}
+
+/** A session's name: the phone's own, or the browser's. */
+function sessionName(row: SignedInSession): string {
+  if (row.deviceName !== null && row.deviceName !== '') return row.deviceName;
+  if (row.current) return 'This browser';
+  return row.native ? 'D3 Constellation' : 'A browser';
+}
+
+/**
+ * Where this account is signed in (FRM-T-14.4) — beside the tokens because it is the same question,
+ * "what can act as me?", about people rather than credentials. Ending a session signs it out at
+ * once; a phone finds out at its next refresh.
+ */
+function SignedIn() {
+  const { state, reload } = useAsync(() => foreman.sessions(), []);
+  return (
+    <Section title="Signed in" description="Everywhere this account is signed in. End any you don’t recognise." surface="card">
+      {state.status === 'loading' ? <Skeleton lines={2} /> : null}
+      {state.status === 'error' ? <Alert tone="danger">{state.message}</Alert> : null}
+      {state.status === 'ready' ? (
+        <Stack gap="8">
+          {state.value.map((row) => (
+            <Card key={row.id}>
+              <Cluster justify="between" align="center">
+                <Stack gap="4">
+                  <strong>{sessionName(row)}</strong>
+                  <span>
+                    {row.native ? 'App' : row.method === 'oidc' ? 'D3 Auth' : 'Password'} · signed in {relativeDay(row.createdAt)}
+                    {row.ip === null ? '' : ` · ${row.ip}`}
+                  </span>
+                </Stack>
+                {row.current ? (
+                  <Pill tone="neutral">This one</Pill>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    aria-label={`Sign out ${sessionName(row)}`}
+                    onClick={() => {
+                      void foreman.endSession(row.id).then(reload);
+                    }}
+                  >
+                    Sign out
+                  </Button>
+                )}
+              </Cluster>
+            </Card>
+          ))}
+        </Stack>
+      ) : null}
+    </Section>
   );
 }
