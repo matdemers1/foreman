@@ -21,6 +21,7 @@ import {
 import { Markdown } from '../components/Markdown';
 import { ApiError, foreman, type DiffResult, type DocumentSection } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { OpenInConstellation } from '../components/OpenInConstellation';
 
 /**
  * S-22 — the document editor.
@@ -66,7 +67,12 @@ export function DocumentEditor({ code, id }: { code: string; id: string }) {
         title={document.title}
         description={document.kind.replace(/_/g, ' ')}
         back={<Link href={`/projects/${code}/documents`}>Documents</Link>}
-        actions={<RevisionHistory code={code} id={id} />}
+        actions={
+          <>
+            <OpenInConstellation path={`document/${code}/${document.kind}`} />
+            <RevisionHistory code={code} id={id} />
+          </>
+        }
       />
 
       {document.sections.length === 0 ? (

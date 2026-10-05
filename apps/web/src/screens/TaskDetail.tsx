@@ -16,6 +16,7 @@ import {
 import { foreman } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { EditForm, SIZES } from './EditForms';
+import { OpenInConstellation } from '../components/OpenInConstellation';
 
 /**
  * S-12 — one task: what it is for, what it declares, what it satisfies, and what cites it.
@@ -99,6 +100,7 @@ export function TaskDetail({ humanId }: { humanId: string }) {
         actions={
           <>
             <Badge tone={task.status === 'blocked' ? 'danger' : 'neutral'}>{task.status}</Badge>
+            <OpenInConstellation path={`item/${humanId}`} />
             <EditForm
               title={`Edit ${humanId}`}
               path={`/api/projects/${projectCode}/tasks/${humanId}`}

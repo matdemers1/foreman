@@ -27,6 +27,7 @@ const SELECT = {
   role: true,
   status: true,
   createdAt: true,
+  deleteAfter: true,
   invite: { select: { expiresAt: true, acceptedAt: true } },
 } as const;
 
@@ -111,7 +112,9 @@ export async function invite(
   return {
     user,
     token,
-    acceptUrl: `${config.BASE_URL}/accept?token=${token}`,
+    // An invite-named path, which is what D3 Constellation recognises when the link is pasted
+    // into it (CON-T-12.1); the console answers `/accept` too, for links already sent.
+    acceptUrl: `${config.BASE_URL}/invite?token=${token}`,
     expiresAt,
   };
 }
@@ -126,8 +129,8 @@ export async function invite(
 export async function acceptInvite(
   db: Db,
   config: Config,
-  input: { token: string; password: string },
-): Promise<{ email: string }> {
+  input: { token: string; password: string; displayName?: string },
+): Promise<{ email: string; userId: string }> {
   const invitation = await db.invite.findUnique({
     where: { tokenHash: hashToken(input.token) },
     include: { user: { select: { id: true, email: true, status: true } } },
@@ -145,7 +148,11 @@ export async function acceptInvite(
 
   await setPassword({ db, config }, invitation.user.id, input.password);
   await db.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: invitation.user.id }, data: { status: 'active' } });
+    // The app asks the person their name (FRM-T-15.2); the console keeps the one the admin typed.
+    await tx.user.update({
+      where: { id: invitation.user.id },
+      data: { status: 'active', ...(input.displayName === undefined ? {} : { displayName: input.displayName }) },
+    });
     await tx.invite.update({
       where: { id: invitation.id },
       data: { acceptedAt: new Date() },
@@ -162,7 +169,7 @@ export async function acceptInvite(
     });
   });
 
-  return { email: invitation.user.email };
+  return { email: invitation.user.email, userId: invitation.user.id };
 }
 
 export async function setRole(db: Db, actor: Actor, userId: string, role: UserRole) {
@@ -219,7 +226,13 @@ export async function suspend(db: Db, actor: Actor, userId: string, suspended: b
 
   return db.$transaction(async (tx) => {
     const status = suspended ? 'suspended' : 'active';
-    const user = await tx.user.update({ where: { id: userId }, data: { status }, select: SELECT });
+    // Lifting a suspension also cancels a deletion the person asked for (FRM-ADR-022): this is
+    // the recovery the grace period exists to allow.
+    const user = await tx.user.update({
+      where: { id: userId },
+      data: { status, ...(suspended ? {} : { deleteAfter: null }) },
+      select: SELECT,
+    });
     // Their sessions go with it, or a suspended account stays signed in until its cookie lapses.
     if (suspended) await tx.session.deleteMany({ where: { userId } });
     await record(tx, {
@@ -228,7 +241,7 @@ export async function suspend(db: Db, actor: Actor, userId: string, suspended: b
       entityType: 'user',
       entityId: userId,
       entityHumanId: before.email,
-      before: { status: before.status },
+      before: { status: before.status, ...(before.deleteAfter === null ? {} : { deleteAfter: before.deleteAfter.toISOString() }) },
       after: { status },
     });
     return user;

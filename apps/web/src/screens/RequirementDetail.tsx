@@ -16,6 +16,7 @@ import {
 import { foreman } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
 import { EditForm } from './EditForms';
+import { OpenInConstellation } from '../components/OpenInConstellation';
 
 /**
  * S-14 — one requirement: what it says, how the lint read it, what would prove it, and what
@@ -87,6 +88,7 @@ export function RequirementDetail({ humanId }: { humanId: string }) {
             <Badge tone={isMust ? 'danger' : 'neutral'}>
               {PRIORITY_LABEL[requirement.priority] ?? requirement.priority}
             </Badge>
+            <OpenInConstellation path={`item/${humanId}`} />
             <EditForm
               title={`Edit ${humanId}`}
               path={`/api/projects/${projectCode}/requirements/${humanId}`}

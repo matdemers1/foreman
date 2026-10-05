@@ -35,6 +35,7 @@ const PUBLIC = new Set([
   'POST /auth/native/signin', // the native app's way to become authenticated
   'POST /auth/native/refresh', // the refresh token is the credential
   'POST /auth/native/link', // a D3 Auth token plus this account's password and code
+  'POST /auth/native/invite', // the invitation's token, then the challenge it answers (FRM-T-15.2)
 ]);
 
 describe.skipIf(url === undefined)('every route, not only the ones tested individually', () => {

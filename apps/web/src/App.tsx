@@ -150,7 +150,7 @@ export function App() {
 
   // Before the login branch: somebody accepting an invitation has no account yet, which is the
   // entire point of the link they followed.
-  if (path === '/accept') {
+  if (path === '/accept' || path === '/invite') {
     return (
       <ThemeProvider>
         <AcceptInvite />

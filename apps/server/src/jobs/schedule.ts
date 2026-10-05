@@ -62,6 +62,13 @@ export async function scheduleMaintenance(
     }
   }
 
+  if (registry.has('purge-deleted-accounts')) {
+    const purge = await enqueue(db, registry, 'purge-deleted-accounts', {
+      idempotencyKey: `purge-deleted-accounts:${dayKey(now)}`,
+    });
+    if (purge.created) enqueued.push('purge-deleted-accounts');
+  }
+
   return { enqueued };
 }
 
