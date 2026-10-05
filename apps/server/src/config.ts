@@ -61,6 +61,8 @@ const Env = z.object({
    * runs.
    */
   D3AUTH_ISSUER: z.url().optional(),
+  /** Accept a loopback http push relay — CI's mock relay only; production relays are https (FRM-T-15.4). */
+  RELAY_ALLOW_LOOPBACK_HTTP: z.enum(['0', '1']).optional(),
   D3AUTH_CLIENT_ID: z.string().optional(),
   D3AUTH_CLIENT_SECRET: z.string().optional(),
 

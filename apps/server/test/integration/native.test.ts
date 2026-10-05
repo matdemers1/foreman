@@ -1,4 +1,7 @@
 import { createServer, type Server } from 'node:http';
+import { createECDH } from 'node:crypto';
+import { openEnvelope } from '../../src/push/envelope.js';
+import { signRelayRequest } from '../../src/push/relay.js';
 import { randomUUID } from 'node:crypto';
 import { exportJWK, generateKeyPair, SignJWT, type JWK } from 'jose';
 import { Secret, TOTP } from 'otpauth';
@@ -114,6 +117,7 @@ describe.skipIf(url === undefined)('the D3 App contract (FRM-P-14)', () => {
       D3AUTH_ISSUER: issuer,
       D3AUTH_CLIENT_ID: 'foreman',
       D3AUTH_CLIENT_SECRET: 'not-used-here',
+      RELAY_ALLOW_LOOPBACK_HTTP: '1',
     });
     server = await new Promise<Server>((resolve) => {
       const s = createApp({ config, db, verifier: createVerifier(config), oidc: null }).listen(port, '127.0.0.1', () => { resolve(s); });
@@ -230,6 +234,78 @@ describe.skipIf(url === undefined)('the D3 App contract (FRM-P-14)', () => {
         headers: { accept: 'application/json, text/event-stream' },
       });
       expect(mcp.status).toBe(200);
+    });
+  });
+
+  describe('push through the relay (FRM-T-15.4)', () => {
+    const pushes: { path: string; timestamp: string; signature: string; raw: string }[] = [];
+    let relay: Server;
+    let relayUrl = '';
+    beforeAll(async () => {
+      relay = createServer((req, res) => {
+        let raw = '';
+        req.on('data', (chunk: Buffer) => (raw += chunk.toString()));
+        req.on('end', () => {
+          pushes.push({ path: req.url ?? '', timestamp: String(req.headers['x-d3-relay-timestamp']), signature: String(req.headers['x-d3-relay-signature']), raw });
+          res.writeHead(202);
+          res.end('{}');
+        });
+      });
+      await new Promise<void>((resolve) => relay.listen(0, '127.0.0.1', () => { resolve(); }));
+      const address = relay.address();
+      if (address === null || typeof address === 'string') throw new Error('no port');
+      relayUrl = `http://127.0.0.1:${String(address.port)}`;
+    });
+    afterAll(() => {
+      relay.close();
+    });
+    const deviceKey = () => {
+      const pair = createECDH('prime256v1');
+      pair.generateKeys();
+      return pair;
+    };
+    const register = (bearer: string, key: ReturnType<typeof deviceKey>, registration: string, url = relayUrl) =>
+      call('/api/push/native/register', { bearer, body: { devicePublicKey: key.getPublicKey().toString('base64'), relay: { url, registration, sendKey: `send-key-${registration}-0123456789` }, categories: [] } });
+    const waitFor = async (registration: string) => {
+      for (let i = 0; i < 80; i++) {
+        const found = pushes.find((p) => p.path === `/v1/push/${registration}`);
+        if (found !== undefined) return found;
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      throw new Error('no push');
+    };
+
+    it('the manifest names the endpoint', async () => {
+      const manifest = (await (await call('/.well-known/d3-app.json')).json()) as { endpoints: Record<string, string> };
+      expect(manifest.endpoints['relayRegister']).toBe(`${origin}/api/push/native/register`);
+    });
+
+    it('a native session registers and gets one foreman.registered only its device can open; revoking forgets it', async () => {
+      const tokens = await signIn(await person());
+      const key = deviceKey();
+      const reg = `reg-${tokens.session.id}`;
+      expect((await register(tokens.accessToken, key, reg)).status).toBe(204);
+      const pushed = await waitFor(reg);
+      expect(pushed.signature).toBe(signRelayRequest(`send-key-${reg}-0123456789`, pushed.timestamp, pushed.raw));
+      const payload = JSON.parse(openEnvelope(key, (JSON.parse(pushed.raw) as { ciphertext: string }).ciphertext).toString()) as Record<string, unknown>;
+      expect(payload).toMatchObject({ v: 1, category: 'foreman.registered' });
+      expect((await call('/auth/native/revoke', { bearer: tokens.accessToken, method: 'POST' })).status).toBe(204);
+      // Foreman revokes softly; the registration goes with the session all the same.
+      expect(await db.relayRegistration.count({ where: { registration: reg } })).toBe(0);
+    });
+
+    it('an app token’s registration belongs to its identity; a bad request, plain http and the console are refused', async () => {
+      const who = await person();
+      const sub = `sub-${randomUUID()}`;
+      const identity = await db.identity.create({ data: { userId: who.id, iss: issuer, sub, claims: {} } });
+      const app = await jwt({ sub, aud: origin });
+      const key = deviceKey();
+      const reg = `app-${sub}`;
+      expect((await register(app, key, reg)).status).toBe(204);
+      expect(await db.relayRegistration.findFirstOrThrow({ where: { registration: reg } })).toMatchObject({ identityId: identity.id, sessionId: null });
+      expect((await register(app, key, 'plain', 'http://relay.example.com')).status).toBe(400);
+      expect((await call('/api/push/native/register', { bearer: app, body: { devicePublicKey: key.getPublicKey().toString('base64') } })).status).toBe(400);
+      expect((await call('/api/push/native/register', { body: {} })).status).toBe(401);
     });
   });
 });

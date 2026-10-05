@@ -241,7 +241,7 @@ export function manifestRoutes(config: Config, d3authAvailable: boolean): Router
         link: issuer === undefined ? null : `${base}/auth/native/link`,
         inviteAccept: null,
         deleteAccount: null,
-        relayRegister: null,
+        relayRegister: `${base}/api/push/native/register`,
       },
     });
   });

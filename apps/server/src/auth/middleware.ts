@@ -22,6 +22,8 @@ export interface AuthContext {
   readonly native?: boolean;
   /** A D3 Auth token for the app's audience (FRM-T-14.3): a person, but never a console session. */
   readonly appToken?: boolean;
+  /** The D3 Auth identity an app token was mapped through — what owns its push registration. */
+  readonly identityId?: string;
   readonly tokenId?: string;
   readonly scopes: readonly string[];
   /**
@@ -209,7 +211,7 @@ async function appAuth(db: Db, verifier: Verifier, presented: string): Promise<A
   }
   const identity = await db.identity.findUnique({
     where: { iss_sub: { iss: token.iss, sub: token.sub } },
-    select: { userId: true, user: { select: { email: true, status: true, role: true, deletedAt: true } } },
+    select: { id: true, userId: true, user: { select: { email: true, status: true, role: true, deletedAt: true } } },
   });
   if (identity === null || identity.user.status !== 'active' || identity.user.deletedAt !== null) return null;
   return {
@@ -217,6 +219,7 @@ async function appAuth(db: Db, verifier: Verifier, presented: string): Promise<A
     actor: identity.user.email,
     actorKind: 'user',
     appToken: true,
+    identityId: identity.id,
     scopes: ['read', 'write'],
     role: identity.user.role,
   };
