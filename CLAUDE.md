@@ -130,6 +130,14 @@ and refuses rather than re-resolving.
 - `d3-check-usage` runs on the console: tokens only, no raw hex, no shadows.
 - Development runs against the **disposable example project**. The real corpus is imported once, in P10, and not before.
 
+## The native app contract (FRM-P-14)
+D3 Constellation reaches Foreman through the D3 App contract (`matdemers1/d3-app-contract`, CON-ADR-003). `src/routes/native.ts` and the session helpers in `src/auth/sessions.ts`:
+- `GET /.well-known/d3-app.json`; `/auth/native/{signin,refresh,revoke,link}` (outside `/api`, which is guarded whole); `GET /auth/me` in the contract's words; `GET /auth/sessions` and `POST /auth/sessions/:id/revoke` behind the Tokens screen's **Signed in**.
+- Sign-in checks the password and code with the console login's own `passwordStep` / `codeStep` (`src/auth/native.ts`) — one way to check a password, not two. **A native session is a `session` row** with `native = true`; its Bearer access token is the row's hash, fifteen minutes, never slid; refresh rotates through `native_refresh` and a replayed token revokes the session. A cookie only resolves a browser row and a Bearer token only a native one.
+- **Two D3 Auth audiences, each path accepting exactly its own.** `/mcp` (and the API calls it loops back, marked with `MCP_LOOPBACK_HEADER` and a boot-time secret) takes `<BASE_URL>/mcp`; every other request takes the app's audience, Foreman's origin. An app token acts as the person (`actorKind: user`, read/write, their role) but is never a console session — `requireUser` refuses it, so it can never mint an `frm_` token. A native session *is* a person signed in with their own password and code, and passes `requireUser`.
+- Refusals to a native client (a non-`frm_` Bearer outside `/mcp`): 401, 403 and 429 become the contract's problems; 412 and 422 keep their shape, which the app reads as they are.
+- CI's `conformance` job runs the suite against `test/conformance-server.ts`; it needs a `D3_CONTRACT_TOKEN` (read:packages) secret while the contract repo is private.
+
 ## Deploying — through Shipyard, never by hand
 
 This app is deployed by **Shipyard** (`https://shipyard.d3cloud.io`). Deploy through its MCP server,

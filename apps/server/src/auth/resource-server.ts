@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Config } from '../config.js';
 
@@ -34,8 +35,29 @@ export function canonicalMcpUri(config: Config): string {
   return new URL('/mcp', config.BASE_URL).toString();
 }
 
+/**
+ * D3 Constellation's audience (FRM-T-14.3): Foreman's own origin, distinct from `/mcp`. A token for
+ * one is never good for the other — the remote MCP endpoint and the app are different resources,
+ * and each accepts exactly its own.
+ */
+export function canonicalAppUri(config: Config): string {
+  return new URL(config.BASE_URL).origin;
+}
+
+/** Which of Foreman's two resources a token must have been issued for. */
+export type Audience = 'mcp' | 'app';
+
+/**
+ * How `/mcp` marks the calls it loops back into Foreman's own API: a header carrying a secret made
+ * at boot and never sent anywhere else. A request bearing it is the MCP endpoint relaying its
+ * caller, and is judged against the `/mcp` audience; every other request to the API is judged
+ * against the app's — so an `/mcp` token presented to the API directly is refused there.
+ */
+export const MCP_LOOPBACK_HEADER = 'x-foreman-mcp-loopback';
+export const MCP_LOOPBACK_SECRET = randomBytes(32).toString('base64url');
+
 export interface Verifier {
-  verify(token: string): Promise<ResourceToken>;
+  verify(token: string, audience?: Audience): Promise<ResourceToken>;
 }
 
 /**
@@ -49,15 +71,16 @@ export function createVerifier(config: Config): Verifier | null {
   if (issuer === undefined) return null;
 
   const jwks = createRemoteJWKSet(new URL('/oidc/jwks', issuer));
-  const audience = canonicalMcpUri(config);
+  const audiences: Record<Audience, string> = { mcp: canonicalMcpUri(config), app: canonicalAppUri(config) };
 
   return {
-    async verify(token: string): Promise<ResourceToken> {
+    async verify(token: string, which: Audience = 'mcp'): Promise<ResourceToken> {
       let payload: Record<string, unknown>;
       try {
         // `issuer` and `audience` are checked by the library, not by us afterwards: a check that
-        // happens after a successful verify is a check somebody can forget to write.
-        const verified = await jwtVerify(token, jwks, { issuer, audience });
+        // happens after a successful verify is a check somebody can forget to write. A minute of
+        // clock leeway, as the D3 App contract allows.
+        const verified = await jwtVerify(token, jwks, { issuer, audience: audiences[which], clockTolerance: 60 });
         payload = verified.payload;
       } catch (error) {
         throw new TokenRejected(error instanceof Error ? error.message : 'the token did not verify');

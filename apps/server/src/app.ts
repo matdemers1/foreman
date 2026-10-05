@@ -14,6 +14,7 @@ import { schemaRevision } from './boot.js';
 import { logger } from './logger.js';
 import { attachAuth } from './auth/middleware.js';
 import { mcpRoutes } from './routes/mcp.js';
+import { manifestRoutes, nativeRoutes, problem } from './routes/native.js';
 import { createVerifier, protectedResourceMetadata, type Verifier } from './auth/resource-server.js';
 import { authRoutes } from './routes/auth.js';
 import { oidcRoutes } from './routes/oidc.js';
@@ -102,7 +103,30 @@ export function createApp({ config, db, oidc = null, registry, verifier: given }
   // simply means no remote MCP — the stdio shim and its scoped tokens are unaffected.
   const verifier = given === undefined ? createVerifier(config) : given;
   app.use(attachAuth({ db, config, verifier }));
-  mount(app, '/auth', authRoutes({ db, config, oidcAvailable: oidc !== null }));
+  // A native client's refusals as problem+json (FRM-P-14): a Bearer that is not an `frm_` API token,
+  // outside /mcp, gets 401, 403 and 429 as the contract's registered problems. Everything else keeps
+  // its shape — the app reads 412 and 422 as they are.
+  app.use((req, res, next) => {
+    const header = req.headers.authorization ?? '';
+    const bearer = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
+    if (bearer === '' || bearer.startsWith('frm_') || req.path === '/mcp' || req.path.startsWith('/mcp/')) {
+      next();
+      return;
+    }
+    const json = res.json.bind(res);
+    res.json = (body: unknown) => {
+      const name = res.statusCode === 401 ? 'session_revoked' : res.statusCode === 403 ? 'forbidden_role' : res.statusCode === 429 ? 'throttled' : null;
+      if (name === null) return json(body);
+      const message = typeof body === 'object' && body !== null && 'error' in body ? String(body.error) : 'Refused';
+      problem(res, res.statusCode, name, message);
+      return res;
+    };
+    next();
+  });
+  // The D3 App contract (FRM-P-14): the manifest at the root, native sessions beside the console's.
+  app.use(manifestRoutes(config, verifier !== null));
+  mount(app, '/auth/native', nativeRoutes({ db, config, verifier }));
+  mount(app, '/auth', authRoutes({ db, config, oidcAvailable: oidc !== null, verifier }));
   mount(app, '/auth/oidc', oidcRoutes({ db, config, client: oidc }));
   mount(app, '/api/projects', projectRoutes(db));
   mount(app, '/api/brief', briefRoutes(db));

@@ -31,6 +31,10 @@ const PUBLIC = new Set([
   'GET /auth/oidc/callback', // the provider's redirect back
   'POST /auth/oidc/logout', // as above
   'POST /webhooks/github', // HMAC-verified, not cookie-authenticated
+  // The D3 App contract (FRM-P-14): each carries its own credential in the body or header.
+  'POST /auth/native/signin', // the native app's way to become authenticated
+  'POST /auth/native/refresh', // the refresh token is the credential
+  'POST /auth/native/link', // a D3 Auth token plus this account's password and code
 ]);
 
 describe.skipIf(url === undefined)('every route, not only the ones tested individually', () => {

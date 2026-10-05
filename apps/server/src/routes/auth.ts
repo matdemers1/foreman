@@ -9,6 +9,8 @@ import { logger } from '../logger.js';
 import { isSecureOrigin, requireUser } from '../auth/middleware.js';
 import * as native from '../auth/native.js';
 import * as sessions from '../auth/sessions.js';
+import { problem } from './native.js';
+import type { Verifier } from '../auth/resource-server.js';
 
 /**
  * The app-native login routes. The OIDC routes join them in T-0.7 — **beside** these, never in
@@ -27,6 +29,8 @@ export interface AuthRouteDeps {
   readonly config: Config;
   /** Whether the D3 Auth button should be offered at all. */
   readonly oidcAvailable?: boolean;
+  /** D3 Auth tokens, to tell an unlinked identity from a bad token at `/auth/me` (FRM-T-14.2). */
+  readonly verifier?: Verifier | null;
 }
 
 export function authRoutes(deps: AuthRouteDeps): Router {
@@ -185,6 +189,78 @@ export function authRoutes(deps: AuthRouteDeps): Router {
     })().catch(() => {
       res.status(500).json({ error: 'session lookup failed' });
     });
+  });
+
+  /**
+   * Who am I, in the D3 App contract's words (FRM-T-14.2): a native session's, an app token's or the
+   * console's. 401 is problem+json, as the contract has every refusal.
+   */
+  router.get('/me', (req, res, next) => {
+    void (async () => {
+      const userId = req.auth?.userId;
+      if (userId === undefined || userId === null) {
+        // A good D3 Auth token for the app with no account linked: the app links it once.
+        const header = req.headers.authorization ?? '';
+        const presented = header.startsWith('Bearer ') ? header.slice('Bearer '.length).trim() : '';
+        if (presented.split('.').length === 3 && deps.verifier !== null && deps.verifier !== undefined) {
+          const token = await deps.verifier.verify(presented, 'app').catch(() => null);
+          if (token !== null) {
+            problem(res, 401, 'identity_not_linked', 'Link this D3 Auth account to Foreman first');
+            return;
+          }
+        }
+        problem(res, 401, 'session_revoked', 'Sign in again');
+        return;
+      }
+      const user = await deps.db.user.findUniqueOrThrow({ where: { id: userId }, select: { id: true, email: true, displayName: true, role: true } });
+      res.json({ accountId: user.id, email: user.email, displayName: user.displayName, roles: [user.role] });
+    })().catch(next);
+  });
+
+  /** Where you are signed in (FRM-T-14.4): browsers, and the app on each device by its name. */
+  router.get('/sessions', requireUser, (req, res, next) => {
+    void (async () => {
+      const rows = await deps.db.session.findMany({
+        where: sessions.liveSessionWhere(req.auth?.userId ?? ''),
+        orderBy: { createdAt: 'desc' },
+      });
+      res.json(
+        rows.map((row) => ({
+          id: row.id,
+          method: row.method,
+          native: row.native,
+          deviceName: row.deviceName,
+          devicePlatform: row.devicePlatform,
+          ip: row.ip,
+          userAgent: row.userAgent,
+          createdAt: row.createdAt.toISOString(),
+          lastSeenAt: row.lastSeenAt.toISOString(),
+          current: row.id === req.auth?.sessionId,
+        })),
+      );
+    })().catch(next);
+  });
+
+  /** Ending one signs it out at once — a phone at its next refresh. */
+  router.post('/sessions/:id/revoke', requireUser, (req, res, next) => {
+    void (async () => {
+      const id = req.params['id'];
+      const row = typeof id === 'string' ? await deps.db.session.findFirst({ where: { id, userId: req.auth?.userId ?? '', revokedAt: null } }) : null;
+      if (row === null) {
+        res.status(404).json({ error: 'no such session' });
+        return;
+      }
+      await sessions.revoke(deps.db, row.id);
+      await record(deps.db, {
+        actor: req.auth?.actor ?? 'unknown',
+        actorKind: 'user',
+        action: 'delete',
+        entityType: 'user',
+        entityId: row.userId,
+        after: { event: 'session_revoked', sessionId: row.id, native: row.native, deviceName: row.deviceName },
+      });
+      res.status(204).end();
+    })().catch(next);
   });
 
   router.post('/totp/enrol', requireUser, (req, res) => {
