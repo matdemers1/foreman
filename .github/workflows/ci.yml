@@ -90,8 +90,9 @@ jobs:
   # there — the boot order that matters (dump, then migrate) is asserted against a real one, and
   # the e2e suite drives the stack rather than a dev server.
   # The D3 App contract (FRM-T-14.4): the conformance suite D3 Constellation's contract publishes,
-  # against this commit's server on a migrated database with a throwaway person — manifest, native
-  # sign-in, me, refresh rotation and reuse, revoke, and throttling (destructive, on that account).
+  # against this commit's server, as a board deployment on a migrated database: manifest, native
+  # sign-in, me, refresh rotation and reuse, revoke, push through a mock relay, invitations and
+  # account deletion (FRM-P-15), and throttling — the destructive checks on throwaway accounts.
   #
   # The suite's image is private while matdemers1/d3-app-contract is (the owner's choice), and this
   # repository's token cannot read another repository's package. D3_CONTRACT_TOKEN — a token with
@@ -152,7 +153,10 @@ jobs:
           docker run --rm --network host -v "$PWD:/out" ghcr.io/matdemers1/d3-app-conformance:contract-1 \
             --base "$(jq -r .base "$ARGS")" --allow-http --product foreman \
             --email "$(jq -r .email "$ARGS")" --password "$(jq -r .password "$ARGS")" \
-            --totp-secret "$(jq -r .totpSecret "$ARGS")" --destructive --relay-listen 18555 --junit /out/conformance.xml
+            --totp-secret "$(jq -r .totpSecret "$ARGS")" --main-is-last-owner \
+            --invite-token "$(jq -r .inviteToken "$ARGS")" --delete-email "$(jq -r .deleteEmail "$ARGS")" \
+            --delete-password "$(jq -r .deletePassword "$ARGS")" --delete-totp-secret "$(jq -r .deleteTotpSecret "$ARGS")" \
+            --destructive --relay-listen 18555 --junit /out/conformance.xml
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         if: always() && env.D3_CONTRACT_TOKEN != ''
         with:

@@ -16,6 +16,7 @@ import {
 import { Markdown } from '../components/Markdown';
 import { foreman, type FindingDetail as Detail } from '../lib/api';
 import { useAsync } from '../lib/useAsync';
+import { OpenInConstellation } from '../components/OpenInConstellation';
 
 /**
  * S-16 — one finding: where it is, what was observed, whether the fix held, and where else it
@@ -112,6 +113,7 @@ export function FindingDetail({ humanId }: { humanId: string }) {
             <Badge tone={finding.status === 'open' ? 'attention' : 'neutral'}>
               {finding.status}
             </Badge>
+            <OpenInConstellation path={`item/${finding.humanId}`} />
           </>
         }
       />

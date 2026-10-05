@@ -4,6 +4,7 @@ import { briefFor, SECTIONS } from '../lib/project';
 import { lifecycleTone } from '../ui/tone';
 import { Pill } from '../ui/viz';
 import { useAsync } from '../lib/useAsync';
+import { OpenInConstellation } from './OpenInConstellation';
 
 /**
  * The heading every screen inside a project wears.
@@ -50,6 +51,7 @@ export function ProjectHeader({
         // third crumb, and "Projects / planned" is not a path.
         <Cluster gap="8" align="center">
           {lifecycle !== null && <Pill tone={lifecycleTone(lifecycle)}>{lifecycle}</Pill>}
+          {section === undefined && <OpenInConstellation path={`project/${code}`} />}
           {actions}
         </Cluster>
       }

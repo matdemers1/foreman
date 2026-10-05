@@ -1343,6 +1343,9 @@ model User {
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// Set when the person asked to delete their account (FRM-T-15.3, FRM-ADR-022): suspended until
+  /// then, restorable by an admin, and purged by the nightly job once it passes.
+  deleteAfter DateTime? @map("delete_after") @db.Timestamptz(6)
 
   credential Credential?
   identities Identity[]

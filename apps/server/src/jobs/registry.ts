@@ -1,6 +1,7 @@
 import { createGitHubClient, isConfigured, type GitHubClient } from '../adapters/github.js';
 import { createMailer, type Mailer } from '../adapters/mail.js';
 import type { Config } from '../config.js';
+import { purgeDeletedAccounts } from '../domain/account-deletion.js';
 import { backupJob, restoreDrillJob } from './backup.js';
 import { backfillJob, ingestWebhookJob, reconcileJob } from './ingest.js';
 import { JobRegistry } from './types.js';
@@ -39,6 +40,12 @@ export function buildRegistry(deps: RegistryDeps = {}): JobRegistry {
       },
       { name: 'third', run: () => Promise.resolve({ step: 3 }) },
     ],
+  });
+
+  // FRM-T-15.3: accounts whose deletion grace period has passed are purged, nightly.
+  registry.register({
+    kind: 'purge-deleted-accounts',
+    stages: [{ name: 'purge', run: (ctx) => purgeDeletedAccounts(ctx.db) }],
   });
 
   registry.register(ingestWebhookJob());
