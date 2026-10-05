@@ -513,6 +513,8 @@ export interface MemberRow {
   role: 'admin' | 'reviewer' | 'submitter';
   status: 'invited' | 'active' | 'suspended';
   createdAt: string;
+  /** Set when the member deleted their account from the app; lifting the suspension cancels it. */
+  deleteAfter?: string | null;
   invite: { expiresAt: string; acceptedAt: string | null } | null;
 }
 

@@ -68,9 +68,17 @@ export function Members() {
           </Pill>
           {/* An invitation nobody accepted is the thing an admin actually wants to see here: it
               looks identical to a working account until somebody asks why they cannot sign in. */}
+          {/* Suspended because they asked to delete their account (FRM-ADR-022): the same row, a
+              different story, and Restore is how it is undone. */}
+          {row.status === 'suspended' && (row.deleteAfter ?? null) !== null && (
+            <span className="fm-muted">
+              deleting on {new Date(row.deleteAfter ?? '').toLocaleDateString(undefined, { dateStyle: 'medium' })} — Restore
+              cancels it
+            </span>
+          )}
           {row.status === 'invited' && row.invite !== null && (
             <span className="fm-muted">
-              invited, expires {relativeDay(row.invite.expiresAt)}
+              invited, expires {new Date(row.invite.expiresAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
             </span>
           )}
         </Stack>
