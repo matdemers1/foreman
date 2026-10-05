@@ -15,6 +15,7 @@ import { logger } from './logger.js';
 import { attachAuth } from './auth/middleware.js';
 import { mcpRoutes } from './routes/mcp.js';
 import { manifestRoutes, nativeRoutes, problem } from './routes/native.js';
+import { pushRoutes } from './routes/push.js';
 import { createVerifier, protectedResourceMetadata, type Verifier } from './auth/resource-server.js';
 import { authRoutes } from './routes/auth.js';
 import { oidcRoutes } from './routes/oidc.js';
@@ -133,6 +134,8 @@ export function createApp({ config, db, oidc = null, registry, verifier: given }
   mount(app, '/api', searchRoutes(db));
   mount(app, '/api/undo', undoRoutes(db));
   mount(app, '/api/tokens', tokenRoutes(db));
+  // Push registration for D3 Constellation (FRM-T-15.4).
+  mount(app, '/api/push', pushRoutes(db, config));
   mount(app, '/api/links', linkRoutes(db));
   mount(app, '/api/project-ideas', projectIdeaRoutes(db, config));
   mount(app, '/api/guidelines', guidelineRoutes(db));

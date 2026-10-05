@@ -30,6 +30,7 @@ const config = loadConfig({
   KEK: kek,
   PEPPER: randomBytes(32).toString('base64'),
   COOKIE_KEYS: randomBytes(32).toString('base64'),
+  RELAY_ALLOW_LOOPBACK_HTTP: '1',
 });
 const db = createDb(url);
 const email = `conformance-${randomBytes(4).toString('hex')}@example.com`;

@@ -108,6 +108,9 @@ export async function revoke(db: Db, sessionId: string): Promise<void> {
     where: { id: sessionId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
+  // Revocation is soft here, so the cascade never fires: a revoked session's push registration
+  // is forgotten explicitly, as the contract has it (FRM-T-15.4).
+  await db.relayRegistration.deleteMany({ where: { sessionId } });
 }
 
 /** Every session for a user — what a password change ends. */
@@ -116,6 +119,7 @@ export async function revokeAllForUser(db: Db, userId: string): Promise<number> 
     where: { userId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
+  await db.relayRegistration.deleteMany({ where: { userId, sessionId: { not: null } } });
   return count;
 }
 

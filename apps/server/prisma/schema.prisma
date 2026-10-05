@@ -1353,6 +1353,7 @@ model User {
   comments   IdeaComment[]
 
   @@index([role])
+  relayRegistrations RelayRegistration[]
   @@map("user")
 }
 
@@ -1391,6 +1392,7 @@ model Identity {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relayRegistrations RelayRegistration[]
 
   @@unique([iss, sub])
   @@index([userId])
@@ -1422,6 +1424,7 @@ model Session {
 
   user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   refreshes NativeRefresh[]
+  relayRegistrations RelayRegistration[]
 
   @@index([userId, expiresAt])
   @@map("session")
@@ -1512,4 +1515,31 @@ model JobStage {
   @@unique([jobId, name])
   @@index([jobId, sortOrder])
   @@map("job_stage")
+}
+
+/// A device's push registration (FRM-T-15.4, the D3 App contract's push): the relay to post to and
+/// the device key every notification is sealed to. Foreman never holds an APNs token. It belongs to
+/// what signed the device in — a native session, or for a D3 Auth app token the identity — and goes
+/// with it; a 410 from the relay forgets it too.
+model RelayRegistration {
+  id              String   @id @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  sessionId       String?  @unique @map("session_id") @db.Uuid
+  identityId      String?  @map("identity_id") @db.Uuid
+  /// P-256, X9.63 uncompressed, 65 bytes.
+  devicePublicKey Bytes    @map("device_public_key")
+  relayUrl        String   @map("relay_url")
+  registration    String
+  /// The relay's send key, sealed under the KEK: whoever holds it can push to the device.
+  sendKeySealed   String   @map("send_key_sealed")
+  categories      String[]
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session  Session?  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  identity Identity? @relation(fields: [identityId], references: [id], onDelete: Cascade)
+
+  @@unique([relayUrl, registration])
+  @@index([userId])
+  @@map("relay_registration")
 }
