@@ -1,6 +1,6 @@
 import type { CheckConclusion } from '../generated/prisma/enums.js';
 import type { Db } from '../db.js';
-import type { TransactionClient } from './audit.js';
+import { record } from './audit.js';
 
 /**
  * Turning GitHub's payloads into rows (T-5.3, FRM-REQ-095 … FRM-REQ-097, FRM-REQ-101).
@@ -282,14 +282,100 @@ export async function ingestReleases(
   return { created, updated };
 }
 
-/** Find the repo a payload names, or null when it is one nothing is linked to. */
-export async function repoFor(
-  db: Db | TransactionClient,
-  fullName: string | undefined,
-): Promise<{ id: string; projectId: string; fullName: string } | null> {
+/** The repository a webhook payload names: GitHub's numeric id and its `owner/name`. */
+export interface PayloadRepo {
+  readonly githubId?: bigint | undefined;
+  readonly fullName?: string | undefined;
+}
+
+export interface LinkedRepo {
+  readonly id: string;
+  readonly projectId: string;
+  readonly fullName: string;
+  /** Set when this payload told us the repo had moved, so the stage output says so. */
+  readonly renamedFrom?: string;
+}
+
+/** Read `repository.id` and `repository.full_name` from a webhook body. */
+export function payloadRepo(body: Record<string, unknown>): PayloadRepo {
+  const repository = body['repository'];
+  if (typeof repository !== 'object' || repository === null) return {};
+  const { id, full_name: fullName } = repository as { id?: unknown; full_name?: unknown };
+  return {
+    githubId: typeof id === 'number' && Number.isSafeInteger(id) ? BigInt(id) : undefined,
+    fullName: typeof fullName === 'string' ? fullName : undefined,
+  };
+}
+
+const WEBHOOK_ACTOR = { actor: 'github', actorKind: 'webhook' } as const;
+
+/**
+ * Find the linked repo a payload names, or null when it is one nothing is linked to.
+ *
+ * **By GitHub's id first, then by name** (GL-006). A repository transferred to another owner keeps
+ * its id and changes its `full_name`, so a lookup by name alone would file every push after a
+ * transfer as "no linked repo" — silently, which is the failure mode this ledger exists to
+ * prevent. Matching by name is kept for rows linked before the id was recorded, and the first
+ * payload to match one that way records the id, so every linked repo learns it from its next push.
+ * When the id matches under a new name, the row takes the new name: backfill and reconcile call
+ * the API by it.
+ *
+ * Both repairs are mutations, so both write an audit event in the same transaction. Neither
+ * overwrites another row: a name or id already held by some other repo, deleted or not, is left
+ * alone, because guessing which link the owner meant is not this function's call.
+ */
+export async function repoFor(db: Db, payload: PayloadRepo): Promise<LinkedRepo | null> {
+  const select = { id: true, projectId: true, fullName: true, githubId: true } as const;
+  const { githubId, fullName } = payload;
+
+  if (githubId !== undefined) {
+    const byId = await db.repo.findFirst({ where: { githubId, deletedAt: null }, select });
+    if (byId !== null) {
+      if (fullName === undefined || fullName === byId.fullName) return shape(byId);
+
+      const taken = await db.repo.findFirst({ where: { fullName }, select: { id: true } });
+      if (taken !== null) return shape(byId);
+
+      await db.$transaction(async (tx) => {
+        await tx.repo.update({ where: { id: byId.id }, data: { fullName } });
+        await record(tx, {
+          ...WEBHOOK_ACTOR,
+          action: 'update',
+          entityType: 'repo',
+          entityId: byId.id,
+          entityHumanId: fullName,
+          before: { fullName: byId.fullName },
+          after: { fullName },
+        });
+      });
+      return { ...shape(byId), fullName, renamedFrom: byId.fullName };
+    }
+  }
+
   if (fullName === undefined) return null;
-  return db.repo.findFirst({
-    where: { fullName, deletedAt: null },
-    select: { id: true, projectId: true, fullName: true },
-  });
+  const byName = await db.repo.findFirst({ where: { fullName, deletedAt: null }, select });
+  if (byName === null) return null;
+
+  if (githubId !== undefined && byName.githubId === null) {
+    const taken = await db.repo.findFirst({ where: { githubId }, select: { id: true } });
+    if (taken === null) {
+      await db.$transaction(async (tx) => {
+        await tx.repo.update({ where: { id: byName.id }, data: { githubId } });
+        await record(tx, {
+          ...WEBHOOK_ACTOR,
+          action: 'update',
+          entityType: 'repo',
+          entityId: byName.id,
+          entityHumanId: byName.fullName,
+          before: { githubId: null },
+          after: { githubId: githubId.toString() },
+        });
+      });
+    }
+  }
+  return shape(byName);
+}
+
+function shape(row: { id: string; projectId: string; fullName: string }): LinkedRepo {
+  return { id: row.id, projectId: row.projectId, fullName: row.fullName };
 }

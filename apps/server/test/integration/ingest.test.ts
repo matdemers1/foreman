@@ -19,6 +19,8 @@ const PASSWORD = 'a-password-for-the-ingest-tests';
 const CODE = 'ING';
 const SECRET = 'a-webhook-secret-for-tests';
 const REPO = 'matdemers1/ingest-test';
+/** Where the same repository lives after a transfer (GL-006). */
+const MOVED = 'D3Cloud-io/ingest-test';
 
 describe.skipIf(url === undefined)('ingest', () => {
   let db: Db;
@@ -121,7 +123,7 @@ describe.skipIf(url === undefined)('ingest', () => {
 
   beforeEach(async () => {
     await db.job.deleteMany({ where: { kind: { startsWith: 'ingest' } } });
-    await db.repo.deleteMany({ where: { fullName: REPO } });
+    await db.repo.deleteMany({ where: { fullName: { in: [REPO, MOVED] } } });
     await db.project.deleteMany({ where: { code: CODE } });
 
     await post('/projects', { code: CODE, name: 'Ingest Test' });
@@ -130,7 +132,7 @@ describe.skipIf(url === undefined)('ingest', () => {
   });
 
   afterAll(async () => {
-    await db.repo.deleteMany({ where: { fullName: REPO } });
+    await db.repo.deleteMany({ where: { fullName: { in: [REPO, MOVED] } } });
     await db.project.deleteMany({ where: { code: CODE } });
     await db.user.deleteMany({ where: { email: EMAIL } });
     await db.job.deleteMany({ where: { kind: { startsWith: 'ingest' } } });
@@ -271,6 +273,82 @@ describe.skipIf(url === undefined)('ingest', () => {
       // Not an error, and not silence: the reason is in the stage output.
       expect(job.status).toBe('succeeded');
       expect(JSON.stringify(job.stages[0]?.output)).toContain('no linked repo');
+    });
+  });
+
+  describe('a transferred repository (GL-006, FRM-T-012)', () => {
+    const GITHUB_ID = 4242;
+    /** A push as GitHub sends it: the repository carries its numeric id as well as its name. */
+    const pushFrom = (fullName: string, commits: unknown[]) => ({
+      repository: { id: GITHUB_ID, full_name: fullName },
+      ref: 'refs/heads/main',
+      commits,
+    });
+    const repoAudits = (repoId: string) =>
+      db.auditEvent.findMany({
+        where: { entityType: 'repo', entityId: repoId, actorKind: 'webhook' },
+        orderBy: { createdAt: 'asc' },
+      });
+
+    it('records the GitHub id the first time a payload matches by name, with an audit event', async () => {
+      await deliver('push', pushFrom(REPO, []), 'd-t1');
+      await drain();
+
+      const repo = await db.repo.findFirstOrThrow({ where: { fullName: REPO } });
+      expect(repo.githubId).toBe(BigInt(GITHUB_ID));
+      const [event] = await repoAudits(repo.id);
+      expect(event?.action).toBe('update');
+      expect(event?.after).toEqual({ githubId: String(GITHUB_ID) });
+    });
+
+    it('keeps ingesting after a transfer, and takes the new name', async () => {
+      await deliver('push', pushFrom(REPO, []), 'd-t2');
+      await drain();
+
+      const sha = '9'.repeat(40);
+      await deliver('push', pushFrom(MOVED, [commit(sha, 'After the move')]), 'd-t3');
+      await drain();
+
+      const repo = await db.repo.findFirstOrThrow({ where: { githubId: BigInt(GITHUB_ID) } });
+      expect(repo.fullName).toBe(MOVED);
+      expect(await db.commit.count({ where: { repoId: repo.id, sha } })).toBe(1);
+
+      // Visible where somebody would look: the job record and the audit log.
+      const job = await db.job.findFirstOrThrow({
+        where: { idempotencyKey: 'gh:d-t3' },
+        include: { stages: true },
+      });
+      expect(job.stages[0]?.output).toMatchObject({ renamedFrom: REPO, renamedTo: MOVED });
+      const rename = (await repoAudits(repo.id)).at(-1);
+      expect(rename?.before).toEqual({ fullName: REPO });
+      expect(rename?.after).toEqual({ fullName: MOVED });
+    });
+
+    it('still matches by name a linked repo whose id it has never seen', async () => {
+      const sha = '0'.repeat(40);
+      await deliver('push', pushBody([commit(sha, 'No id in the payload')]), 'd-t4');
+      await drain();
+
+      const repo = await db.repo.findFirstOrThrow({ where: { fullName: REPO } });
+      expect(repo.githubId).toBeNull();
+      expect(await db.commit.count({ where: { repoId: repo.id, sha } })).toBe(1);
+    });
+
+    it('does not take a name another linked repo already holds', async () => {
+      await deliver('push', pushFrom(REPO, []), 'd-t5');
+      await drain();
+      const project = await db.project.findFirstOrThrow({ where: { code: CODE } });
+      await db.repo.create({ data: { projectId: project.id, fullName: MOVED } });
+
+      const sha = '9a'.repeat(20);
+      await deliver('push', pushFrom(MOVED, [commit(sha, 'Ambiguous')]), 'd-t6');
+      await drain();
+
+      // The id is the stronger signal, so the commit lands on the original link; the name stays,
+      // because which of two links the owner meant is theirs to decide.
+      const original = await db.repo.findFirstOrThrow({ where: { githubId: BigInt(GITHUB_ID) } });
+      expect(original.fullName).toBe(REPO);
+      expect(await db.commit.count({ where: { repoId: original.id, sha } })).toBe(1);
     });
   });
 

@@ -8,6 +8,7 @@ import {
   ingestCommits,
   ingestReleases,
   normalizeCommit,
+  payloadRepo,
   repoFor,
   type GhCheckRun,
   type GhCommit,
@@ -52,13 +53,6 @@ function webhookPayload(ctx: StageContext): WebhookPayload {
   };
 }
 
-function repoFullName(body: Record<string, unknown>): string | undefined {
-  const repository = body['repository'];
-  if (typeof repository !== 'object' || repository === null) return undefined;
-  const fullName = (repository as { full_name?: unknown }).full_name;
-  return typeof fullName === 'string' ? fullName : undefined;
-}
-
 // ─── One webhook delivery ────────────────────────────────────────────────────
 
 /**
@@ -74,24 +68,29 @@ export function ingestWebhookJob(): JobDefinition {
         name: 'store',
         async run(ctx) {
           const { event, body } = webhookPayload(ctx);
-          const repo = await repoFor(ctx.db, repoFullName(body));
+          const named = payloadRepo(body);
+          const repo = await repoFor(ctx.db, named);
 
           if (repo === null) {
             // A webhook for a repository nothing is linked to is not an error. Recorded so the
             // reason is visible rather than looking like a dropped delivery.
-            return { skipped: 'no linked repo', fullName: repoFullName(body) ?? null };
+            return { skipped: 'no linked repo', fullName: named.fullName ?? null };
           }
+
+          // A transfer is worth seeing in the job record, not only in the audit log.
+          const moved =
+            repo.renamedFrom === undefined ? {} : { renamedFrom: repo.renamedFrom, renamedTo: repo.fullName };
 
           switch (event) {
             case 'push':
-              return ingestPush(ctx.db, repo.id, body);
+              return { ...(await ingestPush(ctx.db, repo.id, body)), ...moved };
             case 'check_run':
             case 'check_suite':
-              return ingestCheckRunEvent(ctx.db, repo.id, body);
+              return { ...(await ingestCheckRunEvent(ctx.db, repo.id, body)), ...moved };
             case 'release':
-              return ingestReleaseEvent(ctx.db, repo.id, body);
+              return { ...(await ingestReleaseEvent(ctx.db, repo.id, body)), ...moved };
             default:
-              return { skipped: `unhandled event ${event}` };
+              return { skipped: `unhandled event ${event}`, ...moved };
           }
         },
       },
@@ -107,7 +106,7 @@ export function ingestWebhookJob(): JobDefinition {
           const { event, body } = webhookPayload(ctx);
           if (event !== 'push') return { skipped: 'not a push' };
 
-          const repo = await repoFor(ctx.db, repoFullName(body));
+          const repo = await repoFor(ctx.db, payloadRepo(body));
           if (repo === null) return { skipped: 'no linked repo' };
 
           const shas = commitsIn(body)
