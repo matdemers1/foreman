@@ -25,36 +25,40 @@ production database and host (read-only), not inferred from the console:
   `external_id` and falls back to the numeric id only when there is none), and `repo.github_id`,
   which is null on all three because nothing writes it.
 
-### Only three repositories are linked
+### Which repositories are linked
 
-The App is installed more widely than Foreman reads. Deliveries arrive from eleven
-repositories, and only these three are linked to a project:
+Until 2026-10-06 only `foreman`, `bindery` and `d3-auth` were linked, although the App was
+already delivering from eight more. Those deliveries were acknowledged, queued and then
+**skipped** (`no linked repo` in the job result; see `apps/server/src/jobs/ingest.ts`), which wrote
+no rows and left `foreman_brief` reporting `ci.unknown: true` for DI, DS, FLR, PST and SHP. A
+skipped delivery is not replayed when its repository is linked later; the link's backfill reads
+history from GitHub instead. All eight were linked on 2026-10-06 (FRM-T-011) and backfilled
+within three minutes:
 
-| Project | Linked repository |
+| Project | Linked repositories |
 |---|---|
 | `FRM` | `matdemers1/foreman` |
 | `BND` | `matdemers1/bindery` |
 | `AUTH` | `matdemers1/d3-auth` |
+| `DS` | `matdemers1/d3-design-system` |
+| `FLR` | `matdemers1/d3-floorspec`, `matdemers1/floorspec` |
+| `PST` | `matdemers1/d3-postroom` |
+| `SHP` | `matdemers1/shipyard` |
+| `DI` | `matdemers1/d3cloud-www` |
+| `CON` | `matdemers1/d3-constellation`, `matdemers1/d3-app-contract` |
 
-A delivery for any other repository is acknowledged, queued, and then **skipped** (`no linked
-repo` in its job result; see `apps/server/src/jobs/ingest.ts`). It writes no commit or check-run
-row, and a later link does not replay it — the link's backfill reads history from GitHub instead.
+Four projects still report `ci.unknown`, for reasons no link can fix:
 
-That is why `foreman_brief` reports `ci.unknown: true` for these projects. It is grey, not red:
-no check run has been ingested, which says nothing about whether their builds pass.
+| Project | Why |
+|---|---|
+| `CW` Clearwhen, `BURR` Burrow, `SBL` Sarah Byrne LICSW | The local repository has no remote; there is no GitHub repository to install on |
+| `PW` Personal Website | `matdemers1/Personal-Website` exists (private), but the App has never delivered from it, so it is not in the installation. Add it under the App's *Install* settings on GitHub first, then link it. A link made before that only produces a backfill that fails |
 
-| Project | Repository | Why CI is unknown |
-|---|---|---|
-| `CW` Clearwhen | none | The local repository has no remote; there is nothing on GitHub to install on |
-| `DI` d3cloud.io | `matdemers1/d3cloud-www` | Delivering, not linked |
-| `DS` Design System | `matdemers1/d3-design-system` | Delivering, not linked |
-| `FLR` Floorspec | `matdemers1/d3-floorspec`, `matdemers1/floorspec` | Delivering, not linked |
-| `PST` Postroom | `matdemers1/d3-postroom` | Delivering, not linked — the busiest repository (4,043 deliveries) |
-| `SHP` Shipyard | `matdemers1/shipyard` | Delivering, not linked |
+The projects that were never imported into Foreman have no project to link to.
 
-`matdemers1/d3-constellation` and `matdemers1/d3-app-contract` (project `CON`) deliver too and
-are not linked either. To turn any of them on, link it (below); the backfill brings in the last
-hundred commits and their check runs.
+A brief that shows `ci.unknown: true` is grey, not red: no check run has been ingested, which
+says nothing about whether the build passes. If a project with a GitHub repository shows it, the
+repository is not linked. Link it (below).
 
 ## Setting it up on a new instance
 
