@@ -48,8 +48,11 @@ been the source of truth for D3 Cloud project state since the cutover from the O
 2026-09-20. It tracks itself as project `FRM`, so which phases are built — and what is open — is
 recorded there rather than repeated here: a second copy is a copy that goes stale.
 
-One known gap: the GitHub App integration is written but has never run against real GitHub. See
-[`docs/runbooks/github-app-setup.md`](docs/runbooks/github-app-setup.md).
+The GitHub App is registered and installed, and has ingested pushes, check runs and releases
+from real GitHub since 2026-09-21. Only three repositories are linked so far — `foreman`,
+`bindery` and `d3-auth` — so the other projects' briefs show CI as unknown.
+[`docs/runbooks/github-app-setup.md`](docs/runbooks/github-app-setup.md) has the evidence, which
+projects are unlinked and why, and how to link one.
 
 ## Getting started
 

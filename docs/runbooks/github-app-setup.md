@@ -4,13 +4,61 @@ Foreman authenticates as a **GitHub App**, not with a personal token. Check-run 
 retrievable with a PAT, and a PAT is a credential tied to a person rather than to an installation
 that can be revoked on its own.
 
-> [!warning]
-> **This has never been run against real GitHub.** The client, its JWT signing and the
-> refresh-before-expiry logic are written and tested against a stub; no App is registered. What
-> follows is the procedure, not a record of it having been done — unlike
-> [backup-restore.md](backup-restore.md), which records a drill that was actually performed.
+## State in production
 
-## Registering it
+**Registered, installed, and ingesting since 2026-09-21.** Checked on 2026-10-06 against the
+production database and host (read-only), not inferred from the console:
+
+- `server.env` on the host sets all four `GITHUB_*` variables, and an unsigned POST to
+  `/webhooks/github` is refused with 401 "signature did not verify" — the receiver has a secret.
+  (Without one it answers 503.)
+- **One installation.** Every one of the 8,291 `ingest-webhook` jobs carries the same
+  `installation.id` and a `gh:<delivery id>` idempotency key. The first arrived at
+  2026-09-21 02:46 UTC, a minute before the three backfills; the newest within minutes of the
+  check. By event: 7,026 `check_run`, 634 `push`, 608 `check_suite`, 23 `release`.
+- **Rows from GitHub.** `check_run`: foreman 404, bindery 564, d3-auth 528, every one with the
+  `external_id` GitHub sends (Actions' own job UUID). Their names, conclusions and completion
+  times match what `gh api …/check-runs` reports for the same commit to the second. Commits:
+  foreman 119, bindery 280, d3-auth 140. `reconcile-repo` has run 51 times, every run
+  succeeded.
+- Two ids are *not* stored, so do not look for them: GitHub's numeric check-run id (the code keeps
+  `external_id` and falls back to the numeric id only when there is none), and `repo.github_id`,
+  which is null on all three because nothing writes it.
+
+### Only three repositories are linked
+
+The App is installed more widely than Foreman reads. Deliveries arrive from eleven
+repositories, and only these three are linked to a project:
+
+| Project | Linked repository |
+|---|---|
+| `FRM` | `matdemers1/foreman` |
+| `BND` | `matdemers1/bindery` |
+| `AUTH` | `matdemers1/d3-auth` |
+
+A delivery for any other repository is acknowledged, queued, and then **skipped** (`no linked
+repo` in its job result; see `apps/server/src/jobs/ingest.ts`). It writes no commit or check-run
+row, and a later link does not replay it — the link's backfill reads history from GitHub instead.
+
+That is why `foreman_brief` reports `ci.unknown: true` for these projects. It is grey, not red:
+no check run has been ingested, which says nothing about whether their builds pass.
+
+| Project | Repository | Why CI is unknown |
+|---|---|---|
+| `CW` Clearwhen | none | The local repository has no remote; there is nothing on GitHub to install on |
+| `DI` d3cloud.io | `matdemers1/d3cloud-www` | Delivering, not linked |
+| `DS` Design System | `matdemers1/d3-design-system` | Delivering, not linked |
+| `FLR` Floorspec | `matdemers1/d3-floorspec`, `matdemers1/floorspec` | Delivering, not linked |
+| `PST` Postroom | `matdemers1/d3-postroom` | Delivering, not linked — the busiest repository (4,043 deliveries) |
+| `SHP` Shipyard | `matdemers1/shipyard` | Delivering, not linked |
+
+`matdemers1/d3-constellation` and `matdemers1/d3-app-contract` (project `CON`) deliver too and
+are not linked either. To turn any of them on, link it (below); the backfill brings in the last
+hundred commits and their check runs.
+
+## Setting it up on a new instance
+
+### Registering it
 
 1. **Settings → Developer settings → GitHub Apps → New GitHub App**, on the account that owns the
    repositories.
@@ -26,7 +74,7 @@ that can be revoked on its own.
 6. Generate a **private key** and download the `.pem`.
 7. **Install** the App on the repositories to ingest, and note the installation id from the URL.
 
-## Configuring
+### Configuring
 
 ```bash
 GITHUB_APP_ID=123456
@@ -44,6 +92,7 @@ variables.
 
 ```bash
 curl -X POST https://foreman.d3cloud.io/api/projects/BND/repos \
+  -H "authorization: Bearer $FOREMAN_WRITE_TOKEN" \
   -H 'content-type: application/json' -d '{"fullName":"matdemers1/bindery"}'
 ```
 
