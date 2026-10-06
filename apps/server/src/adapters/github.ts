@@ -118,32 +118,36 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
   const { config } = options;
   const doFetch = options.fetch ?? fetch;
   const now = options.now ?? (() => new Date());
+  const fallbackInstallation = config.GITHUB_APP_INSTALLATION_ID ?? '';
 
-  let cached: InstallationToken | null = null;
+  /** One token per installation: a personal account and an organization are separate installs. */
+  const cached = new Map<string, InstallationToken>();
   /** In flight, so a burst of parallel stages mints one token rather than eight. */
-  let refreshing: Promise<InstallationToken> | null = null;
+  const refreshing = new Map<string, Promise<InstallationToken>>();
+  /** Owner (lower-cased) → its installation, looked up once per process. */
+  const installationOf = new Map<string, Promise<string>>();
 
-  async function mint(): Promise<InstallationToken> {
+  function jwt(): string {
     if (!isConfigured(config)) throw new GitHubNotConfigured();
-
-    const jwt = appJwt(
+    return appJwt(
       config.GITHUB_APP_ID ?? '',
       // A key pasted into an env var usually arrives with literal \n. Both forms have to work,
       // because the one that does not is a five-minute outage and a confusing error.
       (config.GITHUB_APP_PRIVATE_KEY ?? '').replace(/\\n/g, '\n'),
       now(),
     );
+  }
 
-    const url = `${API}/app/installations/${config.GITHUB_APP_INSTALLATION_ID ?? ''}/access_tokens`;
-    const res = await doFetch(url, {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${jwt}`,
-        accept: 'application/vnd.github+json',
-        'x-github-api-version': '2022-11-28',
-        'user-agent': UA,
-      },
-    });
+  const appHeaders = () => ({
+    authorization: `Bearer ${jwt()}`,
+    accept: 'application/vnd.github+json',
+    'x-github-api-version': '2022-11-28',
+    'user-agent': UA,
+  });
+
+  async function mint(installation: string): Promise<InstallationToken> {
+    const url = `${API}/app/installations/${installation}/access_tokens`;
+    const res = await doFetch(url, { method: 'POST', headers: appHeaders() });
 
     if (!res.ok) {
       throw new GitHubError(res.status, `could not mint an installation token: ${await res.text()}`, url);
@@ -153,26 +157,69 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
     return { token: body.token, expiresAt: new Date(body.expires_at) };
   }
 
-  async function token(): Promise<string> {
-    const current = cached;
+  async function token(installation: string): Promise<string> {
+    const current = cached.get(installation);
     // The whole of R-12 in one condition: refresh *before* expiry, never after a 401.
-    if (current !== null && current.expiresAt.getTime() - now().getTime() > REFRESH_MARGIN_MS) {
+    if (current !== undefined && current.expiresAt.getTime() - now().getTime() > REFRESH_MARGIN_MS) {
       return current.token;
     }
 
-    refreshing ??= mint()
-      .then((fresh) => {
-        cached = fresh;
-        return fresh;
-      })
-      .finally(() => {
-        refreshing = null;
-      });
-
-    return (await refreshing).token;
+    let pending = refreshing.get(installation);
+    if (pending === undefined) {
+      pending = mint(installation)
+        .then((fresh) => {
+          cached.set(installation, fresh);
+          return fresh;
+        })
+        .finally(() => {
+          refreshing.delete(installation);
+        });
+      refreshing.set(installation, pending);
+    }
+    return (await pending).token;
   }
 
-  async function request(path: string, query: Record<string, string | number | undefined> = {}) {
+  /**
+   * The installation that covers a `/repos/{owner}/{repo}/…` path (GL-006).
+   *
+   * The App is installed once per account, and a repository transferred from a personal account to
+   * an organization moves to the organization's installation. One configured installation id
+   * would therefore reach only the repos still on one side, and during a migration they are on
+   * both. So the owner's installation is asked for once (`GET /repos/{owner}/{repo}/installation`,
+   * signed with the App JWT) and remembered. Anything that is not a repo path, or a repo the App
+   * cannot see (404), uses the configured installation, which is what every call used before.
+   */
+  async function installationFor(path: string): Promise<string> {
+    if (!isConfigured(config)) throw new GitHubNotConfigured();
+    const match = /^\/repos\/([^/]+)\/([^/?#]+)/.exec(path);
+    if (match === null) return fallbackInstallation;
+    const [, owner = '', repo = ''] = match;
+
+    const key = owner.toLowerCase();
+    let found = installationOf.get(key);
+    if (found === undefined) {
+      found = (async () => {
+        const url = `${API}/repos/${owner}/${repo}/installation`;
+        const res = await doFetch(url, { headers: appHeaders() });
+        if (res.status === 404) return fallbackInstallation;
+        if (!res.ok) {
+          throw new GitHubError(res.status, `could not find the installation for ${owner}: ${await res.text()}`, url);
+        }
+        const body = (await res.json()) as { id?: number };
+        return body.id === undefined ? fallbackInstallation : String(body.id);
+      })();
+      // A failed lookup is not remembered, so the next call tries again rather than failing forever.
+      found.catch(() => installationOf.delete(key));
+      installationOf.set(key, found);
+    }
+    return found;
+  }
+
+  async function request(
+    installation: string,
+    path: string,
+    query: Record<string, string | number | undefined> = {},
+  ) {
     const url = new URL(path.startsWith('http') ? path : `${API}${path}`);
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined) url.searchParams.set(key, String(value));
@@ -180,7 +227,7 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
 
     const res = await doFetch(url.toString(), {
       headers: {
-        authorization: `Bearer ${await token()}`,
+        authorization: `Bearer ${await token(installation)}`,
         accept: 'application/vnd.github+json',
         'x-github-api-version': '2022-11-28',
         'user-agent': UA,
@@ -203,16 +250,19 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
 
   return {
     async get<T>(path: string, query?: Record<string, string | number | undefined>) {
-      return (await (await request(path, query)).json()) as T;
+      return (await (await request(await installationFor(path), path, query)).json()) as T;
     },
 
     async paginate<T>(path: string, query?: Record<string, string | number | undefined>) {
       const out: T[] = [];
+      // Resolved from the first path and kept: GitHub's `next` links can name the repository by
+      // id (`/repositories/123/commits?page=2`), which says nothing about its owner.
+      const installation = await installationFor(path);
       let next: string | null = path;
       let params: Record<string, string | number | undefined> = { per_page: 100, ...query };
 
       while (next !== null) {
-        const res = await request(next, params);
+        const res = await request(installation, next, params);
         const page = (await res.json()) as T[];
         out.push(...page);
 
@@ -224,7 +274,11 @@ export function createGitHubClient(options: GitHubClientOptions): GitHubClient {
       return out;
     },
 
-    tokenExpiresAt: () => cached?.expiresAt ?? null,
+    // The configured installation's token is the one the health screen has always shown.
+    tokenExpiresAt: () =>
+      cached.get(fallbackInstallation)?.expiresAt ??
+      [...cached.values()].map((t) => t.expiresAt).sort((a, b) => a.getTime() - b.getTime())[0] ??
+      null,
   };
 }
 
