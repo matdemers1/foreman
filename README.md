@@ -49,10 +49,10 @@ been the source of truth for D3 Cloud project state since the cutover from the O
 recorded there rather than repeated here: a second copy is a copy that goes stale.
 
 The GitHub App is registered and installed, and has ingested pushes, check runs and releases
-from real GitHub since 2026-09-21. Only three repositories are linked so far — `foreman`,
-`bindery` and `d3-auth` — so the other projects' briefs show CI as unknown.
-[`docs/runbooks/github-app-setup.md`](docs/runbooks/github-app-setup.md) has the evidence, which
-projects are unlinked and why, and how to link one.
+from real GitHub since 2026-09-21. Eleven repositories across nine projects are linked
+(since 2026-10-06), so those briefs carry real CI state.
+[`docs/runbooks/github-app-setup.md`](docs/runbooks/github-app-setup.md) has the evidence, the
+linked repositories, and how to link one.
 
 ## Getting started
 
