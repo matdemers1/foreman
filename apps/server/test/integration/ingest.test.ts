@@ -299,6 +299,9 @@ describe.skipIf(url === undefined)('ingest', () => {
       const [event] = await repoAudits(repo.id);
       expect(event?.action).toBe('update');
       expect(event?.after).toEqual({ githubId: String(GITHUB_ID) });
+      // And the project's repositories still list, the id as a string (FRM-T-016: a BigInt broke JSON).
+      const listed = await get<{ items: { fullName: string; githubId: string | null }[] }>(`/projects/${CODE}/repos`);
+      expect(listed.items.find((r) => r.fullName === REPO)?.githubId).toBe(String(GITHUB_ID));
     });
 
     it('keeps ingesting after a transfer, and takes the new name', async () => {
