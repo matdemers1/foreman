@@ -122,6 +122,15 @@ export function realityRoutes(db: Db, registry?: JobRegistry): Router {
 
   // ─── Repositories (T-5.4, FRM-REQ-033, FRM-REQ-102) ──────────────────────
 
+  /**
+   * A repository row as JSON: its GitHub id is a BigInt in the database, which JSON cannot carry, so it
+   * goes out as a string — as the audit trail already records it (FRM-T-016).
+   */
+  const repoJson = <R extends { githubId: bigint | null }>(r: R): Omit<R, 'githubId'> & { githubId: string | null } => ({
+    ...r,
+    githubId: r.githubId === null ? null : r.githubId.toString(),
+  });
+
   router.get(
     '/:code/repos',
     handler(async (req, res) => {
@@ -130,7 +139,7 @@ export function realityRoutes(db: Db, registry?: JobRegistry): Router {
         where: { projectId: project.id, deletedAt: null },
         orderBy: { fullName: 'asc' },
       });
-      res.json({ items, nextCursor: null, total: items.length });
+      res.json({ items: items.map(repoJson), nextCursor: null, total: items.length });
     }),
   );
 
@@ -185,7 +194,7 @@ export function realityRoutes(db: Db, registry?: JobRegistry): Router {
           entityType: 'repo',
           entityId: created.id,
           entityHumanId: created.fullName,
-          after: created,
+          after: repoJson(created),
         });
         return created;
       });
@@ -199,7 +208,7 @@ export function realityRoutes(db: Db, registry?: JobRegistry): Router {
         });
       }
 
-      res.status(201).json(repo);
+      res.status(201).json(repoJson(repo));
     }),
   );
 
